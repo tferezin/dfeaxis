@@ -35,11 +35,7 @@ import {
   RefreshCw,
   ShieldCheck,
   Upload,
-  Play,
-  FileCheck,
-  Loader2,
 } from "lucide-react"
-import { useSettings } from "@/hooks/use-settings"
 
 interface Certificate {
   id: number
@@ -135,8 +131,6 @@ function getValidityLabel(diasRestantes: number) {
 
 export default function CertificadosPage() {
   const [sheetOpen, setSheetOpen] = useState(false)
-  const [captureStatus, setCaptureStatus] = useState<Record<number, "loading" | "done" | undefined>>({})
-  const { settings } = useSettings()
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -268,48 +262,15 @@ export default function CertificadosPage() {
                 <span className="text-sm">{cert.ultimaCaptura}</span>
               </div>
             </CardContent>
-            <CardFooter className="flex flex-col gap-2">
-              {cert.status === "Ativo" && settings.operationMode === "manual" && (
-                <div className="flex w-full gap-2">
-                  <Button
-                    variant="default"
-                    size="sm"
-                    className="flex-1 gap-1.5"
-                    onClick={() => {
-                      setCaptureStatus((s) => ({ ...s, [cert.id]: "loading" }))
-                      setTimeout(() => setCaptureStatus((s) => ({ ...s, [cert.id]: "done" })), 2000)
-                      setTimeout(() => setCaptureStatus((s) => ({ ...s, [cert.id]: undefined })), 4000)
-                    }}
-                  >
-                    {captureStatus[cert.id] === "loading" ? (
-                      <Loader2 className="size-3.5 animate-spin" />
-                    ) : captureStatus[cert.id] === "done" ? (
-                      <FileCheck className="size-3.5" />
-                    ) : (
-                      <Play className="size-3.5" />
-                    )}
-                    {captureStatus[cert.id] === "loading"
-                      ? "Capturando..."
-                      : captureStatus[cert.id] === "done"
-                        ? "0 novos docs"
-                        : "Capturar agora"}
-                  </Button>
-                  <Button variant="outline" size="sm" className="flex-1 gap-1.5">
-                    <FileCheck className="size-3.5" />
-                    Manifestar
-                  </Button>
-                </div>
-              )}
-              <div className="flex w-full gap-2">
-                <Button variant="outline" size="sm" className="flex-1 gap-1.5">
-                  <RefreshCw className="size-3.5" />
-                  Renovar
-                </Button>
-                <Button variant="destructive" size="sm" className="flex-1 gap-1.5">
-                  <Trash2 className="size-3.5" />
-                  Excluir
-                </Button>
-              </div>
+            <CardFooter className="gap-2">
+              <Button variant="outline" size="sm" className="flex-1 gap-1.5">
+                <RefreshCw className="size-3.5" />
+                Renovar
+              </Button>
+              <Button variant="destructive" size="sm" className="flex-1 gap-1.5">
+                <Trash2 className="size-3.5" />
+                Excluir
+              </Button>
             </CardFooter>
           </Card>
         ))}

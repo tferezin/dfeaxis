@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Save, Clock, Globe, Bell, AlertTriangle, Play } from "lucide-react"
+import { Save, Clock, Globe, Bell, AlertTriangle } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -135,14 +135,10 @@ export default function ConfiguracoesPage() {
             )}
 
             {settings.operationMode === "manual" && (
-              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 space-y-2">
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
                 <p className="text-xs text-blue-800">
-                  Acesse <strong>Certificados A1</strong> para capturar por CNPJ ou use o botão abaixo para capturar todos.
+                  Use o menu <strong>Captura Manual</strong> na barra lateral para disparar a captura por CNPJ ou para todos de uma vez.
                 </p>
-                <Button variant="outline" size="sm" className="gap-2 border-blue-300 text-blue-700 hover:bg-blue-100">
-                  <Play className="size-3.5" />
-                  Capturar todos os CNPJs
-                </Button>
               </div>
             )}
           </CardContent>
