@@ -1,0 +1,108 @@
+"use client"
+
+import * as React from "react"
+import { useRouter } from "next/navigation"
+import { supabase } from "@/lib/supabase"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+
+export default function LoginPage() {
+  const router = useRouter()
+  const [email, setEmail] = React.useState("")
+  const [password, setPassword] = React.useState("")
+  const [error, setError] = React.useState<string | null>(null)
+  const [loading, setLoading] = React.useState(false)
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    setLoading(true)
+
+    try {
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (authError) {
+        setError(authError.message)
+        return
+      }
+
+      router.push("/")
+      router.refresh()
+    } catch {
+      setError("Erro inesperado. Tente novamente.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="flex min-h-svh items-center justify-center bg-background px-4">
+      <div className="w-full max-w-sm">
+        <div className="mb-8 text-center">
+          <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-xl bg-primary text-primary-foreground font-bold text-lg">
+            Df
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight">DFeAxis</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Gestao inteligente de documentos fiscais
+          </p>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Entrar</CardTitle>
+            <CardDescription>
+              Insira suas credenciais para acessar o painel.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleLogin} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="email">E-mail</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="seu@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoComplete="email"
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="password">Senha</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                />
+              </div>
+
+              {error && (
+                <p className="text-sm text-destructive">{error}</p>
+              )}
+
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? "Entrando..." : "Entrar"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <p className="mt-6 text-center text-xs text-muted-foreground">
+          &copy; {new Date().getFullYear()} DFeAxis. Todos os direitos reservados.
+        </p>
+      </div>
+    </div>
+  )
+}
