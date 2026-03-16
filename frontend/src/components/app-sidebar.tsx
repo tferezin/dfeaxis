@@ -17,10 +17,12 @@ import {
   CreditCard,
   ChevronDown,
   LogOut,
+  Play,
 } from "lucide-react"
 
 import { supabase } from "@/lib/supabase"
 import { cn } from "@/lib/utils"
+import { useSettings } from "@/hooks/use-settings"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -205,6 +207,7 @@ function UserFooter() {
 
 export function AppSidebar() {
   const pathname = usePathname()
+  const { settings } = useSettings()
 
   return (
     <Sidebar collapsible="icon">
@@ -237,6 +240,36 @@ export function AppSidebar() {
             </SidebarGroupContent>
           </SidebarGroup>
         ))}
+
+        {/* Captura Manual — sempre visível, habilitado só quando modo manual */}
+        <SidebarGroup>
+          <SidebarGroupLabel>Execução</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                {settings.operationMode === "manual" ? (
+                  <SidebarMenuButton
+                    isActive={pathname === "/execucao/captura"}
+                    render={<Link href="/execucao/captura" />}
+                  >
+                    <Play className="size-4" />
+                    <span>Captura Manual</span>
+                  </SidebarMenuButton>
+                ) : (
+                  <SidebarMenuButton
+                    className="opacity-40 pointer-events-none"
+                  >
+                    <Play className="size-4" />
+                    <span>Captura Manual</span>
+                    <Badge variant="secondary" className="ml-auto text-[10px] px-1.5 py-0">
+                      Auto
+                    </Badge>
+                  </SidebarMenuButton>
+                )}
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
 
       <UserFooter />
