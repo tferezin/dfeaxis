@@ -90,9 +90,9 @@ export default function HistoricoCtePage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Historico CT-e</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">CT-e Recebidos</h1>
           <p className="text-sm text-muted-foreground">
-            Consulte e gerencie todos os Conhecimentos de Transporte Eletronicos
+            Conhecimentos de transporte recebidos via captura automatica
           </p>
         </div>
         <Button variant="outline">

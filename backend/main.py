@@ -93,7 +93,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="DFeAxis API",
-    description="Distribuição automática de DF-e da SEFAZ para SAP DRC",
+    description="Captura automática de documentos fiscais recebidos da SEFAZ para SAP DRC",
     version="0.1.0",
     lifespan=lifespan,
 )
@@ -203,4 +203,8 @@ app.include_router(nfse.router, prefix="/api/v1", tags=["NFS-e"])
 
 @app.get("/health")
 async def health_check():
-    return {"status": "ok", "service": "dfeaxis"}
+    return {
+        "status": "ok",
+        "service": "dfeaxis",
+        "tagline": "Captura automática de documentos fiscais recebidos da SEFAZ para SAP DRC",
+    }

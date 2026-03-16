@@ -23,7 +23,7 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-sm text-muted-foreground">
-            Visao geral dos seus documentos fiscais
+            Visao geral dos documentos recebidos
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -48,31 +48,31 @@ export default function DashboardPage() {
       {/* Stat cards grid */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="NF-e"
+          title="NF-e Recebidas"
           value="1.247"
           icon={<FileText className="h-5 w-5" />}
           period="Ultimos 30 dias"
           trend={{ value: 12.5, label: "vs. mes anterior" }}
           color="text-blue-600"
           subCounts={[
-            { label: "Entrada", value: 843, color: "bg-blue-50 text-blue-700" },
-            { label: "Saida", value: 404, color: "bg-indigo-50 text-indigo-700" },
+            { label: "Autorizadas", value: 1105, color: "bg-blue-50 text-blue-700" },
+            { label: "Canceladas", value: 142, color: "bg-indigo-50 text-indigo-700" },
           ]}
         />
         <StatCard
-          title="CT-e"
+          title="CT-e Recebidos"
           value="384"
           icon={<Truck className="h-5 w-5" />}
           period="Ultimos 30 dias"
           trend={{ value: 8.3, label: "vs. mes anterior" }}
           color="text-violet-600"
           subCounts={[
-            { label: "Recebidos", value: 312, color: "bg-violet-50 text-violet-700" },
-            { label: "Emitidos", value: 72, color: "bg-purple-50 text-purple-700" },
+            { label: "Autorizados", value: 352, color: "bg-violet-50 text-violet-700" },
+            { label: "Cancelados", value: 32, color: "bg-purple-50 text-purple-700" },
           ]}
         />
         <StatCard
-          title="MDF-e"
+          title="MDF-e Recebidos"
           value="56"
           icon={<FileCheck className="h-5 w-5" />}
           period="Ultimos 30 dias"
@@ -84,7 +84,7 @@ export default function DashboardPage() {
           ]}
         />
         <StatCard
-          title="NFS-e"
+          title="NFS-e Recebidas"
           value="12"
           icon={<Receipt className="h-5 w-5" />}
           period="Ultimos 30 dias"
@@ -92,8 +92,8 @@ export default function DashboardPage() {
           badge="ADN"
           color="text-amber-600"
           subCounts={[
-            { label: "Prestadas", value: 8, color: "bg-amber-50 text-amber-700" },
-            { label: "Tomadas", value: 4, color: "bg-orange-50 text-orange-700" },
+            { label: "Autorizadas", value: 10, color: "bg-amber-50 text-amber-700" },
+            { label: "Canceladas", value: 2, color: "bg-orange-50 text-orange-700" },
           ]}
         />
       </div>
@@ -110,18 +110,11 @@ export default function DashboardPage() {
           period="Mar 2026"
           items={[
             {
-              label: "Recebidas",
-              value: "R$ 1.923.450,30",
-              amount: 1923450,
+              label: "Autorizadas",
+              value: "R$ 2.847.320,45",
+              amount: 2847320,
               color: "text-emerald-600",
               bgColor: "bg-emerald-500",
-            },
-            {
-              label: "Emitidas",
-              value: "R$ 987.120,15",
-              amount: 987120,
-              color: "text-blue-600",
-              bgColor: "bg-blue-500",
             },
             {
               label: "Canceladas",
@@ -140,18 +133,11 @@ export default function DashboardPage() {
           period="Mar 2026"
           items={[
             {
-              label: "Recebidos",
-              value: "R$ 342.560,70",
-              amount: 342560,
+              label: "Autorizados",
+              value: "R$ 442.570,90",
+              amount: 442570,
               color: "text-emerald-600",
               bgColor: "bg-emerald-500",
-            },
-            {
-              label: "Emitidos",
-              value: "R$ 128.430,20",
-              amount: 128430,
-              color: "text-blue-600",
-              bgColor: "bg-blue-500",
             },
             {
               label: "Cancelados",

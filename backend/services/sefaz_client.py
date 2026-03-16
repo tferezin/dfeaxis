@@ -1,6 +1,7 @@
-"""Cliente SOAP para distribuição de DF-e da SEFAZ (NF-e, CT-e, MDF-e).
+"""Cliente SOAP para captura automática de documentos fiscais recebidos da SEFAZ (NF-e, CT-e, MDF-e).
 
 Usa zeep para SOAP + mTLS com certificado A1 do cliente.
+Captura notas de fornecedores via distribuição de DF-e.
 """
 
 import base64
@@ -26,7 +27,7 @@ logger = logging.getLogger(__name__)
 SEFAZ_ENDPOINTS = {
     "nfe": {
         "1": "https://www1.nfe.fazenda.gov.br/NFeDistribuicaoDFe/NFeDistribuicaoDFe.asmx?wsdl",
-        "2": "https://hom1.nfe.fazenda.gov.br/NFeDistribuicaoDFe/NFeDistribuicaoDFe.asmx?wsdl",
+        "2": "https://hom.nfe.fazenda.gov.br/NFeDistribuicaoDFe/NFeDistribuicaoDFe.asmx?wsdl",
     },
     "cte": {
         "1": "https://www1.cte.fazenda.gov.br/CTeDistribuicaoDFe/CTeDistribuicaoDFe.asmx?wsdl",
@@ -34,7 +35,7 @@ SEFAZ_ENDPOINTS = {
     },
     "mdfe": {
         "1": "https://mdfe.svrs.rs.gov.br/ws/MDFeDistribuicaoDFe/MDFeDistribuicaoDFe.asmx?wsdl",
-        "2": "https://mdfe-homologacao.svrs.rs.gov.br/ws/MDFeDistribuicaoDFe/MDFeDistribuicaoDFe.asmx?wsdl",
+        "2": "https://hom.mdfe.fazenda.gov.br/MdFeDistribuicaoDFe/MdFeDistribuicaoDFe.asmx?wsdl",
     },
 }
 
@@ -68,7 +69,7 @@ class SefazResponse:
 
 
 class SefazClient:
-    """Cliente para consultar DF-e na SEFAZ via SOAP + mTLS."""
+    """Cliente para captura automática de documentos recebidos da SEFAZ via SOAP + mTLS."""
 
     def __init__(self):
         self.ambiente = os.getenv("SEFAZ_AMBIENTE", "2")  # default homologação
@@ -85,10 +86,10 @@ class SefazClient:
         cuf_autor: str = "35",  # SP default
         ambiente: str | None = None,  # per-tenant override
     ) -> SefazResponse:
-        """Consulta distribuição de DF-e na SEFAZ.
+        """Consulta documentos recebidos (notas de fornecedores) na SEFAZ.
 
         Args:
-            cnpj: CNPJ do destinatário
+            cnpj: CNPJ da empresa (documentos recebidos)
             tipo: 'nfe', 'cte' ou 'mdfe'
             ult_nsu: Último NSU processado
             pfx_encrypted: Certificado .pfx cifrado — hex string from DB

@@ -12,7 +12,7 @@ export const metadata: Metadata = {
     default: "DFeAxis",
     template: "%s | DFeAxis",
   },
-  description: "Gestao inteligente de documentos fiscais eletronicos",
+  description: "Captura automatica de documentos fiscais recebidos da SEFAZ para SAP DRC",
 }
 
 export default function RootLayout({

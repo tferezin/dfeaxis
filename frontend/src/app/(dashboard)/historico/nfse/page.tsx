@@ -97,13 +97,13 @@ export default function HistoricoNfsePage() {
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">Historico NFS-e</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">NFS-e Recebidas</h1>
             <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-[10px]">
               ADN
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground">
-            Consulte as Notas Fiscais de Servico via Ambiente Nacional
+            Notas fiscais de servico recebidas via Ambiente Nacional
           </p>
         </div>
         <Button variant="outline">
@@ -116,9 +116,8 @@ export default function HistoricoNfsePage() {
       <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
         <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
         <p>
-          A integracao com o Ambiente Nacional de NFS-e esta ativa. Alguns municipios podem ainda nao
-          ter aderido ao sistema nacional. Registros podem estar indisponiveis para localidades com
-          adesao pendente.
+          A cobertura de NFS-e depende da adesao do municipio ao padrao nacional.
+          Consulte gov.br/nfse.
         </p>
       </div>
 

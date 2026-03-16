@@ -79,12 +79,12 @@ const navigation: NavSection[] = [
     ],
   },
   {
-    label: "Histórico",
+    label: "Documentos Recebidos",
     items: [
-      { title: "NF-e", href: "/historico/nfe", icon: FileText },
-      { title: "CT-e", href: "/historico/cte", icon: Truck },
-      { title: "NFS-e", href: "/historico/nfse", icon: Building2, badge: "ADN" },
-      { title: "MDF-e", href: "/historico/mdfe", icon: FileStack },
+      { title: "NF-e Recebidas", href: "/historico/nfe", icon: FileText },
+      { title: "CT-e Recebidos", href: "/historico/cte", icon: Truck },
+      { title: "NFS-e Recebidas", href: "/historico/nfse", icon: Building2, badge: "ADN" },
+      { title: "MDF-e Recebidos", href: "/historico/mdfe", icon: FileStack },
     ],
   },
   {
@@ -116,7 +116,6 @@ function NavItemLink({
     <SidebarMenuItem>
       <SidebarMenuButton
         isActive={isActive}
-        tooltip={item.title}
         render={<Link href={item.href} />}
       >
         <Icon className="size-4" />
@@ -156,22 +155,9 @@ function UserFooter() {
     ? email.slice(0, 2).toUpperCase()
     : "U"
 
-  const isHomologacao = process.env.NEXT_PUBLIC_SEFAZ_ENV !== "producao"
-
   return (
     <SidebarFooter>
       <SidebarSeparator />
-      {isHomologacao ? (
-        <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium">
-          <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-          Homologacao
-        </div>
-      ) : (
-        <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium">
-          <span className="h-2 w-2 rounded-full bg-emerald-500" />
-          Producao
-        </div>
-      )}
       <DropdownMenu>
         <DropdownMenuTrigger
           className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-sm hover:bg-sidebar-accent transition-colors outline-none"
@@ -210,7 +196,7 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader className="p-4">
         <Link href="/" className="flex items-center gap-2">
-          <Image src="/logo-dfeaxis.png" alt="DFeAxis" width={140} height={40} className="object-contain" />
+          <Image src="/logo-dfeaxis.png" alt="DFeAxis" width={140} height={40} className="object-contain" unoptimized />
         </Link>
       </SidebarHeader>
 

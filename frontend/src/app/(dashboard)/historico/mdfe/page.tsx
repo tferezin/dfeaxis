@@ -91,9 +91,9 @@ export default function HistoricoMdfePage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Historico MDF-e</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">MDF-e Recebidos</h1>
           <p className="text-sm text-muted-foreground">
-            Consulte e gerencie todos os Manifestos Eletronicos de Documentos Fiscais
+            Manifestos eletronicos recebidos via captura automatica
           </p>
         </div>
         <Button variant="outline">

@@ -16,6 +16,10 @@ export default function DashboardLayout({
           <SidebarTrigger />
           <Separator orientation="vertical" className="h-5" />
           <div className="flex-1" />
+          <div className="flex items-center gap-2 rounded-md bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium px-2.5 py-1">
+            <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+            Homologação
+          </div>
         </header>
         <div className="flex-1 p-6">{children}</div>
         <AppFooter />

@@ -53,7 +53,10 @@ export default function LoginPage() {
         <div className="mb-8 text-center">
           <Image src="/logo-dfeaxis.png" alt="DFeAxis" width={200} height={56} className="mx-auto mb-4" />
           <p className="text-sm text-muted-foreground mt-1">
-            Gestao inteligente de documentos fiscais
+            Captura automatica de documentos fiscais recebidos
+          </p>
+          <p className="text-xs text-muted-foreground mt-2 max-w-[300px] mx-auto leading-relaxed">
+            Seus fornecedores emitem. A SEFAZ guarda. O DFeAxis entrega no SAP.
           </p>
         </div>
 

@@ -44,7 +44,7 @@ interface Certificate {
   validadeDe: string
   validadeAte: string
   status: "Ativo" | "Inativo"
-  ultimoPolling: string
+  ultimaCaptura: string
   diasRestantes: number
 }
 
@@ -56,7 +56,7 @@ const mockCertificates: Certificate[] = [
     validadeDe: "01/04/2025",
     validadeAte: "01/04/2027",
     status: "Ativo",
-    ultimoPolling: "16/03/2026 08:30",
+    ultimaCaptura: "16/03/2026 08:30",
     diasRestantes: 381,
   },
   {
@@ -66,7 +66,7 @@ const mockCertificates: Certificate[] = [
     validadeDe: "15/06/2025",
     validadeAte: "15/06/2026",
     status: "Ativo",
-    ultimoPolling: "16/03/2026 08:25",
+    ultimaCaptura: "16/03/2026 08:25",
     diasRestantes: 91,
   },
   {
@@ -76,7 +76,7 @@ const mockCertificates: Certificate[] = [
     validadeDe: "10/01/2025",
     validadeAte: "10/04/2026",
     status: "Ativo",
-    ultimoPolling: "16/03/2026 08:20",
+    ultimaCaptura: "16/03/2026 08:20",
     diasRestantes: 25,
   },
   {
@@ -86,7 +86,7 @@ const mockCertificates: Certificate[] = [
     validadeDe: "20/03/2024",
     validadeAte: "20/03/2025",
     status: "Inativo",
-    ultimoPolling: "20/03/2025 12:00",
+    ultimaCaptura: "20/03/2025 12:00",
     diasRestantes: -361,
   },
   {
@@ -96,7 +96,7 @@ const mockCertificates: Certificate[] = [
     validadeDe: "05/08/2025",
     validadeAte: "05/08/2027",
     status: "Ativo",
-    ultimoPolling: "16/03/2026 08:15",
+    ultimaCaptura: "16/03/2026 08:15",
     diasRestantes: 507,
   },
   {
@@ -106,7 +106,7 @@ const mockCertificates: Certificate[] = [
     validadeDe: "12/11/2025",
     validadeAte: "12/11/2026",
     status: "Ativo",
-    ultimoPolling: "16/03/2026 08:10",
+    ultimaCaptura: "16/03/2026 08:10",
     diasRestantes: 241,
   },
 ]
@@ -155,7 +155,7 @@ export default function CertificadosPage() {
             <SheetHeader>
               <SheetTitle>Upload de Certificado</SheetTitle>
               <SheetDescription>
-                Envie um certificado digital A1 (.pfx) para iniciar o polling automatico.
+                Envie um certificado digital A1 (.pfx) para iniciar a captura automatica.
               </SheetDescription>
             </SheetHeader>
             <div className="flex flex-col gap-4 px-4">
@@ -191,7 +191,7 @@ export default function CertificadosPage() {
               <Separator />
 
               <div className="flex flex-col gap-2">
-                <Label>Modo de polling</Label>
+                <Label>Modo de captura</Label>
                 <Select defaultValue="automatico">
                   <SelectTrigger className="w-full">
                     <SelectValue />
@@ -258,8 +258,8 @@ export default function CertificadosPage() {
               </div>
 
               <div className="flex flex-col gap-1">
-                <span className="text-xs font-medium text-muted-foreground">Ultimo polling</span>
-                <span className="text-sm">{cert.ultimoPolling}</span>
+                <span className="text-xs font-medium text-muted-foreground">Ultima captura</span>
+                <span className="text-sm">{cert.ultimaCaptura}</span>
               </div>
             </CardContent>
             <CardFooter className="gap-2">
