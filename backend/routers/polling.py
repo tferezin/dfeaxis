@@ -36,7 +36,7 @@ async def trigger_polling(
 
     # Busca tenant data
     tenant = sb.table("tenants").select(
-        "id, polling_mode, credits"
+        "id, polling_mode, credits, sefaz_ambiente"
     ).eq("id", tenant_id).single().execute()
 
     total_docs = 0

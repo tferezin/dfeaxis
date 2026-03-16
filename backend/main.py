@@ -22,7 +22,7 @@ from middleware.security import (
     RateLimitMiddleware,
     request_id_ctx,
 )
-from routers import documents, certificates, polling, credits, api_keys, tenants, manifestacao
+from routers import documents, certificates, polling, credits, api_keys, tenants, manifestacao, nfse
 from scheduler.polling_job import start_scheduler, stop_scheduler
 
 
@@ -198,6 +198,7 @@ app.include_router(credits.router, prefix="/api/v1", tags=["Créditos"])
 app.include_router(api_keys.router, prefix="/api/v1", tags=["API Keys"])
 app.include_router(tenants.router, prefix="/api/v1", tags=["Tenants"])
 app.include_router(manifestacao.router, prefix="/api/v1", tags=["Manifestação"])
+app.include_router(nfse.router, prefix="/api/v1", tags=["NFS-e"])
 
 
 @app.get("/health")

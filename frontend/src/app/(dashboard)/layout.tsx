@@ -1,5 +1,6 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
+import { AppFooter } from "@/components/app-footer"
 import { Separator } from "@/components/ui/separator"
 
 export default function DashboardLayout({
@@ -17,6 +18,7 @@ export default function DashboardLayout({
           <div className="flex-1" />
         </header>
         <div className="flex-1 p-6">{children}</div>
+        <AppFooter />
       </main>
     </SidebarProvider>
   )

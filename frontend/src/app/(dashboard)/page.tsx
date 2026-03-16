@@ -85,11 +85,16 @@ export default function DashboardPage() {
         />
         <StatCard
           title="NFS-e"
-          value="--"
+          value="12"
           icon={<Receipt className="h-5 w-5" />}
-          period=""
-          badge="Em breve"
+          period="Ultimos 30 dias"
+          trend={{ value: 4.1, label: "vs. mes anterior" }}
+          badge="ADN"
           color="text-amber-600"
+          subCounts={[
+            { label: "Prestadas", value: 8, color: "bg-amber-50 text-amber-700" },
+            { label: "Tomadas", value: 4, color: "bg-orange-50 text-orange-700" },
+          ]}
         />
       </div>
 

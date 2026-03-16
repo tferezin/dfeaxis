@@ -66,6 +66,7 @@ class ManifestacaoService:
         tenant_id: str,
         pfx_password: str,
         justificativa: str = "",
+        ambiente: str | None = None,  # per-tenant override
     ) -> ManifestacaoResponse:
         """Envia evento de manifestação para uma NF-e.
 
@@ -109,12 +110,13 @@ class ManifestacaoService:
             )
 
         pfx_bytes = decrypt_pfx(pfx_encrypted, pfx_iv, tenant_id)
+        effective_ambiente = ambiente or self.ambiente
 
         start_time = time.time()
         try:
             result = self._soap_call(
                 chave_acesso, cnpj, tipo_evento, pfx_bytes,
-                pfx_password, justificativa,
+                pfx_password, justificativa, effective_ambiente,
             )
             circuit_breaker.record_success(cb_key, "evento")
             return result
@@ -138,9 +140,11 @@ class ManifestacaoService:
         pfx_bytes: bytes,
         pfx_password: str,
         justificativa: str,
+        ambiente: str | None = None,
     ) -> ManifestacaoResponse:
         """Executa chamada SOAP ao RecepcaoEvento."""
-        endpoint = RECEPCAO_EVENTO_ENDPOINTS[self.ambiente]
+        effective_ambiente = ambiente or self.ambiente
+        endpoint = RECEPCAO_EVENTO_ENDPOINTS[effective_ambiente]
         start_time = time.time()
 
         with temp_cert_files(pfx_bytes, pfx_password) as (cert_path, key_path):
@@ -153,6 +157,7 @@ class ManifestacaoService:
 
             xml_evento = self._build_evento_xml(
                 chave_acesso, cnpj, tipo_evento, justificativa,
+                effective_ambiente,
             )
 
             response = client.service.nfeRecepcaoEvento(nfeDadosMsg=xml_evento)
@@ -166,8 +171,10 @@ class ManifestacaoService:
         cnpj: str,
         tipo_evento: str,
         justificativa: str,
+        ambiente: str | None = None,
     ) -> etree._Element:
         """Monta XML do envEvento para Manifestação do Destinatário."""
+        effective_ambiente = ambiente or self.ambiente
         nsmap = {None: NFE_NS}
 
         # envEvento
@@ -185,7 +192,7 @@ class ManifestacaoService:
         inf_evento.set("Id", f"ID{tipo_evento}{chave_acesso}01")
 
         etree.SubElement(inf_evento, "cOrgao").text = "91"  # AN (Ambiente Nacional)
-        etree.SubElement(inf_evento, "tpAmb").text = self.ambiente
+        etree.SubElement(inf_evento, "tpAmb").text = effective_ambiente
         etree.SubElement(inf_evento, "CNPJ").text = cnpj
         etree.SubElement(inf_evento, "chNFe").text = chave_acesso
         now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S-00:00")

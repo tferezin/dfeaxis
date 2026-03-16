@@ -10,11 +10,12 @@ from middleware.lgpd import mask_cnpj
 from services.cert_manager import decrypt_password
 from services.manifestacao import manifestacao_service
 from services.sefaz_client import sefaz_client
+from services.nfse_client import nfse_client
 from services.nsu_controller import nsu_controller
 
 logger = logging.getLogger(__name__)
 
-TIPOS = ["nfe", "cte", "mdfe"]
+TIPOS = ["nfe", "cte", "mdfe", "nfse"]
 
 
 def polling_job():
@@ -24,7 +25,7 @@ def polling_job():
     # Busca todos os certificados ativos com polling automático
     result = sb.table("certificates").select(
         "id, tenant_id, cnpj, pfx_encrypted, pfx_iv, "
-        "last_nsu_nfe, last_nsu_cte, last_nsu_mdfe"
+        "last_nsu_nfe, last_nsu_cte, last_nsu_mdfe, last_nsu_nfse"
     ).eq("is_active", True).execute()
 
     if not result.data:
@@ -34,7 +35,7 @@ def polling_job():
     # Busca tenants com polling_mode='auto' e créditos > 0
     for cert in result.data:
         tenant = sb.table("tenants").select(
-            "id, polling_mode, manifestacao_mode, credits"
+            "id, polling_mode, manifestacao_mode, credits, sefaz_ambiente"
         ).eq("id", cert["tenant_id"]).single().execute()
 
         if not tenant.data:
@@ -56,6 +57,10 @@ def polling_job():
 
 def _poll_single(cert: dict, tipo: str, tenant_data: dict) -> int:
     """Executa polling de um único CNPJ/tipo. Retorna quantidade de docs encontrados."""
+    # NFS-e usa ADN (REST) em vez de SEFAZ (SOAP)
+    if tipo == "nfse":
+        return _poll_nfse(cert, tenant_data)
+
     sb = get_supabase_client()
     tenant_id = cert["tenant_id"]
     cnpj = cert["cnpj"]
@@ -73,6 +78,8 @@ def _poll_single(cert: dict, tipo: str, tenant_data: dict) -> int:
     if isinstance(pfx_iv, str):
         pfx_iv = bytes.fromhex(pfx_iv.replace("\\x", ""))
 
+    ambiente = tenant_data.get("sefaz_ambiente", "2")
+
     try:
         response = sefaz_client.consultar_distribuicao(
             cnpj=cnpj,
@@ -82,6 +89,7 @@ def _poll_single(cert: dict, tipo: str, tenant_data: dict) -> int:
             pfx_iv=pfx_iv,
             tenant_id=tenant_id,
             pfx_password=pfx_password,
+            ambiente=ambiente,
         )
 
         docs_found = len(response.documents)
@@ -151,6 +159,7 @@ def _poll_single(cert: dict, tipo: str, tenant_data: dict) -> int:
             _auto_ciencia(
                 response.documents[:docs_found],
                 cert, tenant_id, pfx_encrypted, pfx_iv, pfx_password,
+                ambiente=ambiente,
             )
 
         # Atualiza último NSU
@@ -177,6 +186,101 @@ def _poll_single(cert: dict, tipo: str, tenant_data: dict) -> int:
         return 0
 
 
+def _poll_nfse(cert: dict, tenant_data: dict) -> int:
+    """Executa polling de NFS-e via ADN (REST). Retorna quantidade de docs encontrados."""
+    sb = get_supabase_client()
+    tenant_id = cert["tenant_id"]
+    cnpj = cert["cnpj"]
+    ult_nsu = cert.get("last_nsu_nfse", "000000000000000")
+
+    pfx_password = _get_pfx_password(cert["id"], tenant_id)
+    if not pfx_password:
+        return 0
+
+    pfx_encrypted = cert["pfx_encrypted"]
+    pfx_iv = cert["pfx_iv"]
+    if isinstance(pfx_encrypted, str):
+        pfx_encrypted = bytes.fromhex(pfx_encrypted.replace("\\x", ""))
+    if isinstance(pfx_iv, str):
+        pfx_iv = bytes.fromhex(pfx_iv.replace("\\x", ""))
+
+    try:
+        response = nfse_client.consultar_dps_distribuicao(
+            cnpj=cnpj,
+            ult_nsu=ult_nsu,
+            pfx_encrypted=pfx_encrypted,
+            pfx_iv=pfx_iv,
+            tenant_id=tenant_id,
+            pfx_password=pfx_password,
+        )
+
+        docs_found = len(response.documents)
+
+        # Log do polling
+        sb.table("polling_log").insert({
+            "tenant_id": tenant_id,
+            "cnpj": cnpj,
+            "tipo": "nfse",
+            "triggered_by": "scheduler",
+            "status": "success" if response.success else "error",
+            "docs_found": docs_found,
+            "ult_nsu": response.ult_nsu,
+            "latency_ms": response.latency_ms,
+            "error_message": response.message if not response.success else None,
+        }).execute()
+
+        if docs_found == 0:
+            return 0
+
+        # Debit credits atomically via RPC
+        try:
+            sb.rpc("debit_credits", {
+                "p_tenant_id": tenant_id,
+                "p_amount": -docs_found,
+                "p_description": f"Polling NFSE CNPJ {mask_cnpj(cnpj)}: {docs_found} docs",
+            }).execute()
+        except Exception as credit_err:
+            logger.warning(
+                f"Tenant {tenant_id} insufficient credits for {docs_found} NFS-e docs: {credit_err}"
+            )
+            return 0
+
+        # Salva documentos
+        for doc in response.documents:
+            sb.table("documents").upsert({
+                "tenant_id": tenant_id,
+                "cnpj": cnpj,
+                "tipo": "NFSE",
+                "chave_acesso": doc.chave,
+                "nsu": doc.nsu,
+                "xml_content": doc.xml_content,
+                "status": "available",
+                "is_resumo": False,
+                "manifestacao_status": "nao_aplicavel",
+                "codigo_municipio": doc.codigo_municipio,
+                "codigo_servico": doc.codigo_servico,
+            }, on_conflict="tenant_id,chave_acesso").execute()
+
+        # Atualiza ultimo NSU
+        sb.table("certificates").update({
+            "last_nsu_nfse": response.ult_nsu,
+        }).eq("id", cert["id"]).execute()
+
+        return docs_found
+
+    except Exception as e:
+        logger.error(f"Erro no polling NFS-e {mask_cnpj(cnpj)}: {e}")
+        sb.table("polling_log").insert({
+            "tenant_id": tenant_id,
+            "cnpj": cnpj,
+            "tipo": "nfse",
+            "triggered_by": "scheduler",
+            "status": "error",
+            "error_message": str(e),
+        }).execute()
+        return 0
+
+
 def _auto_ciencia(
     documents: list,
     cert: dict,
@@ -184,6 +288,7 @@ def _auto_ciencia(
     pfx_encrypted: bytes,
     pfx_iv: bytes,
     pfx_password: str,
+    ambiente: str = "2",
 ) -> None:
     """Envia Ciência da Operação (210210) automaticamente para resumos NF-e."""
     sb = get_supabase_client()
@@ -202,6 +307,7 @@ def _auto_ciencia(
                 pfx_iv=pfx_iv,
                 tenant_id=tenant_id,
                 pfx_password=pfx_password,
+                ambiente=ambiente,
             )
 
             if result.success:
@@ -271,7 +377,7 @@ def run_retroactive_job(
         return
 
     cert = cert_result.data[0]
-    tenant = sb.table("tenants").select("id, polling_mode, manifestacao_mode, credits").eq(
+    tenant = sb.table("tenants").select("id, polling_mode, manifestacao_mode, credits, sefaz_ambiente").eq(
         "id", tenant_id
     ).single().execute()
 

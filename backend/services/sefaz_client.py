@@ -83,6 +83,7 @@ class SefazClient:
         tenant_id: str,
         pfx_password: str,
         cuf_autor: str = "35",  # SP default
+        ambiente: str | None = None,  # per-tenant override
     ) -> SefazResponse:
         """Consulta distribuição de DF-e na SEFAZ.
 
@@ -121,10 +122,13 @@ class SefazClient:
             iv_bytes = bytes.fromhex(pfx_iv) if isinstance(pfx_iv, str) else pfx_iv
             pfx_bytes = decrypt_pfx(enc_bytes, iv_bytes, tenant_id)
 
+        effective_ambiente = ambiente or self.ambiente
+
         start_time = time.time()
         try:
             result = self._soap_call(
-                cnpj, tipo, ult_nsu, pfx_bytes, pfx_password, cuf_autor
+                cnpj, tipo, ult_nsu, pfx_bytes, pfx_password, cuf_autor,
+                effective_ambiente,
             )
             circuit_breaker.record_success(cnpj, tipo)
             return result
@@ -149,10 +153,12 @@ class SefazClient:
         pfx_bytes: bytes,
         pfx_password: str,
         cuf_autor: str,
+        ambiente: str | None = None,
     ) -> SefazResponse:
         """Executa a chamada SOAP real à SEFAZ."""
+        effective_ambiente = ambiente or self.ambiente
         ns = NAMESPACES[tipo]
-        endpoint = SEFAZ_ENDPOINTS[tipo][self.ambiente]
+        endpoint = SEFAZ_ENDPOINTS[tipo][effective_ambiente]
 
         start_time = time.time()
 
@@ -167,7 +173,7 @@ class SefazClient:
 
             # Monta o XML do request
             xml_request = self._build_dist_dfe_xml(
-                cnpj, tipo, ult_nsu, cuf_autor, ns
+                cnpj, tipo, ult_nsu, cuf_autor, ns, effective_ambiente,
             )
 
             # Nome do service/operation varia por tipo
@@ -178,16 +184,18 @@ class SefazClient:
         return self._parse_response(response, tipo, latency_ms)
 
     def _build_dist_dfe_xml(
-        self, cnpj: str, tipo: str, ult_nsu: str, cuf_autor: str, ns: str
+        self, cnpj: str, tipo: str, ult_nsu: str, cuf_autor: str, ns: str,
+        ambiente: str | None = None,
     ) -> etree._Element:
         """Monta o XML distDFeInt."""
+        effective_ambiente = ambiente or self.ambiente
         tag_prefix = {"nfe": "nfe", "cte": "cte", "mdfe": "mdfe"}[tipo]
         nsmap = {None: ns}
 
         root = etree.Element(f"distDFeInt", nsmap=nsmap)
         root.set("versao", "1.01")
 
-        etree.SubElement(root, "tpAmb").text = self.ambiente
+        etree.SubElement(root, "tpAmb").text = effective_ambiente
         etree.SubElement(root, "cUFAutor").text = cuf_autor
         etree.SubElement(root, "CNPJ").text = cnpj
 

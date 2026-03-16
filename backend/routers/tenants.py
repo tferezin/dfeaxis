@@ -56,18 +56,22 @@ async def get_tenant(auth: dict = Depends(verify_jwt_token)):
 async def update_settings(
     polling_mode: str = Body(None, pattern=r"^(manual|auto)$"),
     manifestacao_mode: str = Body(None, pattern=r"^(auto_ciencia|manual)$"),
+    sefaz_ambiente: str = Body(None, pattern=r"^(1|2)$"),
     auth: dict = Depends(verify_jwt_token),
 ):
     """Atualiza configurações do tenant.
 
     - polling_mode: 'manual' ou 'auto' (polling automático a cada 15 min)
     - manifestacao_mode: 'auto_ciencia' (Ciência automática) ou 'manual'
+    - sefaz_ambiente: '1' (Produção) ou '2' (Homologação)
     """
     updates = {}
     if polling_mode is not None:
         updates["polling_mode"] = polling_mode
     if manifestacao_mode is not None:
         updates["manifestacao_mode"] = manifestacao_mode
+    if sefaz_ambiente is not None:
+        updates["sefaz_ambiente"] = sefaz_ambiente
 
     if not updates:
         raise HTTPException(status_code=400, detail="Nenhum campo para atualizar")

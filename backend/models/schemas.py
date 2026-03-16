@@ -218,3 +218,31 @@ class SefazEndpointStatus(BaseModel):
 
 class SefazStatusResponse(BaseModel):
     endpoints: list[SefazEndpointStatus]
+
+
+# --- NFS-e (Ambiente Nacional - ADN) ---
+
+class NfseOut(BaseModel):
+    chave: str
+    nsu: str
+    xml_content: str
+    codigo_municipio: Optional[str] = None
+    codigo_servico: Optional[str] = None
+    data_emissao: Optional[str] = None
+    valor_servico: Optional[str] = None
+
+
+class NfseListResponse(BaseModel):
+    cnpj: str
+    documentos: list[NfseOut]
+    total: int
+    disclaimer: str = ""
+
+
+class NfsePollingResponse(BaseModel):
+    status: str
+    cnpj: str
+    docs_found: int = 0
+    ult_nsu: str
+    message: str
+    disclaimer: str = ""

@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
@@ -21,6 +22,12 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
+      if (!supabase) {
+        // Demo mode — no Supabase configured
+        router.push("/")
+        return
+      }
+
       const { error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -44,10 +51,7 @@ export default function LoginPage() {
     <div className="flex min-h-svh items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-xl bg-primary text-primary-foreground font-bold text-lg">
-            Df
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight">DFeAxis</h1>
+          <Image src="/logo-dfeaxis.png" alt="DFeAxis" width={200} height={56} className="mx-auto mb-4" />
           <p className="text-sm text-muted-foreground mt-1">
             Gestao inteligente de documentos fiscais
           </p>

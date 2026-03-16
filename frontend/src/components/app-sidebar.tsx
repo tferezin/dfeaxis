@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import Image from "next/image"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
@@ -82,7 +83,7 @@ const navigation: NavSection[] = [
     items: [
       { title: "NF-e", href: "/historico/nfe", icon: FileText },
       { title: "CT-e", href: "/historico/cte", icon: Truck },
-      { title: "NFS-e", href: "/historico/nfse", icon: Building2, badge: "Em breve" },
+      { title: "NFS-e", href: "/historico/nfse", icon: Building2, badge: "ADN" },
       { title: "MDF-e", href: "/historico/mdfe", icon: FileStack },
     ],
   },
@@ -135,13 +136,19 @@ function UserFooter() {
   const [email, setEmail] = React.useState<string | null>(null)
 
   React.useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setEmail(data.user?.email ?? null)
-    })
+    if (supabase) {
+      supabase.auth.getUser().then(({ data }) => {
+        setEmail(data.user?.email ?? null)
+      })
+    } else {
+      setEmail("demo@dfeaxis.com.br")
+    }
   }, [])
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
+    if (supabase) {
+      await supabase.auth.signOut()
+    }
     router.push("/login")
   }
 
@@ -149,9 +156,22 @@ function UserFooter() {
     ? email.slice(0, 2).toUpperCase()
     : "U"
 
+  const isHomologacao = process.env.NEXT_PUBLIC_SEFAZ_ENV !== "producao"
+
   return (
     <SidebarFooter>
       <SidebarSeparator />
+      {isHomologacao ? (
+        <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium">
+          <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+          Homologacao
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium">
+          <span className="h-2 w-2 rounded-full bg-emerald-500" />
+          Producao
+        </div>
+      )}
       <DropdownMenu>
         <DropdownMenuTrigger
           className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-sm hover:bg-sidebar-accent transition-colors outline-none"
@@ -190,12 +210,7 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader className="p-4">
         <Link href="/" className="flex items-center gap-2">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm">
-            Df
-          </div>
-          <span className="text-lg font-bold tracking-tight group-data-[collapsible=icon]:hidden">
-            DFeAxis
-          </span>
+          <Image src="/logo-dfeaxis.png" alt="DFeAxis" width={140} height={40} className="object-contain" />
         </Link>
       </SidebarHeader>
 
