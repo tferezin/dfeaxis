@@ -11,13 +11,14 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.serialization import pkcs12
 
 
-def _derive_key(tenant_id: str) -> bytes:
+def _derive_key(tenant_id: str, purpose: str = "pfx") -> bytes:
     """Deriva chave AES-256 do tenant_id + CERT_MASTER_SECRET."""
     secret = os.environ["CERT_MASTER_SECRET"]
+    salt = f"dfeaxis_{purpose}_v1".encode()
     return hashlib.pbkdf2_hmac(
         "sha256",
         (tenant_id + secret).encode(),
-        b"dfeaxis_salt_v1",
+        salt,
         100_000,
     )
 
@@ -47,6 +48,37 @@ def decrypt_pfx(encrypted: bytes, iv: bytes, tenant_id: str) -> bytes:
 
     unpadder = padding.PKCS7(128).unpadder()
     return unpadder.update(padded) + unpadder.finalize()
+
+
+def encrypt_password(password: str, tenant_id: str) -> str:
+    """Cifra a senha do .pfx com AES-256-CBC. Retorna iv_hex:encrypted_hex."""
+    key = _derive_key(tenant_id, purpose="pwd")
+    iv = os.urandom(16)
+
+    padder = padding.PKCS7(128).padder()
+    padded = padder.update(password.encode()) + padder.finalize()
+
+    cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
+    encryptor = cipher.encryptor()
+    encrypted = encryptor.update(padded) + encryptor.finalize()
+
+    return f"{iv.hex()}:{encrypted.hex()}"
+
+
+def decrypt_password(encrypted_str: str, tenant_id: str) -> str:
+    """Decifra a senha do .pfx. Formato: iv_hex:encrypted_hex."""
+    iv_hex, enc_hex = encrypted_str.split(":", 1)
+    iv = bytes.fromhex(iv_hex)
+    encrypted = bytes.fromhex(enc_hex)
+
+    key = _derive_key(tenant_id, purpose="pwd")
+
+    cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
+    decryptor = cipher.decryptor()
+    padded = decryptor.update(encrypted) + decryptor.finalize()
+
+    unpadder = padding.PKCS7(128).unpadder()
+    return (unpadder.update(padded) + unpadder.finalize()).decode()
 
 
 def extract_cert_info(pfx_bytes: bytes, password: str) -> dict:

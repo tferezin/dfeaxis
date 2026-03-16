@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from db.supabase import get_supabase_client
 from middleware.security import verify_jwt_token
 from models.schemas import CertificateOut, CertificateUploadResponse
-from services.cert_manager import encrypt_pfx, extract_cert_info
+from services.cert_manager import encrypt_pfx, encrypt_password, extract_cert_info
 
 router = APIRouter()
 
@@ -45,8 +45,9 @@ async def upload_certificate(
             detail=f"Certificado inválido ou senha incorreta: {e}",
         )
 
-    # Cifra o .pfx
+    # Cifra o .pfx e a senha
     encrypted, iv = encrypt_pfx(pfx_bytes, tenant_id)
+    senha_encrypted = encrypt_password(senha, tenant_id)
 
     sb = get_supabase_client()
 
@@ -55,29 +56,28 @@ async def upload_certificate(
         "tenant_id", tenant_id
     ).eq("cnpj", cnpj).execute()
 
+    cert_data = {
+        "pfx_encrypted": f"\\x{encrypted.hex()}",
+        "pfx_iv": f"\\x{iv.hex()}",
+        "pfx_password_encrypted": senha_encrypted,
+        "company_name": cert_info.get("subject_cn"),
+        "valid_from": str(cert_info["valid_from"]),
+        "valid_until": str(cert_info["valid_until"]),
+        "is_active": True,
+    }
+
     if existing.data:
         # Atualiza certificado existente
-        result = sb.table("certificates").update({
-            "pfx_encrypted": encrypted.hex(),
-            "pfx_iv": iv.hex(),
-            "company_name": cert_info.get("subject_cn"),
-            "valid_from": str(cert_info["valid_from"]),
-            "valid_until": str(cert_info["valid_until"]),
-            "is_active": True,
-        }).eq("id", existing.data[0]["id"]).execute()
+        result = sb.table("certificates").update(
+            cert_data
+        ).eq("id", existing.data[0]["id"]).execute()
 
         cert_id = existing.data[0]["id"]
     else:
         # Insere novo
-        result = sb.table("certificates").insert({
-            "tenant_id": tenant_id,
-            "cnpj": cnpj,
-            "company_name": cert_info.get("subject_cn"),
-            "pfx_encrypted": encrypted.hex(),
-            "pfx_iv": iv.hex(),
-            "valid_from": str(cert_info["valid_from"]),
-            "valid_until": str(cert_info["valid_until"]),
-        }).execute()
+        cert_data["tenant_id"] = tenant_id
+        cert_data["cnpj"] = cnpj
+        result = sb.table("certificates").insert(cert_data).execute()
 
         cert_id = result.data[0]["id"]
 

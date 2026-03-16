@@ -13,6 +13,8 @@ class DocumentoOut(BaseModel):
     nsu: str
     xml_b64: str
     fetched_at: datetime
+    manifestacao_status: Optional[str] = None
+    is_resumo: bool = False
 
 
 class DocumentosResponse(BaseModel):
@@ -93,6 +95,49 @@ class CheckoutRequest(BaseModel):
 class CheckoutResponse(BaseModel):
     checkout_url: str
     preference_id: str
+
+
+# --- SEFAZ Status ---
+
+# --- Manifestação ---
+
+class ManifestacaoRequest(BaseModel):
+    chave_acesso: str = Field(min_length=44, max_length=44)
+    tipo_evento: str = Field(pattern=r"^(210210|210200|210220|210240)$")
+    justificativa: str = Field(default="", max_length=255)
+
+
+class ManifestacaoResponse(BaseModel):
+    chave_acesso: str
+    tipo_evento: str
+    descricao: str
+    cstat: str
+    xmotivo: str
+    protocolo: Optional[str] = None
+    success: bool
+
+
+class ManifestacaoBatchRequest(BaseModel):
+    chaves: list[str] = Field(min_length=1, max_length=50)
+    tipo_evento: str = Field(pattern=r"^(210210|210200|210220|210240)$")
+    justificativa: str = Field(default="", max_length=255)
+
+
+class ManifestacaoBatchResponse(BaseModel):
+    total: int
+    sucesso: int
+    erro: int
+    resultados: list[ManifestacaoResponse]
+
+
+class DocumentoPendenteOut(BaseModel):
+    chave: str
+    nsu: str
+    cnpj_emitente: Optional[str] = None
+    razao_social_emitente: Optional[str] = None
+    valor: Optional[str] = None
+    manifestacao_status: str
+    fetched_at: datetime
 
 
 # --- SEFAZ Status ---

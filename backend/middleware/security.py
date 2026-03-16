@@ -118,7 +118,5 @@ async def verify_jwt_token(request: Request) -> dict:
         "user_id", user.id
     ).execute()
 
-    if not result.data:
-        raise HTTPException(status_code=404, detail="Tenant not found")
-
-    return {"tenant_id": result.data[0]["id"], "user_id": user.id}
+    tenant_id = result.data[0]["id"] if result.data else None
+    return {"tenant_id": tenant_id, "user_id": user.id}

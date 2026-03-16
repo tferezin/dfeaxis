@@ -3,12 +3,16 @@
 import os
 from contextlib import asynccontextmanager
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 from middleware.security import SecurityHeadersMiddleware, RateLimitMiddleware
-from routers import documents, certificates, polling, credits
+from routers import documents, certificates, polling, credits, api_keys, tenants, manifestacao
 from scheduler.polling_job import start_scheduler, stop_scheduler
 
 
@@ -49,6 +53,9 @@ app.include_router(documents.router, prefix="/api/v1", tags=["Documentos"])
 app.include_router(certificates.router, prefix="/api/v1", tags=["Certificados"])
 app.include_router(polling.router, prefix="/api/v1", tags=["Polling"])
 app.include_router(credits.router, prefix="/api/v1", tags=["Créditos"])
+app.include_router(api_keys.router, prefix="/api/v1", tags=["API Keys"])
+app.include_router(tenants.router, prefix="/api/v1", tags=["Tenants"])
+app.include_router(manifestacao.router, prefix="/api/v1", tags=["Manifestação"])
 
 
 @app.get("/health")

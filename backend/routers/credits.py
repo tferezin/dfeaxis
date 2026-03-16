@@ -82,13 +82,27 @@ async def mercadopago_webhook(request: Request):
 
     body = await request.json()
 
-    # Valida assinatura do webhook
+    # Valida assinatura do webhook (MercadoPago x-signature format)
     webhook_secret = os.getenv("MP_WEBHOOK_SECRET", "")
     if webhook_secret:
-        signature = request.headers.get("x-signature", "")
-        # Validação simplificada — em produção, usar validação completa MP
-        if not signature:
+        x_signature = request.headers.get("x-signature", "")
+        x_request_id = request.headers.get("x-request-id", "")
+        if not x_signature:
             raise HTTPException(status_code=401, detail="Missing signature")
+
+        # Parse x-signature: "ts=...,v1=..."
+        parts = dict(p.split("=", 1) for p in x_signature.split(",") if "=" in p)
+        ts = parts.get("ts", "")
+        v1 = parts.get("v1", "")
+
+        data_id = body.get("data", {}).get("id", "")
+        manifest = f"id:{data_id};request-id:{x_request_id};ts:{ts};"
+        expected = hmac.new(
+            webhook_secret.encode(), manifest.encode(), hashlib.sha256
+        ).hexdigest()
+
+        if not hmac.compare_digest(v1, expected):
+            raise HTTPException(status_code=401, detail="Invalid signature")
 
     if body.get("type") != "payment":
         return {"status": "ignored"}

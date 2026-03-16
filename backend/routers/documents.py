@@ -1,6 +1,7 @@
 """Endpoints de documentos — integração SAP DRC."""
 
 import base64
+import threading
 import uuid
 from typing import Optional
 
@@ -18,6 +19,7 @@ from models.schemas import (
     SefazEndpointStatus,
     SefazStatusResponse,
 )
+from scheduler.polling_job import run_retroactive_job
 from services.sefaz_client import sefaz_client
 
 router = APIRouter()
@@ -28,11 +30,23 @@ async def listar_documentos(
     cnpj: str = Query(..., min_length=14, max_length=14),
     tipo: str = Query("nfe", pattern=r"^(nfe|cte|mdfe)$"),
     desde: Optional[str] = Query(None, description="NSU a partir de"),
+    incluir_pendentes: bool = Query(
+        True,
+        description="Incluir resumos pendentes de manifestação (modo manual)",
+    ),
     auth: dict = Depends(verify_api_key),
 ):
-    """Lista documentos disponíveis para um CNPJ/tipo.
+    """Lista documentos para um CNPJ/tipo.
 
     Endpoint principal consumido pelo SAP DRC via RFC Destination HTTP.
+
+    Retorna:
+    - Documentos com XML completo (status=available)
+    - Resumos pendentes de manifestação (is_resumo=true, sem XML)
+      para que o SAP decida quais aceitar
+
+    O SAP pode filtrar por `is_resumo` e chamar POST /manifestacao
+    para aceitar os que desejar.
     """
     sb = get_supabase_client()
     tenant_id = auth["tenant_id"]
@@ -48,12 +62,16 @@ async def listar_documentos(
             detail=f"CNPJ {cnpj} não cadastrado para este tenant",
         )
 
-    # Busca documentos disponíveis
+    # Busca documentos disponíveis + pendentes de manifestação
+    statuses = ["available"]
+    if incluir_pendentes:
+        statuses.append("pending_manifestacao")
+
     query = sb.table("documents").select("*").eq(
         "tenant_id", tenant_id
     ).eq("cnpj", cnpj).eq(
         "tipo", tipo.upper()
-    ).eq("status", "available")
+    ).in_("status", statuses)
 
     if desde:
         query = query.gt("nsu", desde)
@@ -75,6 +93,8 @@ async def listar_documentos(
             nsu=doc["nsu"],
             xml_b64=xml_b64,
             fetched_at=doc["fetched_at"],
+            manifestacao_status=doc.get("manifestacao_status"),
+            is_resumo=doc.get("is_resumo", False),
         ))
 
     ult_nsu = documentos[-1].nsu if documentos else desde or "000000000000000"
@@ -157,8 +177,6 @@ async def consulta_retroativa(
 
     job_id = f"retro_{uuid.uuid4().hex[:12]}"
 
-    # TODO: Agendar job retroativo via APScheduler
-    # Por ora, registra o job e retorna 202
     sb.table("polling_log").insert({
         "tenant_id": tenant_id,
         "cnpj": body.cnpj,
@@ -167,6 +185,13 @@ async def consulta_retroativa(
         "status": "processing",
         "error_message": job_id,  # usa como referência do job
     }).execute()
+
+    # Executa em background thread
+    threading.Thread(
+        target=run_retroactive_job,
+        args=(tenant_id, body.cnpj, body.tipo, job_id),
+        daemon=True,
+    ).start()
 
     return RetroativoResponse(
         job_id=job_id,
