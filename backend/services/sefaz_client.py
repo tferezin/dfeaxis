@@ -16,6 +16,7 @@ from lxml import etree
 from zeep import Client as ZeepClient
 from zeep.transports import Transport
 
+from middleware.lgpd import mask_cnpj
 from services.cert_manager import decrypt_pfx, temp_cert_files
 from services.circuit_breaker import circuit_breaker
 
@@ -77,8 +78,8 @@ class SefazClient:
         cnpj: str,
         tipo: str,
         ult_nsu: str,
-        pfx_encrypted: bytes,
-        pfx_iv: bytes,
+        pfx_encrypted,
+        pfx_iv,
         tenant_id: str,
         pfx_password: str,
         cuf_autor: str = "35",  # SP default
@@ -89,8 +90,9 @@ class SefazClient:
             cnpj: CNPJ do destinatário
             tipo: 'nfe', 'cte' ou 'mdfe'
             ult_nsu: Último NSU processado
-            pfx_encrypted: Certificado .pfx cifrado (AES-256)
-            pfx_iv: IV usado na cifragem
+            pfx_encrypted: Certificado .pfx cifrado — hex string from DB
+                           (v2 format: "v2:<hex>" or legacy raw hex)
+            pfx_iv: IV hex string (legacy v1) or None (v2)
             tenant_id: ID do tenant (para derivar chave AES)
             pfx_password: Senha do .pfx
             cuf_autor: Código UF do autor (default 35 = SP)
@@ -100,15 +102,24 @@ class SefazClient:
             state = circuit_breaker.get_state(cnpj, tipo)
             return SefazResponse(
                 cstat="999",
-                xmotivo=f"Circuit breaker {state.value} para {cnpj}/{tipo}",
+                xmotivo=f"Circuit breaker {state.value} para {mask_cnpj(cnpj)}/{tipo}",
                 ult_nsu=ult_nsu,
                 max_nsu=ult_nsu,
                 documents=[],
                 latency_ms=0,
             )
 
-        # Decifra o .pfx
-        pfx_bytes = decrypt_pfx(pfx_encrypted, pfx_iv, tenant_id)
+        # Decifra o .pfx — auto-detect v1/v2 format
+        pfx_encrypted_str = pfx_encrypted if isinstance(pfx_encrypted, str) else pfx_encrypted.hex() if isinstance(pfx_encrypted, bytes) else str(pfx_encrypted)
+
+        if pfx_encrypted_str.startswith("v2:"):
+            blob = bytes.fromhex(pfx_encrypted_str[3:])
+            pfx_bytes = decrypt_pfx(blob, None, tenant_id)
+        else:
+            # Legacy v1: pfx_encrypted and pfx_iv are separate hex strings
+            enc_bytes = bytes.fromhex(pfx_encrypted_str) if isinstance(pfx_encrypted_str, str) else pfx_encrypted
+            iv_bytes = bytes.fromhex(pfx_iv) if isinstance(pfx_iv, str) else pfx_iv
+            pfx_bytes = decrypt_pfx(enc_bytes, iv_bytes, tenant_id)
 
         start_time = time.time()
         try:
@@ -120,7 +131,7 @@ class SefazClient:
         except Exception as e:
             circuit_breaker.record_failure(cnpj, tipo)
             latency = int((time.time() - start_time) * 1000)
-            logger.error(f"SEFAZ error {cnpj}/{tipo}: {e}")
+            logger.error(f"SEFAZ error {mask_cnpj(cnpj)}/{tipo}: {e}")
             return SefazResponse(
                 cstat="999",
                 xmotivo=str(e),

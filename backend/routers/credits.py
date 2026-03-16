@@ -1,5 +1,8 @@
 """Endpoints de créditos e integração MercadoPago."""
 
+import hashlib
+import hmac
+import logging
 import os
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -9,6 +12,7 @@ from middleware.security import verify_jwt_token
 from models.schemas import CheckoutRequest, CheckoutResponse, CreditBalanceResponse
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # Preço por crédito (centavos BRL)
 CREDIT_PRICE_CENTS = 10  # R$ 0,10 por documento
@@ -77,32 +81,32 @@ async def create_checkout(
 @router.post("/credits/webhook")
 async def mercadopago_webhook(request: Request):
     """Webhook do MercadoPago — processa pagamento aprovado e credita."""
-    import hmac
-    import hashlib
-
-    body = await request.json()
-
-    # Valida assinatura do webhook (MercadoPago x-signature format)
+    # --- Signature validation (fail-safe: MANDATORY) ---
     webhook_secret = os.getenv("MP_WEBHOOK_SECRET", "")
-    if webhook_secret:
-        x_signature = request.headers.get("x-signature", "")
-        x_request_id = request.headers.get("x-request-id", "")
-        if not x_signature:
-            raise HTTPException(status_code=401, detail="Missing signature")
+    if not webhook_secret:
+        logger.critical(
+            "MP_WEBHOOK_SECRET is not configured. "
+            "Rejecting ALL webhooks until it is set."
+        )
+        raise HTTPException(status_code=503, detail="Webhook unavailable")
 
-        # Parse x-signature: "ts=...,v1=..."
-        parts = dict(p.split("=", 1) for p in x_signature.split(",") if "=" in p)
-        ts = parts.get("ts", "")
-        v1 = parts.get("v1", "")
+    raw_body = await request.body()
 
-        data_id = body.get("data", {}).get("id", "")
-        manifest = f"id:{data_id};request-id:{x_request_id};ts:{ts};"
-        expected = hmac.new(
-            webhook_secret.encode(), manifest.encode(), hashlib.sha256
-        ).hexdigest()
+    signature = request.headers.get("x-signature", "")
+    if not signature:
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
-        if not hmac.compare_digest(v1, expected):
-            raise HTTPException(status_code=401, detail="Invalid signature")
+    expected = hmac.new(
+        webhook_secret.encode(),
+        raw_body,
+        hashlib.sha256,
+    ).hexdigest()
+
+    if not hmac.compare_digest(expected, signature):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    # --- Parse body ---
+    body = await request.json()
 
     if body.get("type") != "payment":
         return {"status": "ignored"}
@@ -111,12 +115,26 @@ async def mercadopago_webhook(request: Request):
     if not payment_id:
         return {"status": "ignored"}
 
-    # Busca detalhes do pagamento
+    # --- Idempotency check ---
+    sb = get_supabase_client()
+    existing = (
+        sb.table("credit_transactions")
+        .select("id")
+        .eq("reference_id", str(payment_id))
+        .execute()
+    )
+    if existing.data:
+        logger.info("Payment %s already processed, skipping.", payment_id)
+        return {"status": "already_processed"}
+
+    # --- Fetch payment details from MercadoPago ---
     import mercadopago
+
     sdk = mercadopago.SDK(os.environ["MP_ACCESS_TOKEN"])
     payment = sdk.payment().get(payment_id)
 
     if payment["status"] != 200:
+        logger.error("Failed to fetch payment %s from MercadoPago.", payment_id)
         return {"status": "error"}
 
     payment_data = payment["response"]
@@ -127,32 +145,26 @@ async def mercadopago_webhook(request: Request):
     external_ref = payment_data.get("external_reference", "")
     parts = external_ref.split("_")
     if len(parts) != 2:
+        logger.warning("Invalid external_reference: redacted")
         return {"status": "invalid_reference"}
 
     tenant_id, amount_str = parts
-    amount = int(amount_str)
+    try:
+        amount = int(amount_str)
+    except ValueError:
+        logger.warning("Non-integer amount in external_reference")
+        return {"status": "invalid_reference"}
 
-    sb = get_supabase_client()
-
-    # Credita no tenant
-    tenant = sb.table("tenants").select("credits").eq(
-        "id", tenant_id
-    ).single().execute()
-
-    if not tenant.data:
+    # Credita atomicamente via RPC (atomic debit_credits from agent 3)
+    try:
+        result = sb.rpc("debit_credits", {
+            "p_tenant_id": tenant_id,
+            "p_amount": amount,
+            "p_description": f"Compra de {amount} créditos via MercadoPago",
+            "p_reference_id": str(payment_id),
+        }).execute()
+    except Exception:
+        logger.warning("Tenant not found or RPC failed for payment %s", payment_id)
         return {"status": "tenant_not_found"}
-
-    new_credits = tenant.data["credits"] + amount
-    sb.table("tenants").update(
-        {"credits": new_credits}
-    ).eq("id", tenant_id).execute()
-
-    # Registra transação
-    sb.table("credit_transactions").insert({
-        "tenant_id": tenant_id,
-        "amount": amount,
-        "description": f"Compra de {amount} créditos via MercadoPago",
-        "reference_id": str(payment_id),
-    }).execute()
 
     return {"status": "credited", "amount": amount}

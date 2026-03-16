@@ -6,6 +6,7 @@ import logging
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from db.supabase import get_supabase_client
+from middleware.lgpd import mask_cnpj
 from services.cert_manager import decrypt_password
 from services.manifestacao import manifestacao_service
 from services.sefaz_client import sefaz_client
@@ -101,13 +102,18 @@ def _poll_single(cert: dict, tipo: str, tenant_data: dict) -> int:
         if docs_found == 0:
             return 0
 
-        # Verifica créditos disponíveis
-        credits = tenant_data.get("credits", 0)
-        if credits < docs_found:
+        # Debit credits atomically via RPC
+        try:
+            result = sb.rpc("debit_credits", {
+                "p_tenant_id": tenant_id,
+                "p_amount": -docs_found,
+                "p_description": f"Polling {tipo.upper()} CNPJ {mask_cnpj(cnpj)}: {docs_found} docs",
+            }).execute()
+        except Exception as credit_err:
             logger.warning(
-                f"Tenant {tenant_id} tem {credits} créditos mas encontrou {docs_found} docs"
+                f"Tenant {tenant_id} insufficient credits for {docs_found} docs: {credit_err}"
             )
-            docs_found = credits  # Processa apenas o que tem crédito
+            return 0
 
         # Classifica e salva documentos
         # resNFe/resCTe = resumo (precisa manifestação para NF-e)
@@ -147,17 +153,6 @@ def _poll_single(cert: dict, tipo: str, tenant_data: dict) -> int:
                 cert, tenant_id, pfx_encrypted, pfx_iv, pfx_password,
             )
 
-        # Debita créditos
-        sb.table("tenants").update({
-            "credits": credits - docs_found
-        }).eq("id", tenant_id).execute()
-
-        sb.table("credit_transactions").insert({
-            "tenant_id": tenant_id,
-            "amount": -docs_found,
-            "description": f"Polling {tipo.upper()} CNPJ {cnpj}: {docs_found} docs",
-        }).execute()
-
         # Atualiza último NSU
         nsu_controller.update_last_nsu(cert["id"], tipo, response.ult_nsu)
 
@@ -165,12 +160,12 @@ def _poll_single(cert: dict, tipo: str, tenant_data: dict) -> int:
         received_nsus = [d.nsu for d in response.documents]
         gaps = nsu_controller.detect_gap(ult_nsu, received_nsus)
         if gaps:
-            logger.warning(f"Gaps detectados para {cnpj}/{tipo}: {len(gaps)} NSUs faltantes")
+            logger.warning(f"Gaps detectados para {mask_cnpj(cnpj)}/{tipo}: {len(gaps)} NSUs faltantes")
 
         return docs_found
 
     except Exception as e:
-        logger.error(f"Erro no polling {cnpj}/{tipo}: {e}")
+        logger.error(f"Erro no polling {mask_cnpj(cnpj)}/{tipo}: {e}")
         sb.table("polling_log").insert({
             "tenant_id": tenant_id,
             "cnpj": cnpj,
@@ -272,7 +267,7 @@ def run_retroactive_job(
     if not cert_result.data:
         sb.table("polling_log").update(
             {"status": "error", "error_message": "Certificado não encontrado"}
-        ).eq("error_message", job_id).eq("triggered_by", "retroativo").execute()
+        ).eq("job_id", job_id).eq("triggered_by", "retroativo").execute()
         return
 
     cert = cert_result.data[0]
@@ -302,7 +297,7 @@ def run_retroactive_job(
     sb.table("polling_log").update({
         "status": "success",
         "docs_found": total_docs,
-    }).eq("error_message", job_id).eq("triggered_by", "retroativo").execute()
+    }).eq("job_id", job_id).eq("triggered_by", "retroativo").execute()
 
 
 def start_scheduler() -> BackgroundScheduler:

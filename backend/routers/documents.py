@@ -8,6 +8,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from db.supabase import get_supabase_client
+from middleware.lgpd import mask_cnpj
 from middleware.security import verify_api_key
 from models.schemas import (
     ConfirmarResponse,
@@ -59,7 +60,7 @@ async def listar_documentos(
     if not cert.data:
         raise HTTPException(
             status_code=403,
-            detail=f"CNPJ {cnpj} não cadastrado para este tenant",
+            detail=f"CNPJ {mask_cnpj(cnpj)} nao cadastrado para este tenant",
         )
 
     # Busca documentos disponíveis + pendentes de manifestação
@@ -183,7 +184,7 @@ async def consulta_retroativa(
         "tipo": body.tipo,
         "triggered_by": "retroativo",
         "status": "processing",
-        "error_message": job_id,  # usa como referência do job
+        "job_id": job_id,
     }).execute()
 
     # Executa em background thread
@@ -212,7 +213,7 @@ async def status_retroativo(
     result = sb.table("polling_log").select("*").eq(
         "tenant_id", tenant_id
     ).eq("triggered_by", "retroativo").eq(
-        "error_message", job_id
+        "job_id", job_id
     ).execute()
 
     if not result.data:

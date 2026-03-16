@@ -5,6 +5,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from db.supabase import get_supabase_client
+from middleware.lgpd import mask_cnpj
 from middleware.security import verify_api_key, verify_jwt_token
 from models.schemas import (
     DocumentoPendenteOut,
@@ -29,7 +30,7 @@ def _get_cert_and_password(tenant_id: str, cnpj: str) -> tuple:
     ).eq("tenant_id", tenant_id).eq("cnpj", cnpj).eq("is_active", True).execute()
 
     if not cert.data:
-        raise HTTPException(status_code=404, detail=f"Certificado não encontrado para CNPJ {cnpj}")
+        raise HTTPException(status_code=404, detail=f"Certificado nao encontrado para CNPJ {mask_cnpj(cnpj)}")
 
     row = cert.data[0]
 
