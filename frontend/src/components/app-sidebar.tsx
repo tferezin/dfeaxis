@@ -133,8 +133,10 @@ function NavItemLink({
 function UserFooter() {
   const router = useRouter()
   const [email, setEmail] = React.useState<string | null>(null)
+  const [mounted, setMounted] = React.useState(false)
 
   React.useEffect(() => {
+    setMounted(true)
     if (supabase) {
       supabase.auth.getUser().then(({ data }) => {
         setEmail(data.user?.email ?? null)
@@ -154,6 +156,18 @@ function UserFooter() {
   const initials = email
     ? email.slice(0, 2).toUpperCase()
     : "U"
+
+  if (!mounted) {
+    return (
+      <SidebarFooter>
+        <SidebarSeparator />
+        <div className="flex items-center gap-3 px-2 py-2 text-sm">
+          <div className="size-8 rounded-full bg-muted animate-pulse" />
+          <div className="flex-1 h-4 bg-muted rounded animate-pulse" />
+        </div>
+      </SidebarFooter>
+    )
+  }
 
   return (
     <SidebarFooter>
