@@ -13,13 +13,6 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -190,31 +183,9 @@ export default function CertificadosPage() {
 
               <Separator />
 
-              <div className="flex flex-col gap-2">
-                <Label>Modo de captura</Label>
-                <Select defaultValue="automatico">
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="manual">Manual</SelectItem>
-                    <SelectItem value="automatico">Automatico</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Label>Modo de manifestacao</Label>
-                <Select defaultValue="manual">
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="manual">Manual</SelectItem>
-                    <SelectItem value="auto-ciencia">Auto-Ciencia</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <p className="text-xs text-muted-foreground">
+                O modo de operação (automático ou manual) é configurado globalmente em <strong>Configurações</strong> e aplica-se a todos os CNPJs.
+              </p>
             </div>
             <SheetFooter>
               <Button className="w-full gap-2" onClick={() => setSheetOpen(false)}>

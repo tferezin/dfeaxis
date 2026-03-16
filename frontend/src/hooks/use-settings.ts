@@ -3,7 +3,7 @@
 import { useCallback, useSyncExternalStore } from "react"
 
 interface TenantSettings {
-  operationMode: "auto" | "manual" // unifica captura + manifestação
+  operationMode: "auto" | "manual"
   sefazAmbiente: "1" | "2"
   capturaInterval: string
   notifyEmail: string
@@ -23,14 +23,16 @@ const defaultSettings: TenantSettings = {
 }
 
 let listeners: Array<() => void> = []
+let cachedSettings: TenantSettings = defaultSettings
 
 function emitChange() {
+  cachedSettings = readFromStorage()
   for (const listener of listeners) {
     listener()
   }
 }
 
-function getSnapshot(): TenantSettings {
+function readFromStorage(): TenantSettings {
   if (typeof window === "undefined") return defaultSettings
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -38,6 +40,19 @@ function getSnapshot(): TenantSettings {
   } catch {
     return defaultSettings
   }
+}
+
+// Initialize cache
+if (typeof window !== "undefined") {
+  cachedSettings = readFromStorage()
+}
+
+function getSnapshot(): TenantSettings {
+  return cachedSettings
+}
+
+function getServerSnapshot(): TenantSettings {
+  return defaultSettings
 }
 
 function subscribe(listener: () => void) {
@@ -48,11 +63,10 @@ function subscribe(listener: () => void) {
 }
 
 export function useSettings() {
-  const settings = useSyncExternalStore(subscribe, getSnapshot, () => defaultSettings)
+  const settings = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
 
   const updateSettings = useCallback((updates: Partial<TenantSettings>) => {
-    const current = getSnapshot()
-    const next = { ...current, ...updates }
+    const next = { ...cachedSettings, ...updates }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
     emitChange()
   }, [])
