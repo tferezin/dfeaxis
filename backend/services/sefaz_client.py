@@ -222,9 +222,58 @@ class SefazClient:
             root = etree.fromstring(response.encode())
         elif isinstance(response, bytes):
             root = etree.fromstring(response)
+        elif hasattr(response, '_raw_elements'):
+            # zeep retornou objeto com elementos XML internos
+            root = response._raw_elements[0] if response._raw_elements else etree.Element("empty")
         else:
-            # zeep pode retornar como objeto; serializar
-            root = response
+            # zeep pode retornar ComplexType; serializar via helpers
+            from zeep.helpers import serialize_object
+            serialized = serialize_object(response)
+            # Tenta extrair campos diretamente do dict
+            if isinstance(serialized, dict):
+                cstat = str(serialized.get("cStat", "999"))
+                xmotivo = str(serialized.get("xMotivo", ""))
+                ult_nsu = str(serialized.get("ultNSU", "000000000000000"))
+                max_nsu = str(serialized.get("maxNSU", ult_nsu))
+                documents: list[SefazDocument] = []
+                # Extrai documentos do loteDistDFe
+                lote = serialized.get("loteDistDFe")
+                if lote and hasattr(lote, 'get'):
+                    doc_zips = lote.get("docZip", []) or []
+                elif lote and hasattr(lote, 'docZip'):
+                    doc_zips = lote.docZip or []
+                else:
+                    doc_zips = []
+                for dz in doc_zips:
+                    if hasattr(dz, '_value_1'):
+                        b64_content = dz._value_1
+                        nsu = getattr(dz, 'NSU', '') or ''
+                        schema = getattr(dz, 'schema', '') or ''
+                    elif isinstance(dz, dict):
+                        b64_content = dz.get('_value_1', '')
+                        nsu = dz.get('NSU', '')
+                        schema = dz.get('schema', '')
+                    else:
+                        continue
+                    if b64_content:
+                        try:
+                            xml_bytes = gzip.decompress(base64.b64decode(b64_content))
+                            xml_str = xml_bytes.decode("utf-8")
+                            chave = self._extract_chave(xml_str, tipo)
+                            documents.append(SefazDocument(
+                                chave=chave or f"unknown_{nsu}",
+                                tipo=tipo.upper(),
+                                nsu=nsu,
+                                xml_content=xml_str,
+                                schema=schema,
+                            ))
+                        except Exception as e:
+                            logger.warning(f"Erro ao decodificar docZip NSU={nsu}: {e}")
+                return SefazResponse(
+                    cstat=cstat, xmotivo=xmotivo, ult_nsu=ult_nsu,
+                    max_nsu=max_nsu, documents=documents, latency_ms=latency_ms,
+                )
+            root = etree.Element("empty")
 
         ns = NAMESPACES[tipo]
         nsmap = {"ns": ns}
