@@ -21,9 +21,9 @@ from lxml import etree
 
 
 SEFAZ_ENDPOINTS = {
-    "nfe": "https://hom.nfe.fazenda.gov.br/NFeDistribuicaoDFe/NFeDistribuicaoDFe.asmx?wsdl",
+    "nfe": "https://hom1.nfe.fazenda.gov.br/NFeDistribuicaoDFe/NFeDistribuicaoDFe.asmx?wsdl",
     "cte": "https://hom1.cte.fazenda.gov.br/CTeDistribuicaoDFe/CTeDistribuicaoDFe.asmx?wsdl",
-    "mdfe": "https://hom.mdfe.fazenda.gov.br/MdFeDistribuicaoDFe/MdFeDistribuicaoDFe.asmx?wsdl",
+    "mdfe": "https://mdfe-homologacao.svrs.rs.gov.br/ws/MDFeDistribuicaoDFe/MDFeDistribuicaoDFe.asmx?wsdl",
 }
 
 NAMESPACES = {
@@ -104,7 +104,10 @@ def consultar_sefaz(pfx_bytes, password, cnpj, tipo):
         client = ZeepClient(wsdl=endpoint, transport=transport)
 
         service_name = SERVICE_NAMES[tipo]
-        response = client.service[service_name](nfeDadosMsg=root)
+        # Cada tipo usa um nome de parâmetro diferente
+        param_names = {"nfe": "nfeDadosMsg", "cte": "cteDadosMsg", "mdfe": "mdfeDadosMsg"}
+        param_name = param_names.get(tipo, "nfeDadosMsg")
+        response = client.service[service_name](**{param_name: root})
         latency = int((time.time() - start) * 1000)
 
         # Parse response

@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 SEFAZ_ENDPOINTS = {
     "nfe": {
         "1": "https://www1.nfe.fazenda.gov.br/NFeDistribuicaoDFe/NFeDistribuicaoDFe.asmx?wsdl",
-        "2": "https://hom.nfe.fazenda.gov.br/NFeDistribuicaoDFe/NFeDistribuicaoDFe.asmx?wsdl",
+        "2": "https://hom1.nfe.fazenda.gov.br/NFeDistribuicaoDFe/NFeDistribuicaoDFe.asmx?wsdl",
     },
     "cte": {
         "1": "https://www1.cte.fazenda.gov.br/CTeDistribuicaoDFe/CTeDistribuicaoDFe.asmx?wsdl",
@@ -35,7 +35,7 @@ SEFAZ_ENDPOINTS = {
     },
     "mdfe": {
         "1": "https://mdfe.svrs.rs.gov.br/ws/MDFeDistribuicaoDFe/MDFeDistribuicaoDFe.asmx?wsdl",
-        "2": "https://hom.mdfe.fazenda.gov.br/MdFeDistribuicaoDFe/MdFeDistribuicaoDFe.asmx?wsdl",
+        "2": "https://mdfe-homologacao.svrs.rs.gov.br/ws/MDFeDistribuicaoDFe/MDFeDistribuicaoDFe.asmx?wsdl",
     },
 }
 
@@ -177,9 +177,10 @@ class SefazClient:
                 cnpj, tipo, ult_nsu, cuf_autor, ns, effective_ambiente,
             )
 
-            # Nome do service/operation varia por tipo
+            # Nome do service/operation e parâmetro variam por tipo
             service_name = self._get_service_name(tipo)
-            response = client.service[service_name](nfeDadosMsg=xml_request)
+            param_name = {"nfe": "nfeDadosMsg", "cte": "cteDadosMsg", "mdfe": "mdfeDadosMsg"}[tipo]
+            response = client.service[service_name](**{param_name: xml_request})
 
         latency_ms = int((time.time() - start_time) * 1000)
         return self._parse_response(response, tipo, latency_ms)
