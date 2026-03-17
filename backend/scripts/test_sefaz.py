@@ -39,6 +39,103 @@ SERVICE_NAMES = {
 }
 
 
+def consultar_nfse_adn(pfx_bytes, password, cnpj):
+    """Consulta NFS-e no Ambiente Nacional (ADN) via REST + mTLS."""
+    # Extrai cert e key do PFX
+    private_key, certificate, chain = pkcs12.load_key_and_certificates(
+        pfx_bytes, password.encode()
+    )
+
+    if not private_key or not certificate:
+        return {"tipo": "NFSE", "status": "error", "message": "Certificado ou chave não encontrados no .pfx"}
+
+    cert_pem = certificate.public_bytes(serialization.Encoding.PEM)
+    key_pem = private_key.private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.TraditionalOpenSSL,
+        serialization.NoEncryption(),
+    )
+    chain_pem = b""
+    if chain:
+        for ca in chain:
+            chain_pem += ca.public_bytes(serialization.Encoding.PEM)
+
+    cert_file = None
+    key_file = None
+    try:
+        cert_file = tempfile.NamedTemporaryFile(suffix=".pem", delete=False, mode="wb")
+        cert_file.write(cert_pem + chain_pem)
+        cert_file.flush()
+        cert_file.close()
+
+        key_file = tempfile.NamedTemporaryFile(suffix=".pem", delete=False, mode="wb")
+        key_file.write(key_pem)
+        key_file.flush()
+        key_file.close()
+
+        # REST + mTLS
+        session = requests.Session()
+        session.cert = (cert_file.name, key_file.name)
+        session.verify = True
+        session.headers.update({
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        })
+
+        # Distribuição DPS (equivalente ao DistDFeInt SOAP)
+        base_url = "https://hom.nfse.gov.br/SistemaADN/api/v1"
+        url = f"{base_url}/dps/distribuicao"
+        payload = {"cnpj": cnpj, "ultNSU": "000000000000000"}
+
+        start = time.time()
+        resp = session.post(url, json=payload, timeout=30)
+        latency = int((time.time() - start) * 1000)
+
+        if resp.status_code == 404:
+            return {
+                "tipo": "NFSE",
+                "status": "success",
+                "cstat": "137",
+                "xmotivo": "Nenhum documento localizado. Município pode não estar integrado ao ADN.",
+                "docs_found": 0,
+                "latency_ms": latency,
+            }
+
+        if resp.status_code != 200:
+            return {
+                "tipo": "NFSE",
+                "status": "error",
+                "message": f"ADN HTTP {resp.status_code}: {resp.text[:200]}",
+                "latency_ms": latency,
+            }
+
+        data = resp.json()
+        docs = data.get("documentos", data.get("nfses", []))
+        ult_nsu = data.get("ultNSU", "000000000000000")
+
+        return {
+            "tipo": "NFSE",
+            "status": "success",
+            "cstat": "138",
+            "xmotivo": "documento localizado.",
+            "ult_nsu": ult_nsu,
+            "docs_found": len(docs) if docs else 0,
+            "latency_ms": latency,
+        }
+
+    except requests.exceptions.SSLError as e:
+        return {"tipo": "NFSE", "status": "error", "message": f"SSL/mTLS: {e}"}
+    except requests.exceptions.ConnectionError as e:
+        return {"tipo": "NFSE", "status": "error", "message": f"Conexão ADN falhou: {e}"}
+    except Exception as e:
+        return {"tipo": "NFSE", "status": "error", "message": str(e)}
+    finally:
+        if cert_file and os.path.exists(cert_file.name):
+            os.unlink(cert_file.name)
+        if key_file and os.path.exists(key_file.name):
+            os.unlink(key_file.name)
+
+
 def consultar_sefaz(pfx_bytes, password, cnpj, tipo):
     """Consulta SEFAZ homologação para um tipo de documento."""
     from zeep import Client as ZeepClient
@@ -118,8 +215,33 @@ def consultar_sefaz(pfx_bytes, password, cnpj, tipo):
             resp_root = etree.fromstring(response.encode())
         elif isinstance(response, bytes):
             resp_root = etree.fromstring(response)
-        else:
+        elif hasattr(response, 'find'):
             resp_root = response
+        else:
+            # zeep retornou ComplexType (ex: MDF-e) — serializar via helpers
+            from zeep.helpers import serialize_object
+            serialized = serialize_object(response)
+            if isinstance(serialized, dict):
+                cstat = str(serialized.get("cStat", "999"))
+                xmotivo = str(serialized.get("xMotivo", ""))
+                ult_nsu = str(serialized.get("ultNSU", "000000000000000"))
+                max_nsu = str(serialized.get("maxNSU", ult_nsu))
+                lote = serialized.get("loteDistDFe")
+                doc_count = 0
+                if lote:
+                    doc_zips = lote.get("docZip", []) if isinstance(lote, dict) else getattr(lote, "docZip", [])
+                    doc_count = len(doc_zips) if doc_zips else 0
+                return {
+                    "tipo": tipo.upper(),
+                    "status": "success",
+                    "cstat": cstat,
+                    "xmotivo": xmotivo,
+                    "ult_nsu": ult_nsu,
+                    "max_nsu": max_nsu,
+                    "docs_found": doc_count,
+                    "latency_ms": latency,
+                }
+            resp_root = etree.Element("empty")
 
         nsmap = {"ns": ns}
 
@@ -195,11 +317,8 @@ def main():
     for tipo in tipos:
         tipo = tipo.strip().lower()
         if tipo == "nfse":
-            results.append({
-                "tipo": "NFSE",
-                "status": "skipped",
-                "message": "NFS-e usa API REST (ADN), não SOAP. Teste separado necessário.",
-            })
+            result = consultar_nfse_adn(pfx_bytes, password, cnpj)
+            results.append(result)
             continue
         result = consultar_sefaz(pfx_bytes, password, cnpj, tipo)
         results.append(result)
