@@ -22,9 +22,6 @@ export default function DashboardPage() {
   const showMock = settings.showMockData
   return (
     <div className="space-y-6">
-      {/* Onboarding guide — shows when mock data is off (real testing mode) */}
-      <OnboardingGuide />
-
       {/* Top controls */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -196,6 +193,11 @@ export default function DashboardPage() {
 
       {/* Recent documents table */}
       <RecentDocuments empty={!showMock} />
+
+      <Separator />
+
+      {/* Getting started — always visible */}
+      <OnboardingGuide />
     </div>
   )
 }

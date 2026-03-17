@@ -3,7 +3,6 @@
 import Link from "next/link"
 import { Settings, ShieldCheck, Play, FileText, CheckCircle2 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
-import { useSettings } from "@/hooks/use-settings"
 
 const steps = [
   {
@@ -41,11 +40,6 @@ const steps = [
 ]
 
 export function OnboardingGuide() {
-  const { settings } = useSettings()
-
-  // Don't show if mock data is enabled (user is just browsing demo)
-  if (settings.showMockData) return null
-
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
