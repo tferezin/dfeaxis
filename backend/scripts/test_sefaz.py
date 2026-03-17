@@ -107,7 +107,8 @@ def consultar_sefaz(pfx_bytes, password, cnpj, tipo):
 
         service_name = SERVICE_NAMES[tipo]
         # Cada tipo usa um nome de parâmetro diferente
-        param_names = {"nfe": "nfeDadosMsg", "cte": "cteDadosMsg", "mdfe": "mdfeDadosMsg"}
+        # MDF-e SVRS usa '_value_1' como parâmetro genérico
+        param_names = {"nfe": "nfeDadosMsg", "cte": "cteDadosMsg", "mdfe": "_value_1"}
         param_name = param_names.get(tipo, "nfeDadosMsg")
         response = client.service[service_name](**{param_name: root})
         latency = int((time.time() - start) * 1000)
