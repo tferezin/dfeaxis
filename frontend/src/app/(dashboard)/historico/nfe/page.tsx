@@ -49,12 +49,12 @@ interface NfeRow {
 const statusConfig: Record<NfeStatus, { label: string; description: string; className: string }> = {
   Pendente: {
     label: "Pendente",
-    description: "Resumo detectado, aguardando ciencia",
+    description: "Resumo detectado, aguardando ciência",
     className: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
   },
   Ciencia: {
     label: "Ciencia",
-    description: "Ciencia enviada, aguardando XML completo",
+    description: "Ciência enviada, aguardando XML completo",
     className: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
   },
   Disponivel: {
@@ -64,7 +64,7 @@ const statusConfig: Record<NfeStatus, { label: string; description: string; clas
   },
   Entregue: {
     label: "Entregue",
-    description: "SAP ja baixou e confirmou",
+    description: "SAP já baixou e confirmou",
     className: "bg-gray-100 text-gray-600 dark:bg-gray-800/50 dark:text-gray-400",
   },
   Cancelada: {
@@ -166,7 +166,7 @@ function ActionCell({ row }: { row: NfeRow }) {
       return (
         <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs">
           <CheckCircle2 className="size-3.5" />
-          Dar Ciencia
+          Dar Ciência
         </Button>
       )
     case "Ciencia":
@@ -223,7 +223,7 @@ export default function HistoricoNfePage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">NF-e Recebidas</h1>
           <p className="text-sm text-muted-foreground">
-            Notas fiscais recebidas de fornecedores via captura automatica
+            Notas fiscais recebidas de fornecedores via captura automática
           </p>
         </div>
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16 gap-3">
@@ -270,7 +270,7 @@ export default function HistoricoNfePage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">NF-e Recebidas</h1>
           <p className="text-sm text-muted-foreground">
-            Notas fiscais recebidas de fornecedores via captura automatica
+            Notas fiscais recebidas de fornecedores via captura automática
           </p>
         </div>
         <Button variant="outline">
@@ -314,12 +314,12 @@ export default function HistoricoNfePage() {
         <span className="text-muted-foreground">|</span>
         <div className="flex items-center gap-2">
           <span className="inline-flex size-2.5 rounded-full bg-blue-500" />
-          <span className="text-sm">Ciencia: <span className="font-semibold">{counts.Ciencia}</span></span>
+          <span className="text-sm">Ciência: <span className="font-semibold">{counts.Ciencia}</span></span>
         </div>
         <span className="text-muted-foreground">|</span>
         <div className="flex items-center gap-2">
           <span className="inline-flex size-2.5 rounded-full bg-green-500" />
-          <span className="text-sm">Disponiveis: <span className="font-semibold">{counts.Disponivel}</span></span>
+          <span className="text-sm">Disponíveis: <span className="font-semibold">{counts.Disponivel}</span></span>
         </div>
         <span className="text-muted-foreground">|</span>
         <div className="flex items-center gap-2">
@@ -359,7 +359,7 @@ export default function HistoricoNfePage() {
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <span className="text-xs font-medium text-muted-foreground">Ate</span>
+          <span className="text-xs font-medium text-muted-foreground">Até</span>
           <Input type="date" className="w-[150px]" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
         </div>
 
@@ -372,8 +372,8 @@ export default function HistoricoNfePage() {
             <SelectContent>
               <SelectItem value="Todos">Todos</SelectItem>
               <SelectItem value="Pendente">Pendente</SelectItem>
-              <SelectItem value="Ciencia">Ciencia</SelectItem>
-              <SelectItem value="Disponivel">Disponivel</SelectItem>
+              <SelectItem value="Ciencia">Ciência</SelectItem>
+              <SelectItem value="Disponivel">Disponível</SelectItem>
               <SelectItem value="Entregue">Entregue</SelectItem>
               <SelectItem value="Cancelada">Cancelada</SelectItem>
             </SelectContent>
@@ -403,12 +403,12 @@ export default function HistoricoNfePage() {
             <TableRow>
               <TableHead>Emitente (Fornecedor)</TableHead>
               <TableHead>CNPJ Emitente</TableHead>
-              <TableHead>Emissao</TableHead>
+              <TableHead>Emissão</TableHead>
               <TableHead>Nota</TableHead>
               <TableHead>Chave de Acesso</TableHead>
               <TableHead className="text-right">Valor (R$)</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Acoes</TableHead>
+              <TableHead>Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

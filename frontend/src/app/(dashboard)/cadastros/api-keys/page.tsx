@@ -44,7 +44,7 @@ const mockKeys: ApiKey[] = [
   {
     id: 1,
     prefix: "dfe_live_7kX3...m9Pq",
-    descricao: "Producao - ERP Principal",
+    descricao: "Produção - ERP Principal",
     ultimoUso: "16/03/2026 08:45",
     status: "Ativa",
     criacao: "01/01/2026",
@@ -52,7 +52,7 @@ const mockKeys: ApiKey[] = [
   {
     id: 2,
     prefix: "dfe_live_2bR8...n4Wz",
-    descricao: "Producao - Integracao Contabil",
+    descricao: "Produção - Integração Contábil",
     ultimoUso: "15/03/2026 22:10",
     status: "Ativa",
     criacao: "15/01/2026",
@@ -60,7 +60,7 @@ const mockKeys: ApiKey[] = [
   {
     id: 3,
     prefix: "dfe_test_9mK1...j5Yt",
-    descricao: "Homologacao - Testes QA",
+    descricao: "Homologação - Testes QA",
     ultimoUso: "14/03/2026 16:30",
     status: "Ativa",
     criacao: "01/02/2026",
@@ -68,7 +68,7 @@ const mockKeys: ApiKey[] = [
   {
     id: 4,
     prefix: "dfe_live_4hN6...s8Lp",
-    descricao: "Producao - App Mobile",
+    descricao: "Produção - App Mobile",
     ultimoUso: "10/03/2026 09:15",
     status: "Ativa",
     criacao: "20/02/2026",
@@ -76,7 +76,7 @@ const mockKeys: ApiKey[] = [
   {
     id: 5,
     prefix: "dfe_test_1cF3...w7Rx",
-    descricao: "Homologacao - Sprint 12",
+    descricao: "Homologação - Sprint 12",
     ultimoUso: "05/03/2026 11:00",
     status: "Revogada",
     criacao: "01/03/2026",
@@ -84,7 +84,7 @@ const mockKeys: ApiKey[] = [
   {
     id: 6,
     prefix: "dfe_live_6qD9...v2Hn",
-    descricao: "Producao - Webhook Server",
+    descricao: "Produção - Webhook Server",
     ultimoUso: null,
     status: "Revogada",
     criacao: "10/12/2025",
@@ -125,7 +125,7 @@ export default function ApiKeysPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">API Keys</h1>
           <p className="text-sm text-muted-foreground">
-            Gerencie as chaves de acesso para integracao com a API do DFeAxis
+            Gerencie as chaves de acesso para integração com a API do DFeAxis
           </p>
         </div>
         <Sheet open={sheetOpen} onOpenChange={(open) => { setSheetOpen(open); if (!open) setNewKeyCreated(null) }}>
@@ -148,14 +148,14 @@ export default function ApiKeysPage() {
               {!newKeyCreated ? (
                 <>
                   <div className="flex flex-col gap-2">
-                    <Label htmlFor="key-desc">Descricao</Label>
+                    <Label htmlFor="key-desc">Descrição</Label>
                     <Input
                       id="key-desc"
-                      placeholder="Ex: Producao - ERP Principal"
+                      placeholder="Ex: Produção - ERP Principal"
                     />
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    A chave sera exibida apenas uma vez apos a criacao. Certifique-se de
+                    A chave será exibida apenas uma vez após a criação. Certifique-se de
                     copiar e armazenar em local seguro.
                   </p>
                 </>
@@ -163,7 +163,7 @@ export default function ApiKeysPage() {
                 <div className="flex flex-col gap-3">
                   <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-800 dark:bg-emerald-950/30">
                     <p className="mb-2 text-xs font-medium text-emerald-700 dark:text-emerald-300">
-                      Chave criada com sucesso! Copie-a agora - ela nao sera exibida novamente.
+                      Chave criada com sucesso! Copie-a agora - ela não será exibida novamente.
                     </p>
                     <div className="flex items-center gap-2">
                       <code className="flex-1 break-all rounded bg-white px-2 py-1.5 font-mono text-xs dark:bg-black">
@@ -209,11 +209,11 @@ export default function ApiKeysPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Prefixo</TableHead>
-              <TableHead>Descricao</TableHead>
-              <TableHead>Ultimo uso</TableHead>
+              <TableHead>Descrição</TableHead>
+              <TableHead>Último uso</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Criacao</TableHead>
-              <TableHead>Acoes</TableHead>
+              <TableHead>Criação</TableHead>
+              <TableHead>Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -276,7 +276,7 @@ export default function ApiKeysPage() {
       {/* Info text */}
       <p className="text-xs text-muted-foreground">
         As API Keys concedem acesso a todos os endpoints da API do DFeAxis vinculados
-        a sua conta. Revogue imediatamente qualquer chave comprometida.
+        à sua conta. Revogue imediatamente qualquer chave comprometida.
       </p>
     </div>
   )

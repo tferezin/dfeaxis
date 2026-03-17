@@ -96,7 +96,7 @@ export default function HistoricoCtePage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">CT-e Recebidos</h1>
           <p className="text-sm text-muted-foreground">
-            Conhecimentos de transporte recebidos via captura automatica
+            Conhecimentos de transporte recebidos via captura automática
           </p>
         </div>
         <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -114,7 +114,7 @@ export default function HistoricoCtePage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">CT-e Recebidos</h1>
           <p className="text-sm text-muted-foreground">
-            Conhecimentos de transporte recebidos via captura automatica
+            Conhecimentos de transporte recebidos via captura automática
           </p>
         </div>
         <Button variant="outline">
@@ -131,7 +131,7 @@ export default function HistoricoCtePage() {
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <span className="text-xs font-medium text-muted-foreground">Ate</span>
+          <span className="text-xs font-medium text-muted-foreground">Até</span>
           <Input type="date" className="w-[150px]" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
         </div>
 
@@ -174,13 +174,13 @@ export default function HistoricoCtePage() {
             <TableRow>
               <TableHead>Emitente</TableHead>
               <TableHead>Remetente</TableHead>
-              <TableHead>Destinatario</TableHead>
+              <TableHead>Destinatário</TableHead>
               <TableHead>CT-e N.</TableHead>
               <TableHead>Chave de Acesso</TableHead>
               <TableHead className="text-right">Valor Frete (R$)</TableHead>
-              <TableHead>Emissao</TableHead>
+              <TableHead>Emissão</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Acoes</TableHead>
+              <TableHead>Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

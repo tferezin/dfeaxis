@@ -52,7 +52,7 @@ export function VolumeChart({ empty = false }: { empty?: boolean }) {
               Volume de Documentos
             </CardTitle>
             <CardDescription>
-              NF-e e CT-e recebidos nos ultimos 30 dias
+              NF-e e CT-e recebidos nos últimos 30 dias
             </CardDescription>
           </div>
         </div>
@@ -61,7 +61,7 @@ export function VolumeChart({ empty = false }: { empty?: boolean }) {
         {empty ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <Inbox className="size-12 text-muted-foreground/30 mb-4" />
-            <p className="text-sm text-muted-foreground">Nenhum dado disponivel.</p>
+            <p className="text-sm text-muted-foreground">Nenhum dado disponível.</p>
           </div>
         ) : (
         <ChartContainer config={chartConfig} className="h-[300px] w-full">

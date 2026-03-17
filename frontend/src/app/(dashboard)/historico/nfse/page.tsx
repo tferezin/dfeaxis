@@ -49,7 +49,7 @@ interface NfseRow {
 const statusConfig: Record<NfseStatus, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
   Emitida: { label: "Emitida", variant: "default" },
   Cancelada: { label: "Cancelada", variant: "destructive" },
-  Substituida: { label: "Substituida", variant: "secondary" },
+  Substituida: { label: "Substituída", variant: "secondary" },
   Pendente: { label: "Pendente", variant: "outline" },
 }
 
@@ -109,7 +109,7 @@ export default function HistoricoNfsePage() {
               </Badge>
             </div>
             <p className="text-sm text-muted-foreground">
-              Notas fiscais de servico recebidas via Ambiente Nacional
+              Notas fiscais de serviço recebidas via Ambiente Nacional
             </p>
           </div>
         </div>
@@ -156,7 +156,7 @@ export default function HistoricoNfsePage() {
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground">
-            Notas fiscais de servico recebidas via Ambiente Nacional
+            Notas fiscais de serviço recebidas via Ambiente Nacional
           </p>
         </div>
         <Button variant="outline">
@@ -211,7 +211,7 @@ export default function HistoricoNfsePage() {
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <span className="text-xs font-medium text-muted-foreground">Ate</span>
+          <span className="text-xs font-medium text-muted-foreground">Até</span>
           <Input type="date" className="w-[150px]" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
         </div>
 
@@ -225,16 +225,16 @@ export default function HistoricoNfsePage() {
               <SelectItem value="Todos">Todos</SelectItem>
               <SelectItem value="Emitida">Emitida</SelectItem>
               <SelectItem value="Cancelada">Cancelada</SelectItem>
-              <SelectItem value="Substituida">Substituida</SelectItem>
+              <SelectItem value="Substituida">Substituída</SelectItem>
               <SelectItem value="Pendente">Pendente</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <span className="text-xs font-medium text-muted-foreground">Numero NFS-e</span>
+          <span className="text-xs font-medium text-muted-foreground">Número NFS-e</span>
           <Input
-            placeholder="Buscar por numero..."
+            placeholder="Buscar por número..."
             className="w-[200px]"
             value={searchNumero}
             onChange={(e) => { setSearchNumero(e.target.value); setCurrentPage(1) }}
@@ -254,12 +254,12 @@ export default function HistoricoNfsePage() {
             <TableRow>
               <TableHead>Prestador</TableHead>
               <TableHead>Tomador</TableHead>
-              <TableHead>Municipio</TableHead>
+              <TableHead>Município</TableHead>
               <TableHead>N NFS-e</TableHead>
               <TableHead className="text-right">Valor (R$)</TableHead>
-              <TableHead>Competencia</TableHead>
+              <TableHead>Competência</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Acoes</TableHead>
+              <TableHead>Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

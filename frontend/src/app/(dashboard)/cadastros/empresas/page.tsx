@@ -72,12 +72,12 @@ export default function EmpresasPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Empresas / CNPJs</h1>
           <p className="text-sm text-muted-foreground">
-            Dados extraidos automaticamente dos certificados A1. Para adicionar uma empresa, faca o upload do certificado em <strong>Certificados A1</strong>.
+            Dados extraídos automaticamente dos certificados A1. Para adicionar uma empresa, faça o upload do certificado em <strong>Certificados A1</strong>.
           </p>
         </div>
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <Inbox className="size-12 text-muted-foreground/30 mb-4" />
-          <p className="text-sm text-muted-foreground">Nenhuma empresa cadastrada. As empresas sao criadas automaticamente ao enviar um certificado A1.</p>
+          <p className="text-sm text-muted-foreground">Nenhuma empresa cadastrada. As empresas são criadas automaticamente ao enviar um certificado A1.</p>
         </div>
       </div>
     )

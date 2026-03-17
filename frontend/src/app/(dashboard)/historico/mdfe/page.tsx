@@ -97,7 +97,7 @@ export default function HistoricoMdfePage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">MDF-e Recebidos</h1>
           <p className="text-sm text-muted-foreground">
-            Manifestos eletronicos recebidos via captura automatica
+            Manifestos eletrônicos recebidos via captura automática
           </p>
         </div>
         <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -115,7 +115,7 @@ export default function HistoricoMdfePage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">MDF-e Recebidos</h1>
           <p className="text-sm text-muted-foreground">
-            Manifestos eletronicos recebidos via captura automatica
+            Manifestos eletrônicos recebidos via captura automática
           </p>
         </div>
         <Button variant="outline">
@@ -145,7 +145,7 @@ export default function HistoricoMdfePage() {
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <span className="text-xs font-medium text-muted-foreground">Ate</span>
+          <span className="text-xs font-medium text-muted-foreground">Até</span>
           <Input type="date" className="w-[150px]" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
         </div>
 
@@ -221,9 +221,9 @@ export default function HistoricoMdfePage() {
               <TableHead>Chave de Acesso</TableHead>
               <TableHead>UF Carregamento</TableHead>
               <TableHead>UF Descarregamento</TableHead>
-              <TableHead>Emissao</TableHead>
+              <TableHead>Emissão</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Acoes</TableHead>
+              <TableHead>Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

@@ -145,7 +145,7 @@ export function RecentDocuments({ empty = false }: { empty?: boolean }) {
               Documentos Recentes
             </CardTitle>
             <CardDescription>
-              Ultimos documentos fiscais recebidos
+              Últimos documentos fiscais recebidos
             </CardDescription>
           </div>
           <button className="text-sm font-medium text-primary hover:underline">
@@ -164,7 +164,7 @@ export function RecentDocuments({ empty = false }: { empty?: boolean }) {
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               <TableHead className="pl-4">Emitente</TableHead>
-              <TableHead>Emissao</TableHead>
+              <TableHead>Emissão</TableHead>
               <TableHead>Tipo</TableHead>
               <TableHead>Nota</TableHead>
               <TableHead>Chave</TableHead>

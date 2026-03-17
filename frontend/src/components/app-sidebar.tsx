@@ -144,6 +144,13 @@ function NavItemLink({
               item.badge === "SAP" && "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
               item.badge === "ADN" && "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
             )}
+            title={
+              item.badge === "SAP"
+                ? "Integração nativa com SAP DRC disponível"
+                : item.badge === "ADN"
+                  ? "Captura via Ambiente Nacional de NFS-e"
+                  : undefined
+            }
           >
             {item.badge}
           </Badge>

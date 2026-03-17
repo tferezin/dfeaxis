@@ -218,7 +218,7 @@ export default function CertificadosPage() {
       {!settings.showMockData ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <Inbox className="size-12 text-muted-foreground/30 mb-4" />
-          <p className="text-sm text-muted-foreground">Nenhum certificado cadastrado. Clique em &apos;Novo Certificado&apos; para comecar.</p>
+          <p className="text-sm text-muted-foreground">Nenhum certificado cadastrado. Clique em &apos;Novo Certificado&apos; para começar.</p>
         </div>
       ) : (
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -252,7 +252,7 @@ export default function CertificadosPage() {
               </div>
 
               <div className="flex flex-col gap-1">
-                <span className="text-xs font-medium text-muted-foreground">Ultima captura</span>
+                <span className="text-xs font-medium text-muted-foreground">Última captura</span>
                 <span className="text-sm">{cert.ultimaCaptura}</span>
               </div>
             </CardContent>
