@@ -1,0 +1,2261 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Download Electronic Documents",
+    "description": "Downloads a great amount of XML files of your electronic fiscal documents by selecting them accordingly. This API has the following features:\n- Download several XML files at the same time using the *NF-e/CT-e Monitor* screen (transaction J1BNFE).\n- Save the downloaded fiscal documents in a logical directory, after you run it in a batch. SAP recommends that you use this feature for auditing purposes.",
+    "version": "1.0.0"
+  },
+  "x-sap-shortText": "Downloads electronic document files with various extensions.",
+  "externalDocs": {
+    "description": "SAP Document Compliance, outbound invoicing option for Brazil",
+    "url": "https://help.sap.com/viewer/product/SLH_NFe/Cloud/en-US"
+  },
+  "servers": [
+    {
+      "url": "https://sandbox.api.sap.com/DocumentReportingComplianceInvoicing4Brazil/storage",
+      "description": "Sandbox URL",
+      "variables": {}
+    },
+    {
+      "url": "https://nfe.cfapps.br10.hana.ondemand.com/storage",
+      "description": "Production URL",
+      "variables": {}
+    }
+  ],
+  "security": [
+    {
+      "OAuth2": [
+        "secure"
+      ]
+    }
+  ],
+  "paths": {
+    "/v1/documents": {
+      "get": {
+        "tags": [
+          "Document Controller"
+        ],
+        "summary": "Gets the files of an electronic document or event.",
+        "description": "Downloads files of all types from an electronic document or event issued by your company.",
+        "operationId": "getDocuments",
+        "parameters": [
+          {
+            "name": "environmentType",
+            "in": "query",
+            "description": "Environment",
+            "required": true,
+            "schema": {
+              "enum": [
+                "1",
+                "2",
+                "3",
+                "PRODUCTION",
+                "HOMOLOGATION",
+                "TESTING"
+              ]
+            }
+          },
+          {
+            "name": "documentType",
+            "in": "query",
+            "description": "Document type",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "NFE",
+                "NFSE",
+                "NF3E",
+                "CTE"
+              ]
+            }
+          },
+          {
+            "name": "documentId",
+            "in": "query",
+            "description": "Document universal unique identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "c2677ce5-2067-2067-2067-20677ce572e6"
+          },
+          {
+            "name": "fileType",
+            "in": "query",
+            "description": "File type",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "DANFE"
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "description": "Document action",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "AUTHORIZE",
+                "CANCEL",
+                "CCE",
+                "SKIP",
+                "EPEC"
+              ]
+            },
+            "example": "AUTHORIZE"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Electronic document files were downloaded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DocumentResponse"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The required fields were not informed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "example": "Required FIELD parameter 'FIELD' is not present"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid authentication information was provided.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "example": "The tenant TENANT is not trusted"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error while reading document file."
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Document Controller"
+        ],
+        "summary": "Saves an electronic document or event.",
+        "description": "Saves a file of any type from an electronic document or event issued by your company.",
+        "operationId": "uploadDocument",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentUploadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The electronic document was saved."
+          },
+          "400": {
+            "description": "Invalid upload information was provided.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "example": "Cannot replace document. Only electronic documents that were saved manually can be replaced."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid authentication information was provided.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "example": "The tenant TENANT is not trusted"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error while uploading document file."
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Document Controller"
+        ],
+        "summary": "Deletes an electronic document or event.",
+        "description": "Deletes a file of any type from an electronic document or event issued by your company.",
+        "operationId": "deleteDocument",
+        "parameters": [
+          {
+            "name": "environmentType",
+            "in": "query",
+            "description": "Environment",
+            "required": true,
+            "schema": {
+              "enum": [
+                "1",
+                "2",
+                "3",
+                "PRODUCTION",
+                "HOMOLOGATION",
+                "TESTING"
+              ]
+            }
+          },
+          {
+            "name": "documentType",
+            "in": "query",
+            "description": "Document type",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "NFE",
+                "NFSE",
+                "NF3E",
+                "CTE"
+              ]
+            }
+          },
+          {
+            "name": "documentId",
+            "in": "query",
+            "description": "Document universal unique identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "c2677ce5-2067-2067-2067-20677ce572e6"
+          },
+          {
+            "name": "fileType",
+            "in": "query",
+            "description": "File type",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "DANFE"
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "description": "Document action",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "AUTHORIZE",
+                "CANCEL",
+                "CCE",
+                "SKIP",
+                "EPEC"
+              ]
+            },
+            "example": "AUTHORIZE"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The electronic document was deleted."
+          },
+          "400": {
+            "description": "Invalid deletion information was provided.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "example": "Required EnvironmentType parameter 'environmentType' is not present."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid authentication information was provided.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "example": "The tenant TENANT is not trusted."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The electronic document was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileNotFoundException"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error while deleting the document file."
+          }
+        }
+      }
+    },
+    "/event/v1/download": {
+      "get": {
+        "tags": [
+          "Event Controller"
+        ],
+        "summary": "Gets all the XML files of a single event of an NF-e.",
+        "description": "Downloads the XML file for the NF-e issued and submitted for an event, such as Cancellation, Correction Letter, or EPEC.",
+        "operationId": "downloadSingleEvent",
+        "parameters": [
+          {
+            "name": "accessKey",
+            "in": "query",
+            "description": "NF-e access key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": 43171174544297
+          },
+          {
+            "name": "eventType",
+            "in": "query",
+            "description": "Event Type",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": 110111
+          },
+          {
+            "name": "seqNum",
+            "in": "query",
+            "description": "Event Sequential Number",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "example": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The NF-e was downloaded.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid information was provided.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "example": "Required int parameter 'seqNum' is not present"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The NF-e event was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileNotFoundException"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error while reading the XML file."
+          }
+        }
+      }
+    },
+    "/event/v1/downloadAll": {
+      "get": {
+        "tags": [
+          "Event Controller"
+        ],
+        "summary": "Gets all XML file events of an NF-e.",
+        "description": "Downloads all XML files for the NF-e issued and submitted for all events (Cancellation, Correction Letter, or EPEC).",
+        "operationId": "downloadEvents",
+        "parameters": [
+          {
+            "name": "accessKey",
+            "in": "query",
+            "description": "NF-e access key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": 43171174544297
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The NF-e was downloaded.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid information was provided.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "example": "Required String parameter 'accessKey' is not present"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The NF-e was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileNotFoundException"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error while reading the XML file."
+          }
+        }
+      }
+    },
+    "/event/v1/{accessKey}": {
+      "delete": {
+        "tags": [
+          "Event Controller"
+        ],
+        "summary": "Deletes all XML file events stored.",
+        "description": "Deletes all XML files for the events that are stored in your application.",
+        "operationId": "deleteNFeXML",
+        "parameters": [
+          {
+            "name": "accessKey",
+            "in": "path",
+            "description": "NF-e access key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": 43171174544297
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Your file was deleted."
+          },
+          "400": {
+            "description": "Invalid access key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidNfeKeyException"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error while deleting the document file."
+          }
+        }
+      }
+    },
+    "/nfe/v1/{accessKey}": {
+      "delete": {
+        "tags": [
+          "NF-e Controller"
+        ],
+        "summary": "Deletes the XML file of an NF-e from the storage.",
+        "description": "Deletes a file of any type from an electronic document or event issued by your company.",
+        "operationId": "deleteNFeXML_1",
+        "parameters": [
+          {
+            "name": "accessKey",
+            "in": "path",
+            "description": "NF-e access key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The NF-e was removed."
+          },
+          "400": {
+            "description": "Invalid information was provided.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "example": "Could not delete files for accesskey."
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error while removing the XML file."
+          }
+        }
+      }
+    },
+    "/nfe/v1/download": {
+      "get": {
+        "tags": [
+          "NF-e Controller"
+        ],
+        "summary": "Gets the XML file of an NF-e.",
+        "description": "Downloads the corresponding XML file of an NF-e that you have issued.",
+        "operationId": "downloadNFe",
+        "parameters": [
+          {
+            "name": "accessKey",
+            "in": "query",
+            "description": "NF-e access key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The NF-e was downloaded.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid information was provided.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "example": "Required String parameter 'accessKey' is not present"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The NF-e was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileNotFoundException"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error while reading the XML file."
+          }
+        }
+      }
+    },
+    "/nfse/v1/downloadCancel": {
+      "get": {
+        "tags": [
+          "NFS-e Controller"
+        ],
+        "summary": "Gets the XML file of an NFS-e cancellation.",
+        "description": "Downloads the corresponding XML file of an NFS-e cancellation.",
+        "operationId": "downloadCancelNFSe",
+        "parameters": [
+          {
+            "name": "cnpj",
+            "in": "query",
+            "description": "CNPJ number",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": 74544297000605
+          },
+          {
+            "name": "year",
+            "in": "query",
+            "description": "Year",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": 2018
+          },
+          {
+            "name": "month",
+            "in": "query",
+            "description": "Month",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": 10
+          },
+          {
+            "name": "serie",
+            "in": "query",
+            "description": "NFS-e series",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "01"
+          },
+          {
+            "name": "env",
+            "in": "query",
+            "description": "Environment",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": 1
+          },
+          {
+            "name": "rpsnumber",
+            "in": "query",
+            "description": "RPS number",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": 1234
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The NFS-e cancellation was downloaded.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid information was provided.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "example": "Required String parameter 'rpsnumber' is not present"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The NFS-e cancellation was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileNotFoundException"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error while reading the XML file."
+          }
+        }
+      }
+    },
+    "/nfse/v1": {
+      "delete": {
+        "tags": [
+          "NFS-e Controller"
+        ],
+        "summary": "Deletes the XML file of an NFS-e.",
+        "description": "Deletes the XML file of an NFS-e that you have previously issued.",
+        "operationId": "deleteNFSe",
+        "parameters": [
+          {
+            "name": "cnpj",
+            "in": "query",
+            "description": "CNPJ number",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": 74544297000192
+          },
+          {
+            "name": "year",
+            "in": "query",
+            "description": "Year",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": 2018
+          },
+          {
+            "name": "month",
+            "in": "query",
+            "description": "Month",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": 10
+          },
+          {
+            "name": "serie",
+            "in": "query",
+            "description": "NFS-e series",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "01"
+          },
+          {
+            "name": "env",
+            "in": "query",
+            "description": "Environment",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": 1
+          },
+          {
+            "name": "rpsnumber",
+            "in": "query",
+            "description": "RPS number",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": 1234
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The NFS-e was deleted."
+          },
+          "400": {
+            "description": "Invalid information was provided.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "example": "Required String parameter 'rpsnumber' is not present"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error while removing the XML file."
+          }
+        }
+      }
+    },
+    "/nfse/v1/cancellation": {
+      "delete": {
+        "tags": [
+          "NFS-e Controller"
+        ],
+        "summary": "Deletes the XML file of an NFS-e cancellation.",
+        "description": "Deletes the corresponding XML file of an NFS-e cancellation.",
+        "operationId": "deleteNFSeCancel",
+        "parameters": [
+          {
+            "name": "cnpj",
+            "in": "query",
+            "description": "CNPJ number",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": 74544297000192
+          },
+          {
+            "name": "year",
+            "in": "query",
+            "description": "Year",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": 2018
+          },
+          {
+            "name": "month",
+            "in": "query",
+            "description": "Month",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": 10
+          },
+          {
+            "name": "env",
+            "in": "query",
+            "description": "Environment",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": 1
+          },
+          {
+            "name": "nfsenumber",
+            "in": "query",
+            "description": "NFS-e number",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": 1234
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The NFS-e cancellation was deleted."
+          },
+          "400": {
+            "description": "Invalid information was provided.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "example": "Required String parameter 'nfsenumber' is not present"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error while removing the XML file."
+          }
+        }
+      }
+    },
+    "/nfse/v1/download": {
+      "get": {
+        "tags": [
+          "NFS-e Controller"
+        ],
+        "summary": "Gets the XML file of an NFS-e.",
+        "description": "Downloads the corresponding XML file of an NFS-e that you have issued.",
+        "operationId": "downloadNFSe",
+        "parameters": [
+          {
+            "name": "cnpj",
+            "in": "query",
+            "description": "CNPJ number",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": 74544297000605
+          },
+          {
+            "name": "year",
+            "in": "query",
+            "description": "Year",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": 2018
+          },
+          {
+            "name": "month",
+            "in": "query",
+            "description": "Month",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": 10
+          },
+          {
+            "name": "serie",
+            "in": "query",
+            "description": "NFS-e series",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "01"
+          },
+          {
+            "name": "env",
+            "in": "query",
+            "description": "Environment",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": 1
+          },
+          {
+            "name": "rpsnumber",
+            "in": "query",
+            "description": "RPS number",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": 1234
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The NFS-e was downloaded.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid information was provided.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "example": "Required String parameter 'rpsnumber' is not present"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The NFS-e was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileNotFoundException"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error while reading the XML file."
+          }
+        }
+      }
+    },
+    "/skipping/v1/download": {
+      "get": {
+        "tags": [
+          "Skipping Controller"
+        ],
+        "summary": "Retrieves a skipping request sent to SEFAZ.",
+        "description": "Retrieves a skipping request that you have already sent to SEFAZ, after the confirmation that the request was successfully received.",
+        "operationId": "download",
+        "parameters": [
+          {
+            "name": "skipId",
+            "in": "query",
+            "description": "NF-e skipping ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": 4.318444106418163e+40
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The skipping request was retrieved.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid information was provided.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "example": "Required String parameter 'skipId' is not present"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The skipping request was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileNotFoundException"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error while reading file."
+          }
+        }
+      }
+    },
+    "/v1/mass-downloads": {
+      "post": {
+        "tags": [
+          "Mass Download Controller"
+        ],
+        "summary": "Creates a new Mass Download entity.",
+        "description": "Enables you to create a new Mass Download entity on the database.",
+        "operationId": "create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MassDownloadRequest"
+              },
+              "example": null
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The Mass Download entity was created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MassDownloadResponse"
+                },
+                "example": null
+              }
+            }
+          },
+          "400": {
+            "description": "Field downloadName: must not be blank.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "example": null,
+                  "items": {
+                    "type": "string",
+                    "example": null
+                  }
+                },
+                "example": null
+              }
+            }
+          },
+          "429": {
+            "description": "The maximum of parallel mass downloads was reached. Try again later.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "example": null,
+                  "items": {
+                    "type": "string",
+                    "example": null
+                  }
+                },
+                "example": null
+              }
+            }
+          },
+          "500": {
+            "description": "Error while creating a Mass Download entity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "example": null,
+                  "items": {
+                    "type": "string",
+                    "example": null
+                  }
+                },
+                "example": null
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2": []
+          }
+        ]
+      }
+    },
+    "/v1/mass-downloads/{id}/pre-signed-urls": {
+      "post": {
+        "tags": [
+          "Pre Signed URL Controller"
+        ],
+        "summary": "Creates the Amazon S3 pre-signed URL of Mass Download.",
+        "description": "Enables you to create the Amazon S3 pre-signed URL of Mass Download.",
+        "operationId": "presignedUrls",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Document universal unique identifier",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": null
+            },
+            "example": "c2677ce5-2067-2067-2067-20677ce572e6"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Amazon S3 pre-signed URL of Mass Download was created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MassDownloadUrlResponse"
+                },
+                "example": null
+              }
+            }
+          },
+          "404": {
+            "description": "Requested ID not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "example": null,
+                  "items": {
+                    "type": "string",
+                    "example": null
+                  }
+                },
+                "example": null
+              }
+            }
+          },
+          "500": {
+            "description": "It is not possible to connect to the database service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "example": null,
+                  "items": {
+                    "type": "string",
+                    "example": null
+                  }
+                },
+                "example": null
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2": []
+          }
+        ]
+      }
+    },
+    "/v1/mass-downloads/{id}/parts": {
+      "post": {
+        "tags": [
+          "Part Controller"
+        ],
+        "summary": "Creates a new part in Mass Download entity.",
+        "description": "Enables you to create the Mass Download part, which is a subset of the complete list of documents.",
+        "operationId": "insertPart",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Document universal unique identifier",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": null
+            },
+            "example": "c2677ce5-2067-2067-2067-20677ce572e6"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MassDownloadPart"
+              },
+              "example": null
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "New part in Mass Download entity is created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MassDownloadPartResponse"
+                },
+                "example": null
+              }
+            }
+          },
+          "404": {
+            "description": "Download from ID not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "example": null,
+                  "items": {
+                    "type": "string",
+                    "example": null
+                  }
+                },
+                "example": null
+              }
+            }
+          },
+          "422": {
+            "description": "Download from ID is canceled and it cannot receive new parts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "example": null,
+                  "items": {
+                    "type": "string",
+                    "example": null
+                  }
+                },
+                "example": null
+              }
+            }
+          },
+          "500": {
+            "description": "It is not possible to connect to the database service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "example": null,
+                  "items": {
+                    "type": "string",
+                    "example": null
+                  }
+                },
+                "example": null
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2": []
+          }
+        ]
+      }
+    },
+    "/v1/mass-downloads/{id}": {
+      "get": {
+        "tags": [
+          "Mass Download Controller"
+        ],
+        "summary": "Reads a Mass Download entity from its ID from the database table.",
+        "description": "Enables you to read a Mass Download entity from its ID from the database table.",
+        "operationId": "checkStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Document universal unique identifier",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": null
+            },
+            "example": "c2677ce5-2067-2067-2067-20677ce572e6"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Status of download was returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MassDownloadResponse"
+                },
+                "example": null
+              }
+            }
+          },
+          "404": {
+            "description": "Requested ID not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "example": null,
+                  "items": {
+                    "type": "string",
+                    "example": null
+                  }
+                },
+                "example": null
+              }
+            }
+          },
+          "500": {
+            "description": "It is not possible to connect to the database service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "example": null,
+                  "items": {
+                    "type": "string",
+                    "example": null
+                  }
+                },
+                "example": null
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "Mass Download Controller"
+        ],
+        "summary": "Updates the status of a Mass Download entity.",
+        "description": "Enables you to update the  status of a Mass Download entity from its ID from the database table.",
+        "operationId": "patch",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Document universal unique identifier",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": null
+            },
+            "example": "c2677ce5-2067-2067-2067-20677ce572e6"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MassDownloadPatchRequest"
+              },
+              "example": null
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Mass Download entity have been updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MassDownloadResponse"
+                },
+                "example": null
+              }
+            }
+          },
+          "400": {
+            "description": "The informed processingStatus is invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "example": null,
+                  "items": {
+                    "type": "string",
+                    "example": null
+                  }
+                },
+                "example": null
+              }
+            }
+          },
+          "404": {
+            "description": "Requested ID not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "example": null,
+                  "items": {
+                    "type": "string",
+                    "example": null
+                  }
+                },
+                "example": null
+              }
+            }
+          },
+          "500": {
+            "description": "It is not possible to connect to the database service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "example": null,
+                  "items": {
+                    "type": "string",
+                    "example": null
+                  }
+                },
+                "example": null
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2": []
+          }
+        ]
+      }
+    },
+    "/v1/mass-downloads/parameters": {
+      "get": {
+        "tags": [
+          "Parameters Controller"
+        ],
+        "summary": "Returns the defined parameters for the Mass Download.",
+        "description": "Enables you to view the defined parameters for the Mass Download.",
+        "operationId": "parameters",
+        "responses": {
+          "200": {
+            "description": "Mass Download parameters returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MassDownloadParametersResponse"
+                },
+                "example": null
+              }
+            }
+          },
+          "500": {
+            "description": "It is not possible to connect to the database service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "example": null,
+                  "items": {
+                    "type": "string",
+                    "example": null
+                  }
+                },
+                "example": null
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "DocumentUploadRequest": {
+        "required": [
+          "action",
+          "documentId",
+          "documentType",
+          "environmentType",
+          "fileContent",
+          "fileType",
+          "issuerIdentifier",
+          "issuingDate",
+          "mimeType",
+          "receiverIdentifier"
+        ],
+        "type": "object",
+        "properties": {
+          "environmentType": {
+            "type": "string",
+            "enum": [
+              "PRODUCTION",
+              "HOMOLOGATION",
+              "TESTING",
+              "1",
+              "2",
+              "3"
+            ]
+          },
+          "documentType": {
+            "type": "string",
+            "enum": [
+              "NFE",
+              "NFSE",
+              "NF3E",
+              "CTE"
+            ]
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "AUTHORIZE",
+              "CANCEL",
+              "CCE",
+              "SKIP",
+              "EPEC"
+            ]
+          },
+          "documentId": {
+            "maxLength": 60,
+            "minLength": 0,
+            "type": "string"
+          },
+          "fileType": {
+            "maxLength": 20,
+            "minLength": 0,
+            "type": "string"
+          },
+          "fileContent": {
+            "maxItems": 2147483647,
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "byte"
+            }
+          },
+          "mimeType": {
+            "maxLength": 50,
+            "minLength": 0,
+            "type": "string"
+          },
+          "issuingDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "issuerIdentifier": {
+            "maxLength": 50,
+            "minLength": 0,
+            "type": "string"
+          },
+          "receiverIdentifier": {
+            "maxLength": 50,
+            "minLength": 0,
+            "type": "string"
+          }
+        }
+      },
+      "FileNotFoundException": {
+        "type": "object",
+        "properties": {
+          "cause": {
+            "type": "object",
+            "properties": {
+              "stackTrace": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "methodName": {
+                      "type": "string"
+                    },
+                    "fileName": {
+                      "type": "string"
+                    },
+                    "lineNumber": {
+                      "type": "integer",
+                      "format": "int32"
+                    },
+                    "className": {
+                      "type": "string"
+                    },
+                    "nativeMethod": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              },
+              "message": {
+                "type": "string"
+              },
+              "localizedMessage": {
+                "type": "string"
+              },
+              "suppressed": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "stackTrace": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "methodName": {
+                            "type": "string"
+                          },
+                          "fileName": {
+                            "type": "string"
+                          },
+                          "lineNumber": {
+                            "type": "integer",
+                            "format": "int32"
+                          },
+                          "className": {
+                            "type": "string"
+                          },
+                          "nativeMethod": {
+                            "type": "boolean"
+                          }
+                        }
+                      }
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "localizedMessage": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "stackTrace": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "methodName": {
+                  "type": "string"
+                },
+                "fileName": {
+                  "type": "string"
+                },
+                "lineNumber": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "className": {
+                  "type": "string"
+                },
+                "nativeMethod": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "message": {
+            "type": "string"
+          },
+          "localizedMessage": {
+            "type": "string"
+          },
+          "suppressed": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "stackTrace": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "methodName": {
+                        "type": "string"
+                      },
+                      "fileName": {
+                        "type": "string"
+                      },
+                      "lineNumber": {
+                        "type": "integer",
+                        "format": "int32"
+                      },
+                      "className": {
+                        "type": "string"
+                      },
+                      "nativeMethod": {
+                        "type": "boolean"
+                      }
+                    }
+                  }
+                },
+                "message": {
+                  "type": "string"
+                },
+                "localizedMessage": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "DocumentResponse": {
+        "type": "object",
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "description": "Document universal unique identifier",
+            "format": "uuid",
+            "example": "c2677ce5-2067-2067-2067-20677ce572e6"
+          },
+          "fileType": {
+            "type": "string",
+            "description": "File type",
+            "example": "DANFE"
+          },
+          "fileName": {
+            "type": "string",
+            "description": "File name",
+            "example": "88664d0e-069b-4399-bf96-8a8e01929694.pdf"
+          },
+          "fileContent": {
+            "type": "string",
+            "description": "File content encoded in Base64",
+            "example": "<base64>"
+          },
+          "fileContentType": {
+            "type": "string",
+            "description": "Media type according to IETF RFC 6838",
+            "example": "application/pdf"
+          },
+          "checksum": {
+            "type": "string",
+            "description": "SHA-1 hash to ensure data integrity",
+            "example": "cab62d63be2d8eae25722c46fab9bb8a778a291d"
+          }
+        }
+      },
+      "InvalidNfeKeyException": {
+        "type": "object",
+        "properties": {
+          "cause": {
+            "type": "object",
+            "properties": {
+              "stackTrace": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "methodName": {
+                      "type": "string"
+                    },
+                    "fileName": {
+                      "type": "string"
+                    },
+                    "lineNumber": {
+                      "type": "integer",
+                      "format": "int32"
+                    },
+                    "className": {
+                      "type": "string"
+                    },
+                    "nativeMethod": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              },
+              "message": {
+                "type": "string"
+              },
+              "localizedMessage": {
+                "type": "string"
+              },
+              "suppressed": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "stackTrace": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "methodName": {
+                            "type": "string"
+                          },
+                          "fileName": {
+                            "type": "string"
+                          },
+                          "lineNumber": {
+                            "type": "integer",
+                            "format": "int32"
+                          },
+                          "className": {
+                            "type": "string"
+                          },
+                          "nativeMethod": {
+                            "type": "boolean"
+                          }
+                        }
+                      }
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "localizedMessage": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "stackTrace": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "methodName": {
+                  "type": "string"
+                },
+                "fileName": {
+                  "type": "string"
+                },
+                "lineNumber": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "className": {
+                  "type": "string"
+                },
+                "nativeMethod": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "message": {
+            "type": "string"
+          },
+          "localizedMessage": {
+            "type": "string"
+          },
+          "suppressed": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "stackTrace": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "methodName": {
+                        "type": "string"
+                      },
+                      "fileName": {
+                        "type": "string"
+                      },
+                      "lineNumber": {
+                        "type": "integer",
+                        "format": "int32"
+                      },
+                      "className": {
+                        "type": "string"
+                      },
+                      "nativeMethod": {
+                        "type": "boolean"
+                      }
+                    }
+                  }
+                },
+                "message": {
+                  "type": "string"
+                },
+                "localizedMessage": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "MassDownloadRequest": {
+        "required": [
+          "downloadName",
+          "environmentType"
+        ],
+        "type": "object",
+        "properties": {
+          "downloadName": {
+            "pattern": "^[a-zA-Z0-9-_]{1,65}$",
+            "type": "string",
+            "example": null
+          },
+          "totalDocuments": {
+            "maximum": 5000000,
+            "minimum": 1,
+            "type": "integer",
+            "format": "int64",
+            "example": null
+          },
+          "environmentType": {
+            "type": "string",
+            "example": null,
+            "enum": [
+              "PRODUCTION",
+              "HOMOLOGATION",
+              "TESTING"
+            ]
+          }
+        },
+        "example": null
+      },
+      "MassDownloadMessage": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "example": null,
+            "enum": [
+              "SUCCESS",
+              "WARN",
+              "INFO",
+              "ERROR"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "example": null
+          }
+        },
+        "example": null
+      },
+      "MassDownloadResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Document universal unique identifier",
+            "format": "uuid",
+            "example": "c2677ce5-2067-2067-2067-20677ce572e6"
+          },
+          "processingStatus": {
+            "type": "string",
+            "description": "Value from Processing Status",
+            "example": "CREATED",
+            "enum": [
+              "CREATED",
+              "LOADING",
+              "PROCESSING",
+              "COMPLETED",
+              "ERROR",
+              "CANCELED"
+            ]
+          },
+          "downloadName": {
+            "type": "string",
+            "description": "Download name is the name of the final compressed file in the tar.gz format",
+            "example": "test.tar.gz"
+          },
+          "totalDocuments": {
+            "type": "integer",
+            "description": "The total number of documents that can be sent in a mass download file. When the number of documents equals the total, you must specify the last part to initiate the process",
+            "format": "int64",
+            "example": null
+          },
+          "partSize": {
+            "type": "integer",
+            "description": "The max of document accepted per part",
+            "format": "int32",
+            "example": 1080
+          },
+          "receivedParts": {
+            "type": "integer",
+            "description": "How many parts were received from the cloud",
+            "format": "int32",
+            "example": 0
+          },
+          "processedDocuments": {
+            "type": "integer",
+            "description": "How many documents were already processed",
+            "format": "int64",
+            "example": 0
+          },
+          "expirationAt": {
+            "type": "string",
+            "description": "ISO Date time in UTC (YYYY-MM-DDTHH:MM:SS.ZZZ+OFFSET)",
+            "format": "date-time",
+            "example": "2025-09-26T16:18:35.047Z"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "ISO Date time in UTC (YYYY-MM-DDTHH:MM:SS.ZZZ+OFFSET)",
+            "format": "date-time",
+            "example": "2023-09-26T16:15:35.047Z"
+          },
+          "changedAt": {
+            "type": "string",
+            "description": "ISO Date time in UTC (YYYY-MM-DDTHH:MM:SS.ZZZ+OFFSET)",
+            "format": "date-time",
+            "example": "2023-09-26T16:18:35.047Z"
+          },
+          "messages": {
+            "type": "array",
+            "example": null,
+            "items": {
+              "$ref": "#/components/schemas/MassDownloadMessage"
+            }
+          }
+        },
+        "example": null
+      },
+      "MassDownloadUrlResponse": {
+        "type": "object",
+        "properties": {
+          "compressedFileUrl": {
+            "type": "string",
+            "description": "Amazon S3 generated pre-signed URL",
+            "example": "http://bucket-name.s3-website.Region.amazonaws.com/object-name"
+          }
+        },
+        "example": null
+      },
+      "MassDownloadPart": {
+        "required": [
+          "documents"
+        ],
+        "type": "object",
+        "properties": {
+          "partNumber": {
+            "minimum": 1,
+            "type": "integer",
+            "format": "int32",
+            "example": null
+          },
+          "partSize": {
+            "minimum": 1,
+            "type": "integer",
+            "format": "int32",
+            "example": null
+          },
+          "lastPart": {
+            "type": "boolean",
+            "example": null
+          },
+          "documents": {
+            "type": "array",
+            "example": null,
+            "items": {
+              "$ref": "#/components/schemas/DocumentListByKey"
+            }
+          }
+        },
+        "example": null
+      },
+      "MassDownloadPartResponse": {
+        "type": "object",
+        "properties": {
+          "documentsFoundCount": {
+            "type": "integer",
+            "description": "Number of Documents Found",
+            "format": "int32",
+            "example": 2
+          },
+          "documentsNotFound": {
+            "type": "array",
+            "example": null,
+            "items": {
+              "$ref": "#/components/schemas/DocumentListByKey"
+            }
+          }
+        },
+        "example": null
+      },
+      "MassDownloadPatchRequest": {
+        "required": [
+          "processingStatus"
+        ],
+        "type": "object",
+        "properties": {
+          "processingStatus": {
+            "type": "string",
+            "example": null,
+            "enum": [
+              "CREATED",
+              "LOADING",
+              "PROCESSING",
+              "COMPLETED",
+              "ERROR",
+              "CANCELED"
+            ]
+          }
+        },
+        "example": null
+      },
+      "MassDownloadParametersResponse": {
+        "type": "object",
+        "properties": {
+          "maxDocsUseMassOnMonitor": {
+            "type": "integer",
+            "description": "Maximum number of documents using Mass Download",
+            "format": "int32",
+            "example": 500
+          },
+          "maxParallelMassDownloads": {
+            "type": "integer",
+            "description": "Maximum number of parallel Mass Download",
+            "format": "int32",
+            "example": 3
+          },
+          "filesPerSecondAverage": {
+            "type": "number",
+            "description": "Average files compressed per second in the cloud",
+            "format": "double",
+            "example": 450.0
+          }
+        },
+        "example": null
+      },
+      "DocumentListByKey": {
+        "required": [
+          "documentAction",
+          "documentDirection",
+          "documentIds",
+          "documentType",
+          "environmentType",
+          "fileType"
+        ],
+        "type": "object",
+        "properties": {
+          "environmentType": {
+            "type": "string",
+            "example": null,
+            "enum": [
+              "PRODUCTION",
+              "HOMOLOGATION",
+              "TESTING"
+            ]
+          },
+          "documentType": {
+            "type": "string",
+            "example": null,
+            "enum": [
+              "NFE",
+              "NFSE",
+              "NF3E",
+              "CTE",
+              "MDFE"
+            ]
+          },
+          "documentIds": {
+            "type": "array",
+            "example": null,
+            "items": {
+              "type": "string",
+              "example": null
+            }
+          },
+          "fileType": {
+            "type": "string",
+            "example": null
+          },
+          "documentAction": {
+            "type": "string",
+            "example": null,
+            "enum": [
+              "AUTHORIZE",
+              "CANCEL",
+              "CCE",
+              "SKIP",
+              "EPEC",
+              "CLOSING",
+              "DRIVER_INCLUSION",
+              "DFE_INCLUSION",
+              "PAYMENT",
+              "TRANSPORT_CONFIRMATION",
+              "TRANSPORT_PAYMENT_CHANGE",
+              "EXTENSION",
+              "ADDITIONAL_EXTENSION",
+              "CANCEL_EXTENSION",
+              "CANCEL_ADDITIONAL_EXTENSION"
+            ]
+          },
+          "documentDirection": {
+            "type": "string",
+            "example": null,
+            "enum": [
+              "OUTBOUND",
+              "INBOUND"
+            ]
+          }
+        },
+        "example": null
+      }
+    },
+    "securitySchemes": {
+      "OAuth2": {
+        "type": "oauth2",
+        "flows": {
+          "clientCredentials": {
+            "tokenUrl": "https://nfe-tenant-try-out.authentication.br10.hana.ondemand.com/oauth/token?grant_type=client_credentials",
+            "scopes": {
+              "secure": "Authorization for API functionalities."
+            }
+          }
+        }
+      }
+    }
+  }
+}

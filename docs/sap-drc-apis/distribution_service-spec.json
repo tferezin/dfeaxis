@@ -1,0 +1,522 @@
+{
+ "openapi": "3.0.1",
+ "info": {
+  "title": "Distribution Service",
+  "description": "To distribute electronic fiscal documents files by e-mail, a service is required. Distribution Service enables you to orchestrate distribution operations in the cloud.",
+  "version": "1.0.0"
+ },
+ "externalDocs": {
+  "description": "SAP Document and Reporting Compliance, outbound invoicing option for Brazil",
+  "url": "https://help.sap.com/docs/SLH_NFe?locale=en-US"
+ },
+ "servers": [
+  {
+   "url": "https://sandbox.api.sap.com/DocumentReportingComplianceInvoicing4Brazil/distribution-service",
+   "description": "Sandbox URL"
+  },
+  {
+   "url": "https://nfe.cfapps.br10.hana.ondemand.com/distribution-service",
+   "description": "Production URL"
+  }
+ ],
+ "security": [
+  {
+   "OAuth2": [
+    "secure"
+   ]
+  }
+ ],
+ "paths": {
+  "/v1/distribution": {
+   "post": {
+    "tags": [
+     "Distribution Controller"
+    ],
+    "summary": "Sends a distribution request",
+    "description": "Executes the request according to the sent fields and validates their values. The created distribution logs will be saved to the database and sent to the proper microservice.",
+    "operationId": "processDistribution",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DistributionRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "202": {
+      "description": "The distribution request was saved and sent for processing."
+     },
+     "400": {
+      "description": "Wrong field format provided on distribution request.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "string",
+         "example": "Field environmentType: must not be null."
+        }
+       }
+      }
+     },
+     "500": {
+      "description": "Internal server error. The request operation failed while sending the distribution request.",
+      "content": {
+       "application/json": {
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "Distribution Controller"
+    ],
+    "summary": "Deletes a list of distribution logs",
+    "description": "Enables you to delete distribution logs on the database.",
+    "operationId": "deleteDistribution",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DistributionDeleteRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "204": {
+      "description": "The distribution logs were deleted."
+     },
+     "400": {
+      "description": "Wrong field format provided on distribution request.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "string",
+         "example": "Field documentIdList: must not be null."
+        }
+       }
+      }
+     },
+     "500": {
+      "description": "Internal server error. The request operation failed while sending the distribution request.",
+      "content": {
+       "application/json": {
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/distribution-status": {
+   "post": {
+    "tags": [
+     "Distribution Controller"
+    ],
+    "summary": "Requests the distribution log of documents",
+    "description": "Enables you to display the distribution logs, only with completed status.",
+    "operationId": "retrieveDistribution",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DistributionStatusRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "The distribution of documents was returned.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/DistributionStatusResponse"
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Wrong field format provided on distribution request.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "string",
+         "example": "Field documentIdList: must not be null."
+        }
+       }
+      }
+     },
+     "500": {
+      "description": "Internal server error. The request operation failed while sending the distribution request.",
+      "content": {
+       "application/json": {
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ "components": {
+  "schemas": {
+   "Address": {
+    "required": [
+     "email",
+     "type"
+    ],
+    "type": "object",
+    "properties": {
+     "type": {
+      "type": "string",
+      "description": "E-mail type",
+      "example": "RECIPIENT",
+      "enum": [
+       "RECIPIENT",
+       "REPLY_TO"
+      ]
+     },
+     "email": {
+      "type": "string",
+      "description": "E-mail",
+      "example": "name@company.com"
+     }
+    },
+    "description": "Email Data"
+   },
+   "Attachment": {
+    "type": "object",
+    "properties": {
+     "title": {
+      "type": "string",
+      "description": "File name",
+      "example": "43211074544297000192558190000567851490575375-procNFe"
+     },
+     "content": {
+      "type": "array",
+      "description": "File content encoded in Base64",
+      "example": "<base64>",
+      "items": {
+       "type": "string",
+       "description": "File content encoded in Base64",
+       "format": "byte"
+      }
+     },
+     "type": {
+      "type": "string",
+      "description": "File type",
+      "example": "FISCAL_DOCUMENT"
+     },
+     "mimeType": {
+      "type": "string",
+      "description": "Mime type",
+      "example": "application/xml"
+     }
+    },
+    "description": "Email Attachment Data"
+   },
+   "DistributionRequest": {
+    "required": [
+     "action",
+     "documentId",
+     "documentType",
+     "environmentType",
+     "mail"
+    ],
+    "type": "object",
+    "properties": {
+     "documentId": {
+      "type": "string",
+      "description": "Distribution log unique identifier",
+      "example": "bfd8273d-0877-457f-81e7-eda52f82093d"
+     },
+     "documentType": {
+      "type": "string",
+      "description": "Document type",
+      "example": "NFE",
+      "enum": [
+       "NFE",
+       "NFSE",
+       "NF3E",
+       "CTE",
+       "MDFE"
+      ]
+     },
+     "environmentType": {
+      "type": "string",
+      "description": "Environment type",
+      "example": "HOMOLOGATION",
+      "enum": [
+       "PRODUCTION",
+       "HOMOLOGATION",
+       "TESTING"
+      ]
+     },
+     "action": {
+      "type": "string",
+      "description": "Document action",
+      "example": "AUTHORIZE",
+      "enum": [
+       "AUTHORIZE",
+       "CANCEL",
+       "CCE",
+       "SKIP",
+       "EPEC"
+      ]
+     },
+     "accessKey": {
+      "type": "string",
+      "description": "Access key",
+      "example": "12345678901234567890123456789012345678901234"
+     },
+     "receiverIdentifier": {
+      "type": "string",
+      "description": "Unique identifier of receiver",
+      "example": "13669157000652"
+     },
+     "issuerIdentifier": {
+      "type": "string",
+      "description": "Unique identifier of issuer",
+      "example": "13669157000652"
+     },
+     "mail": {
+      "$ref": "#/components/schemas/Mail"
+     },
+     "attachments": {
+      "type": "array",
+      "items": {
+       "$ref": "#/components/schemas/Attachment"
+      }
+     }
+    },
+    "description": "The distribution request contains document and distribution related information"
+   },
+   "Mail": {
+    "required": [
+     "addressName",
+     "cityName",
+     "recipientName",
+     "tradingName"
+    ],
+    "type": "object",
+    "properties": {
+     "tradingName": {
+      "type": "string",
+      "description": "Company trading name",
+      "example": "Trade name Inc."
+     },
+     "addressName": {
+      "type": "string",
+      "description": "Address",
+      "example": "SAP Street"
+     },
+     "cityName": {
+      "type": "string",
+      "description": "City",
+      "example": "Porto Alegre"
+     },
+     "recipientName": {
+      "type": "string",
+      "description": "Recipient Name",
+      "example": "SAP"
+     },
+     "phone": {
+      "type": "string",
+      "description": "Phone number",
+      "example": "555130811000"
+     },
+     "qrCode": {
+      "type": "string",
+      "description": "QR Code URL",
+      "example": "https://dfe-portal.svrs.rs.gov.br/cte/QRCode?chCTe=43210374544297000192570240000022951961807015&tpAmb=2"
+     },
+     "emails": {
+      "type": "array",
+      "items": {
+       "$ref": "#/components/schemas/Address"
+      }
+     }
+    },
+    "description": "Mail information"
+   },
+   "DistributionStatusResponse": {
+    "type": "object",
+    "properties": {
+     "documentId": {
+      "type": "string",
+      "description": "Distribution unique identifiers list",
+      "example": "bfd8273d-0877-457f-81e7-eda52f82093d"
+     },
+     "mailLog": {
+      "$ref": "#/components/schemas/MailLog"
+     },
+     "messages": {
+      "type": "array",
+      "items": {
+       "$ref": "#/components/schemas/Message"
+      }
+     }
+    },
+    "description": "Distribution Status Response"
+   },
+   "MailLog": {
+    "type": "object",
+    "properties": {
+     "processingStatus": {
+      "type": "string",
+      "description": "Processing status of the log",
+      "example": "COMPLETED",
+      "enum": [
+       "PROCESSING",
+       "COMPLETED",
+       "ERROR"
+      ]
+     },
+     "messageId": {
+      "type": "string",
+      "description": "MessageId",
+      "example": "1810874508.48175.1655930013505.JavaMail.vcap@8a10fd95-fc61-443f-4c51-a625"
+     },
+     "dateTime": {
+      "type": "string",
+      "description": "Processing time and date",
+      "format": "date-time",
+      "example": "2022-04-26T11:53:22.341Z"
+     },
+     "senderList": {
+      "type": "array",
+      "description": "Sender email list",
+      "example": "test@email.com",
+      "items": {
+       "type": "string",
+       "description": "Sender email list",
+       "example": "test@email.com"
+      }
+     },
+     "mailStatusList": {
+      "type": "array",
+      "items": {
+       "$ref": "#/components/schemas/MailStatus"
+      }
+     }
+    },
+    "description": "Mail log information"
+   },
+   "MailStatus": {
+    "type": "object",
+    "properties": {
+     "type": {
+      "type": "string",
+      "description": "Type of the description message",
+      "example": "SUCCESS",
+      "enum": [
+       "SUCCESS",
+       "WARN",
+       "INFO",
+       "ERROR"
+      ]
+     },
+     "email": {
+      "type": "string",
+      "description": "Email",
+      "example": "email@test.com"
+     },
+     "description": {
+      "type": "string",
+      "description": "Status description message",
+      "example": "The e-mail was successfully sent."
+     }
+    }
+   },
+   "Message": {
+    "type": "object",
+    "properties": {
+     "type": {
+      "type": "string",
+      "description": "Type of the description message",
+      "example": "ERROR",
+      "enum": [
+       "SUCCESS",
+       "WARN",
+       "INFO",
+       "ERROR"
+      ]
+     },
+     "distributionType": {
+      "type": "string",
+      "description": "Type of distribution",
+      "example": "MAIL",
+      "enum": [
+       "MAIL",
+       "EXTENSION"
+      ]
+     },
+     "text": {
+      "type": "string",
+      "description": "Text message",
+      "example": "No recipient e-mail was found, please review the configuration."
+     }
+    },
+    "description": "Distribution log messages"
+   },
+   "DistributionStatusRequest": {
+    "required": [
+     "documentIdList"
+    ],
+    "type": "object",
+    "properties": {
+     "documentIdList": {
+      "type": "array",
+      "description": "Distribution unique identifiers list",
+      "example": [ "bfd8273d-0877-457f-81e7-eda52f82093d" ],
+      "items": {
+       "type": "string",
+       "description": "Distribution unique identifiers list",
+       "example": "bfd8273d-0877-457f-81e7-eda52f82093d"
+      }
+     }
+    },
+    "description": "Distribution Retrieve Request"
+   },
+   "DistributionDeleteRequest": {
+    "required": [
+     "documentIdList"
+    ],
+    "type": "object",
+    "properties": {
+     "documentIdList": {
+      "type": "array",
+      "description": "Distribution unique identifiers list",
+      "example": [ "bfd8273d-0877-457f-81e7-eda52f82093d" ],
+      "items": {
+       "type": "string",
+       "description": "Distribution unique identifiers list",
+       "example": "bfd8273d-0877-457f-81e7-eda52f82093d"
+      }
+     }
+    },
+    "description": "Distribution Logs Delete request"
+   }
+  },
+  "securitySchemes": {
+   "Sandbox": {
+    "type": "oauth2",
+    "flows": {
+     "clientCredentials": {
+      "tokenUrl": "https://sandboxapihub.authentication.br10.hana.ondemand.com/oauth/token?grant_type=client_credentials",
+      "scopes": {
+      }
+     }
+    }
+   }
+  }
+ },
+ "x-sap-shortText": "Distribute electronic fiscal documents to customers."
+}

@@ -1,0 +1,745 @@
+{
+  "openapi" : "3.0.1",
+  "info" : {
+    "title" : "Electronic Document Partner Connector",
+    "description" : "Allows you to configure destinations in the cloud. Destinations are the elements that establish the connection between your cloud environment and SAP Document Compliance, outbound invoicing option for Brazil. Your cloud environment then communicates with the local authorities to send and receive the electronic documents. This API communicates with the *Manage Partner Destinations* screen (transaction NFE_CLOUD_DEST) of your source system.",
+    "version" : "1.0.0"
+  },
+  "externalDocs" : {
+    "description" : "Partner Enablement for SAP Document Compliance, outbound invoicing option for Brazil",
+    "url" : "https://help.sap.com/viewer/71b3b178e5cb4a50a88cf2985a14f17c/Cloud/en-US/8f203794372d413eae6da083e5e0838f.html"
+  },
+  "x-sap-shortText": "Enables the configuration of destinations in the cloud.",
+  "servers" : [
+    {
+      "url": "https://sandbox.api.sap.com/DocumentReportingComplianceInvoicing4Brazil/electronic-document-partner-connector",
+      "description": "Sandbox URL",
+      "variables": {}
+    },
+    {
+      "url": "https://nfe.cfapps.br10.hana.ondemand.com/electronic-document-partner-connector",
+      "description": "Production URL",
+      "variables": {}
+    }
+  ],
+  "security": [
+    {
+      "OAuth2": [
+        "secure"
+      ]
+    }
+  ],
+  "paths" : {
+    "/v2/destinations/{uuid}" : {
+      "put" : {
+        "tags" : [ "Destinations" ],
+        "summary" : "Changes a destination.",
+        "description" : "Changes one destination. After you proceed with this operation, the system returns the change status and the changed destination.",
+        "operationId" : "updateDestinationV2",
+        "parameters" : [ {
+          "name" : "uuid",
+          "in" : "path",
+          "description" : "Unique identifier of the destination",
+          "required" : true,
+          "schema" : {
+            "pattern" : "([a-f0-9]{8}(-[a-f0-9]{4}){4}[a-f0-9]{8})",
+            "type" : "string",
+            "example" : "73e4eb38-ea2c-48c0-95c3-4dd4f3d843a3"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/DestinationRequestV2"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "The destination was changed.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DestinationResponseV2"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Invalid data was supplied for the operation.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExceptionMessagesResponse"
+                }
+              },
+              "text/plain" : {
+                "schema" : {
+                  "type" : "string",
+                  "example" : "Invalid UUID string: {UUID}"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "The destination was not found.",
+            "content" : {
+              "text/plain" : {
+                "schema" : {
+                  "type" : "string",
+                  "example" : "The destination UUID does not exist: {UUID}"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "A destination with the same identifiers already exists.",
+            "content" : {
+              "text/plain" : {
+                "schema" : {
+                  "type" : "string",
+                  "example" : "An entry already exists with the same key."
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "OAuth2" : [ ]
+        } ]
+      },
+      "delete" : {
+        "tags" : [ "Destinations" ],
+        "summary" : "Deletes a destination.",
+        "description" : "Deletes one destination. After you proceed with this operation, the system returns the deletion status.",
+        "operationId" : "deleteDestinationsV2",
+        "parameters" : [ {
+          "name" : "uuid",
+          "in" : "path",
+          "description" : "Unique identifier of the destination",
+          "required" : true,
+          "schema" : {
+            "pattern" : "([a-f0-9]{8}(-[a-f0-9]{4}){4}[a-f0-9]{8})",
+            "type" : "string",
+            "example" : "73e4eb38-ea2c-48c0-95c3-4dd4f3d843a3"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "The destination was deleted."
+          },
+          "400" : {
+            "description" : "Invalid data was supplied for the operation.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExceptionMessagesResponse"
+                }
+              },
+              "text/plain" : {
+                "schema" : {
+                  "type" : "string",
+                  "example" : "Invalid UUID string: {UUID}"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "The destination was not found."
+          }
+        },
+        "security" : [ {
+          "OAuth2" : [ ]
+        } ]
+      }
+    },
+    "/v1/destinations/{uuid}" : {
+      "put" : {
+        "tags" : [ "Destinations" ],
+        "summary" : "Changes a destination.",
+        "description" : "Changes one destination. After you proceed with this operation, the system returns the change status and the changed destination.",
+        "operationId" : "updateDestination",
+        "parameters" : [ {
+          "name" : "uuid",
+          "in" : "path",
+          "description" : "Unique identifier of the destination",
+          "required" : true,
+          "schema" : {
+            "pattern" : "([a-f0-9]{8}(-[a-f0-9]{4}){4}[a-f0-9]{8})",
+            "type" : "string",
+            "example" : "73e4eb38-ea2c-48c0-95c3-4dd4f3d843a3"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/DestinationRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "The destination was changed.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DestinationResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Invalid data was supplied for the operation.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExceptionMessagesResponse"
+                }
+              },
+              "text/plain" : {
+                "schema" : {
+                  "type" : "string",
+                  "example" : "Invalid UUID string: {UUID}"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "The destination was not found.",
+            "content" : {
+              "text/plain" : {
+                "schema" : {
+                  "type" : "string",
+                  "example" : "The destination UUID does not exist: {UUID}"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "A destination with the same identifiers already exists.",
+            "content" : {
+              "text/plain" : {
+                "schema" : {
+                  "type" : "string",
+                  "example" : "An entry already exists with the same key."
+                }
+              }
+            }
+          }
+        },
+        "deprecated" : true,
+        "security" : [ {
+          "OAuth2" : [ ]
+        } ]
+      },
+      "delete" : {
+        "tags" : [ "Destinations" ],
+        "summary" : "Deletes a destination.",
+        "description" : "Deletes one destination. After you proceed with this operation, the system returns the deletion status.",
+        "operationId" : "deleteDestinations",
+        "parameters" : [ {
+          "name" : "uuid",
+          "in" : "path",
+          "description" : "Unique identifier of the destination",
+          "required" : true,
+          "schema" : {
+            "pattern" : "([a-f0-9]{8}(-[a-f0-9]{4}){4}[a-f0-9]{8})",
+            "type" : "string",
+            "example" : "73e4eb38-ea2c-48c0-95c3-4dd4f3d843a3"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/DeleteDestinationRequest"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "204" : {
+            "description" : "The destination was deleted."
+          },
+          "400" : {
+            "description" : "Invalid data was supplied for the operation.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExceptionMessagesResponse"
+                }
+              },
+              "text/plain" : {
+                "schema" : {
+                  "type" : "string",
+                  "example" : "Invalid UUID string: {UUID}"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "The destination was not found."
+          }
+        },
+        "deprecated" : true,
+        "security" : [ {
+          "OAuth2" : [ ]
+        } ]
+      }
+    },
+    "/v2/destinations" : {
+      "get" : {
+        "tags" : [ "Destinations" ],
+        "summary" : "Retrieves all destinations.",
+        "description" : "Retrieves all destinations. After you proceed with this operation, the system returns the retrieve status and the list of destinations.",
+        "operationId" : "getAllDestinationsV2",
+        "responses" : {
+          "200" : {
+            "description" : "The list of destinations was retrieved.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/DestinationResponseV2"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "OAuth2" : [ ]
+        } ]
+      },
+      "post" : {
+        "tags" : [ "Destinations" ],
+        "summary" : "Creates a destination.",
+        "description" : "Posts one destination. After you proceed with this operation, the system returns the posting status and the posted destination.",
+        "operationId" : "saveDestinationV2",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/DestinationRequestV2"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "description" : "The destination was created.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DestinationResponseV2"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Invalid data was supplied for the operation.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExceptionMessagesResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "A destination with the same identifiers already exists.",
+            "content" : {
+              "text/plain" : {
+                "schema" : {
+                  "type" : "string",
+                  "example" : "An entry already exists with the same key."
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "OAuth2" : [ ]
+        } ]
+      }
+    },
+    "/v1/destinations" : {
+      "get" : {
+        "tags" : [ "Destinations" ],
+        "summary" : "Retrieves all destinations.",
+        "description" : "Retrieves all destinations. After you proceed with this operation, the system returns the retrieve status and the list of destinations.",
+        "operationId" : "getAllDestinations",
+        "responses" : {
+          "200" : {
+            "description" : "The list of destinations was retrieved.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/DestinationResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "deprecated" : true,
+        "security" : [ {
+          "OAuth2" : [ ]
+        } ]
+      },
+      "post" : {
+        "tags" : [ "Destinations" ],
+        "summary" : "Creates a destination.",
+        "description" : "Posts one destination. After you proceed with this operation, the system returns the posting status and the posted destination.",
+        "operationId" : "saveDestination",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/DestinationRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "description" : "The destination was created.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DestinationResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Invalid data was supplied for the operation.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExceptionMessagesResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "A destination with the same identifiers already exists.",
+            "content" : {
+              "text/plain" : {
+                "schema" : {
+                  "type" : "string",
+                  "example" : "An entry already exists with the same key."
+                }
+              }
+            }
+          }
+        },
+        "deprecated" : true,
+        "security" : [ {
+          "OAuth2" : [ ]
+        } ]
+      }
+    }
+  },
+  "components" : {
+    "schemas" : {
+      "DestinationResponse" : {
+        "type" : "object",
+        "properties" : {
+          "uuid" : {
+            "pattern" : "([a-f0-9]{8}(-[a-f0-9]{4}){4}[a-f0-9]{8})",
+            "type" : "string",
+            "description" : "Unique identifier of the destination",
+            "format" : "uuid",
+            "example" : "73e4eb38-ea2c-48c0-95c3-4dd4f3d843a3"
+          },
+          "environmentType" : {
+            "type" : "string",
+            "description" : "Environment type for which the destination is used",
+            "example" : "1",
+            "enum" : [ "1", "2" ]
+          },
+          "documentModel" : {
+            "maxLength" : 2,
+            "minLength" : 2,
+            "type" : "string",
+            "description" : "Document model for which the destination is used",
+            "example" : "00"
+          },
+          "state" : {
+            "maxLength" : 2,
+            "type" : "string",
+            "description" : "State for which the destination is used, or empty if valid for any state",
+            "example" : "RS"
+          },
+          "cityCode" : {
+            "maxLength" : 10,
+            "type" : "string",
+            "description" : "City code for which the destination is used, or empty if valid for any city code",
+            "example" : "4318705"
+          },
+          "action" : {
+            "type" : "string",
+            "description" : "Action in which the destination is used, or empty if valid for any action",
+            "example" : "AUTHORIZE",
+            "enum" : [ "AUTHORIZE", "CANCEL", "STATUS" ]
+          },
+          "name" : {
+            "maxLength" : 100,
+            "type" : "string",
+            "description" : "Name of the destination registered in SAP Business Technology Platform",
+            "example" : "DESTINATION_RS_SL_AUTH"
+          },
+          "changedDate" : {
+            "maxLength" : 8,
+            "minLength" : 8,
+            "pattern" : "yyyyMMdd",
+            "type" : "string",
+            "description" : "Date the destination was last changed",
+            "example" : "20191128"
+          },
+          "changedTime" : {
+            "maxLength" : 6,
+            "minLength" : 6,
+            "pattern" : "HHmmss",
+            "type" : "string",
+            "description" : "Time the destination was last changed",
+            "example" : "143821"
+          },
+          "changedByUser" : {
+            "maxLength" : 100,
+            "type" : "string",
+            "description" : "User who last changed the destination",
+            "example" : "ADMIN"
+          }
+        },
+        "description" : "Response of a destination"
+      },
+      "DestinationResponseV2" : {
+        "type" : "object",
+        "properties" : {
+          "uuid" : {
+            "pattern" : "([a-f0-9]{8}(-[a-f0-9]{4}){4}[a-f0-9]{8})",
+            "type" : "string",
+            "description" : "Unique identifier of the destination",
+            "format" : "uuid",
+            "example" : "73e4eb38-ea2c-48c0-95c3-4dd4f3d843a3"
+          },
+          "environmentType" : {
+            "type" : "string",
+            "description" : "Environment type for which the destination is used",
+            "example" : "1",
+            "enum" : [ "1", "2" ]
+          },
+          "documentModel" : {
+            "maxLength" : 2,
+            "minLength" : 2,
+            "type" : "string",
+            "description" : "Document model for which the destination is used",
+            "example" : "00"
+          },
+          "state" : {
+            "maxLength" : 2,
+            "type" : "string",
+            "description" : "State for which the destination is used, or empty if valid for any state",
+            "example" : "RS"
+          },
+          "cityCode" : {
+            "maxLength" : 10,
+            "type" : "string",
+            "description" : "City code for which the destination is used, or empty if valid for any city code",
+            "example" : "4318705"
+          },
+          "action" : {
+            "type" : "string",
+            "description" : "Action in which the destination is used, or empty if valid for any action",
+            "example" : "AUTHORIZE",
+            "enum" : [ "AUTHORIZE", "CANCEL", "STATUS" ]
+          },
+          "name" : {
+            "maxLength" : 100,
+            "type" : "string",
+            "description" : "Name of the destination registered in SAP Business Technology Platform",
+            "example" : "DESTINATION_RS_SL_AUTH"
+          },
+          "changedDate" : {
+            "maxLength" : 8,
+            "minLength" : 8,
+            "pattern" : "yyyyMMdd",
+            "type" : "string",
+            "description" : "Date the destination was last changed",
+            "example" : "20191128"
+          },
+          "changedTime" : {
+            "maxLength" : 6,
+            "minLength" : 6,
+            "pattern" : "HHmmss",
+            "type" : "string",
+            "description" : "Time the destination was last changed",
+            "example" : "143821"
+          }
+        },
+        "description" : "Response of a destination"
+      },
+      "ExceptionMessagesResponse" : {
+        "type" : "object",
+        "properties" : {
+          "messages" : {
+            "type" : "array",
+            "description" : "List of exception messages",
+            "example" : [ "The field is not valid." ],
+            "items" : {
+              "type" : "string",
+              "description" : "List of exception messages",
+              "example" : "[\"The field is not valid.\"]"
+            }
+          }
+        },
+        "description" : "Response with a list of exception messages"
+      },
+      "DestinationRequest" : {
+        "required" : [ "changedByUser", "documentModel", "environmentType", "name" ],
+        "type" : "object",
+        "properties" : {
+          "environmentType" : {
+            "maxLength" : 1,
+            "minLength" : 0,
+            "type" : "string",
+            "description" : "Environment type for which the destination is used",
+            "example" : "1",
+            "enum" : [ "1", "2" ]
+          },
+          "documentModel" : {
+            "maxLength" : 2,
+            "minLength" : 0,
+            "type" : "string",
+            "description" : "Document model for which the destination is used",
+            "example" : "00"
+          },
+          "state" : {
+            "maxLength" : 2,
+            "minLength" : 0,
+            "type" : "string",
+            "description" : "State for which the destination is used, or empty if valid for any state",
+            "example" : "RS"
+          },
+          "cityCode" : {
+            "maxLength" : 10,
+            "minLength" : 0,
+            "type" : "string",
+            "description" : "City code for which the destination is used, or empty if valid for any city code",
+            "example" : "4318705"
+          },
+          "action" : {
+            "type" : "string",
+            "description" : "Action in which the destination is used, or empty if valid for any action",
+            "example" : "AUTHORIZE",
+            "enum" : [ "AUTHORIZE", "CANCEL", "STATUS" ]
+          },
+          "name" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : "string",
+            "description" : "Name of the destination registered in SAP Business Technology Platform",
+            "example" : "DESTINATION_RS_SL_AUTH"
+          },
+          "changedByUser" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : "string",
+            "description" : "User who changed the destination",
+            "example" : "ADMIN"
+          }
+        },
+        "description" : "Request for a destination"
+      },
+      "DestinationRequestV2" : {
+        "required" : [ "documentModel", "environmentType", "name" ],
+        "type" : "object",
+        "properties" : {
+          "environmentType" : {
+            "maxLength" : 1,
+            "minLength" : 0,
+            "type" : "string",
+            "description" : "Environment type for which the destination is used",
+            "example" : "1",
+            "enum" : [ "1", "2" ]
+          },
+          "documentModel" : {
+            "maxLength" : 2,
+            "minLength" : 0,
+            "type" : "string",
+            "description" : "Document model for which the destination is used",
+            "example" : "00"
+          },
+          "state" : {
+            "maxLength" : 2,
+            "minLength" : 0,
+            "type" : "string",
+            "description" : "State for which the destination is used, or empty if valid for any state",
+            "example" : "RS"
+          },
+          "cityCode" : {
+            "maxLength" : 10,
+            "minLength" : 0,
+            "type" : "string",
+            "description" : "City code for which the destination is used, or empty if valid for any city code",
+            "example" : "4318705"
+          },
+          "action" : {
+            "type" : "string",
+            "description" : "Action in which the destination is used, or empty if valid for any action",
+            "example" : "AUTHORIZE",
+            "enum" : [ "AUTHORIZE", "CANCEL", "STATUS" ]
+          },
+          "name" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : "string",
+            "description" : "Name of the destination registered in SAP Business Technology Platform",
+            "example" : "DESTINATION_RS_SL_AUTH"
+          }
+        },
+        "description" : "Request for a destination"
+      },
+      "DeleteDestinationRequest" : {
+        "required" : [ "changedByUser" ],
+        "type" : "object",
+        "properties" : {
+          "changedByUser" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : "string",
+            "description" : "User who deleted the destination",
+            "example" : "ADMIN"
+          }
+        },
+        "description" : "Request for destination deletion"
+      }
+    },
+    "securitySchemes": {
+      "OAuth2": {
+        "type": "oauth2",
+        "flows": {
+          "clientCredentials": {
+            "tokenUrl": "https://nfe-tenant-try-out.authentication.br10.hana.ondemand.com/oauth/token?grant_type=client_credentials",
+            "scopes": {
+              "secure": "Authorization for API functionalities."
+            }
+          }
+        }
+      }
+    }
+  }
+}

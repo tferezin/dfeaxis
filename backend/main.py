@@ -22,7 +22,7 @@ from middleware.security import (
     RateLimitMiddleware,
     request_id_ctx,
 )
-from routers import documents, certificates, polling, credits, api_keys, tenants, manifestacao, nfse
+from routers import documents, certificates, polling, credits, api_keys, tenants, manifestacao, nfse, sap_drc
 from scheduler.polling_job import start_scheduler, stop_scheduler
 
 
@@ -199,6 +199,7 @@ app.include_router(api_keys.router, prefix="/api/v1", tags=["API Keys"])
 app.include_router(tenants.router, prefix="/api/v1", tags=["Tenants"])
 app.include_router(manifestacao.router, prefix="/api/v1", tags=["Manifestação"])
 app.include_router(nfse.router, prefix="/api/v1", tags=["NFS-e"])
+app.include_router(sap_drc.router, prefix="/sap-drc", tags=["SAP DRC Compatibility"])
 
 
 @app.get("/health")

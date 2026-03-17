@@ -1,0 +1,137 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "description": "Allows you to manage inbound NF-es that your supplier has issued and sent to you. This API has the following features:\n- Receive the XML file of a new official document.\n- Retrieve all the new inbound invoice documents for a specific CNPJ.\n- Download the XML file of an existing official document.",
+    "version": "1.0.0",
+    "title": "Electronic Nota Fiscal (NFe) Inbound Simple"
+  },
+  "host": "sandbox.api.sap.com",
+  "basePath": "/DocumentReportingComplianceInvoicing4Brazil/nfe-inbound-simple",
+  "schemes": ["https"],
+  "x-servers": [
+    {
+      "url": "https://nfe.cfapps.br10.hana.ondemand.com/nfe-inbound-simple",
+      "description": "Production URL"
+    }
+  ],
+  "securityDefinitions": {
+    "OAuth2": {
+      "type": "oauth2",
+      "flow": "application",
+      "tokenUrl": "https://nfe-tenant-try-out.authentication.br10.hana.ondemand.com/oauth/token?grant_type=client_credentials"
+    }
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Gets application health status",
+        "responses": { "200": { "description": "OK" }, "401": { "description": "Unauthorized" }, "404": { "description": "Not Found" } }
+      }
+    },
+    "/v1/deleteInboundInvoices": {
+      "delete": {
+        "summary": "Deletes inbound invoice information",
+        "parameters": [{ "in": "body", "name": "invoices", "schema": { "$ref": "#/definitions/InboundInvoiceDeleteRequest" } }],
+        "responses": { "204": { "description": "Deleted" }, "400": { "description": "No UUID informed" }, "401": { "description": "Unauthorized" } }
+      }
+    },
+    "/v1/deleteOfficialDocument": {
+      "delete": {
+        "summary": "Deletes the XML file of an official document",
+        "parameters": [
+          { "name": "accessKey", "in": "query", "required": true, "type": "string" },
+          { "name": "eventSequence", "in": "query", "required": false, "type": "string" },
+          { "name": "eventType", "in": "query", "required": false, "type": "string" }
+        ],
+        "responses": { "204": { "description": "Deleted" }, "400": { "description": "Invalid info" }, "404": { "description": "Not found" } }
+      }
+    },
+    "/v1/downloadOfficialDocument": {
+      "get": {
+        "summary": "Downloads the XML file of an official document",
+        "produces": ["application/xml"],
+        "parameters": [
+          { "name": "accessKey", "in": "query", "required": true, "type": "string" },
+          { "name": "eventSequence", "in": "query", "required": false, "type": "string" },
+          { "name": "eventType", "in": "query", "required": false, "type": "string" }
+        ],
+        "responses": { "200": { "description": "Downloaded" }, "400": { "description": "Invalid info" }, "404": { "description": "Not found" }, "422": { "description": "Error reading XML" } }
+      }
+    },
+    "/v1/receiveOfficialDocument": {
+      "post": {
+        "summary": "Receives the XML file of an official document",
+        "consumes": ["application/json"],
+        "parameters": [{ "in": "body", "name": "request", "schema": { "$ref": "#/definitions/OfficialDocumentReceiveRequest" } }],
+        "responses": { "202": { "description": "Received" }, "400": { "description": "Invalid info" }, "409": { "description": "Already exists" }, "422": { "description": "Cannot process" } }
+      }
+    },
+    "/v1/retrieveInboundInvoices": {
+      "post": {
+        "summary": "Retrieves inbound invoice information by CNPJ",
+        "consumes": ["application/json"],
+        "parameters": [{ "in": "body", "name": "request", "schema": { "$ref": "#/definitions/InboundInvoiceRetrieveRequest" } }],
+        "responses": { "200": { "description": "OK", "schema": { "$ref": "#/definitions/InboundInvoiceRetrieveResponse" } } }
+      }
+    }
+  },
+  "definitions": {
+    "InboundInvoiceDeleteRequest": {
+      "type": "object",
+      "required": ["uuidList"],
+      "properties": { "uuidList": { "type": "array", "items": { "type": "string", "format": "uuid" } } }
+    },
+    "InboundInvoiceRetrieveRequest": {
+      "type": "object",
+      "required": ["cnpj"],
+      "properties": { "cnpj": { "type": "array", "items": { "type": "string" }, "example": ["74544297000192"] } }
+    },
+    "InboundInvoiceRetrieveResponse": {
+      "type": "object",
+      "properties": {
+        "eventFragmentList": { "type": "array", "items": { "$ref": "#/definitions/EventFragment" } },
+        "notaFiscalFragmentList": { "type": "array", "items": { "$ref": "#/definitions/NotaFiscalFragment" } }
+      }
+    },
+    "OfficialDocumentReceiveRequest": {
+      "type": "object",
+      "required": ["xml"],
+      "properties": { "xml": { "type": "string", "example": "<?xml version=\"1.0\" encoding=\"utf-8\"?><nfeProc xmlns=\"http://www.portalfiscal.inf.br/nfe\" versao=\"4.00\"></nfeProc>" } }
+    },
+    "EventFragment": {
+      "type": "object",
+      "properties": {
+        "accessKey": { "type": "string" },
+        "eventDescription": { "type": "string" },
+        "eventSequence": { "type": "string" },
+        "eventStatusCode": { "type": "string" },
+        "eventStatusDescription": { "type": "string" },
+        "eventType": { "type": "string" },
+        "issueDate": { "type": "string", "format": "date-time" },
+        "processStatusCode": { "type": "string" },
+        "processStatusDescription": { "type": "string" },
+        "uuid": { "type": "string", "format": "uuid" }
+      }
+    },
+    "NotaFiscalFragment": {
+      "type": "object",
+      "properties": {
+        "accessKey": { "type": "string" },
+        "companyCNPJ": { "type": "string" },
+        "companyRegion": { "type": "string" },
+        "environmentType": { "type": "string" },
+        "issueDate": { "type": "string", "format": "date-time" },
+        "issueType": { "type": "string" },
+        "notaFiscalNumber": { "type": "string" },
+        "notaFiscalSeries": { "type": "string" },
+        "notaFiscalStatusCode": { "type": "string" },
+        "notaFiscalStatusDescription": { "type": "string" },
+        "processStatusCode": { "type": "string" },
+        "processStatusDescription": { "type": "string" },
+        "supplierCNPJ": { "type": "string" },
+        "supplierRegion": { "type": "string" },
+        "uuid": { "type": "string", "format": "uuid" }
+      }
+    }
+  }
+}

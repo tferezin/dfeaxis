@@ -1,0 +1,2039 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Electronic Document Orchestrator",
+    "description": "Sends and checks the status of electronic documents processed by your configured partner solution. This API has the following features:\n- Access your application and request the status of a document.\n- Access your application and send a document to be processed by your configured partner solution.\n- Make requests to your configured partner service.\n- Communicate with the *Brazil: Extension Fields for Cloud Requests* (NFE_CLOUD_REQ_EXT) BAdI.",
+    "version": "1.0.0"
+  },
+  "x-sap-shortText": "Enables you to send and check the status of electronic documents processed by your configured partner solution.",
+  "externalDocs": {
+    "description": "Partner Enablement for SAP Document and Reporting Compliance Outbound Invoicing Option for Brazil",
+    "url": "https://help.sap.com/viewer/71b3b178e5cb4a50a88cf2985a14f17c/Cloud/en-US/8f203794372d413eae6da083e5e0838f.html"
+  },
+  "servers": [
+    {
+      "url": "https://sandbox.api.sap.com/DocumentReportingComplianceInvoicing4Brazil/electronic-document-orchestrator",
+      "description": "Sandbox URL"
+    },
+    {
+      "url": "https://nfe.cfapps.br10.hana.ondemand.com/electronic-document-orchestrator",
+      "description": "Production URL"
+    }
+  ],
+  "security": [
+    {
+      "OAuth2": [
+        "secure"
+      ]
+    }
+  ],
+  "paths": {
+    "/v1/status": {
+      "post": {
+        "tags": [
+          "Orchestrator Controller"
+        ],
+        "summary": "Requests status of a document.",
+        "description": "Accesses your application and requests the status of a document.",
+        "operationId": "checkStatus",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatusRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The status was returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid data was supplied for the operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionMessagesResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "An unexpected error occurred while processing the message.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessagingExceptionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/document": {
+      "post": {
+        "tags": [
+          "Orchestrator Controller"
+        ],
+        "summary": "Sends a document for processing.",
+        "description": "Accesses your application and sends a document to be processed by your configured partner solution.",
+        "operationId": "sendDocument",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ElectronicDocumentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "The document was accepted for processing."
+          },
+          "400": {
+            "description": "Invalid data was supplied for the operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionMessagesResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "An unexpected error occurred while processing the message.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessagingExceptionResponse"
+                }
+              }
+            }
+          }
+        },
+        "callbacks": {
+          "Partner Solution Request": {
+            "http://$destination.url": {
+              "post": {
+                "description": "A request that is sent to the partner API for processing.",
+                "requestBody": {
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "$ref": "#/components/schemas/ElectronicDocumentRequest"
+                      }
+                    }
+                  }
+                },
+                "responses": {
+                  "200": {
+                    "description": "The electronic document has been processed.",
+                    "content": {
+                      "application/json": {
+                        "schema": {
+                          "$ref": "#/components/schemas/PartnerResponse"
+                        }
+                      }
+                    }
+                  },
+                  "202": {
+                    "description": "The electronic document has been accepted for asynchronous processing.",
+                    "content": {
+                      "application/json": {
+                        "schema": {
+                          "$ref": "#/components/schemas/PartnerResponse"
+                        }
+                      }
+                    }
+                  },
+                  "default": {
+                    "description": "An error occurred while processing the electronic document.",
+                    "content": {
+                      "application/json": {
+                        "schema": {
+                          "$ref": "#/components/schemas/PartnerResponse"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ExceptionMessagesResponse": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "description": "List of exception messages",
+            "example": [
+              "The field is not valid."
+            ],
+            "items": {
+              "type": "string",
+              "description": "List of exception messages",
+              "example": "[\"The field is not valid.\"]"
+            }
+          }
+        },
+        "description": "Response with a list of exception messages"
+      },
+      "MessagingExceptionResponse": {
+        "type": "object",
+        "properties": {
+          "timestamp": {
+            "type": "integer",
+            "description": "Timestamp that the error occurred",
+            "format": "int64",
+            "example": 1538125452647
+          },
+          "status": {
+            "maxLength": 3,
+            "type": "integer",
+            "description": "HTTP status code of the error",
+            "format": "int32",
+            "example": 404
+          },
+          "error": {
+            "type": "string",
+            "description": "Description of the HTTP status code",
+            "example": "Not found"
+          },
+          "exception": {
+            "type": "string",
+            "description": "Name of the exception class",
+            "example": "NotFoundException"
+          },
+          "message": {
+            "type": "string",
+            "description": "Message of the error",
+            "example": "The page was not found"
+          },
+          "path": {
+            "type": "string",
+            "description": "Path of the error",
+            "example": "/v1/document"
+          }
+        },
+        "description": "Response with details of unexpected message error"
+      },
+      "StatusRequest": {
+        "required": [
+          "uuidList"
+        ],
+        "type": "object",
+        "properties": {
+          "uuidList": {
+            "pattern": "([a-f0-9]{8}(-[a-f0-9]{4}){4}[a-f0-9]{8})",
+            "type": "array",
+            "description": "Unique identifier of the document",
+            "example": [
+              "c2677ce5-2067-2067-2067-20677ce572e6"
+            ],
+            "items": {
+              "pattern": "([a-f0-9]{8}(-[a-f0-9]{4}){4}[a-f0-9]{8})",
+              "type": "string",
+              "description": "Unique identifier of the document",
+              "format": "uuid"
+            }
+          }
+        },
+        "description": "Request for status check"
+      },
+      "DocumentStatusResponse": {
+        "type": "object",
+        "properties": {
+          "uuid": {
+            "pattern": "([a-f0-9]{8}(-[a-f0-9]{4}){4}[a-f0-9]{8})",
+            "type": "string",
+            "description": "Unique identifier of the document",
+            "format": "uuid",
+            "example": "ccf9e52b-e2e4-45d8-8884-0721d3246a53"
+          },
+          "action": {
+            "type": "string",
+            "description": "Action performed by the document",
+            "example": "AUTHORIZE",
+            "enum": [
+              "AUTHORIZE",
+              "CANCEL"
+            ]
+          },
+          "result": {
+            "type": "string",
+            "description": "Document status",
+            "example": "APPROVED",
+            "enum": [
+              "PROCESSING",
+              "APPROVED",
+              "REJECTED",
+              "DENIED",
+              "ERROR",
+              "TIMEOUT"
+            ]
+          },
+          "officialStatusCode": {
+            "maxLength": 3,
+            "type": "string",
+            "description": "Official status code",
+            "example": "100"
+          },
+          "officialStatusDescription": {
+            "maxLength": 100,
+            "type": "string",
+            "description": "Official status description",
+            "example": "Authorized"
+          },
+          "fiscalDocumentNumber": {
+            "maxLength": 9,
+            "type": "string",
+            "description": "Fiscal document number",
+            "example": "000178261"
+          },
+          "protocolNumber": {
+            "maxLength": 15,
+            "type": "string",
+            "description": "Protocol number",
+            "example": "143200000079630"
+          },
+          "processDate": {
+            "pattern": "yyyyMMdd",
+            "type": "string",
+            "description": "Process date",
+            "example": "20191030"
+          },
+          "processTime": {
+            "pattern": "HHmmss",
+            "type": "string",
+            "description": "Process time",
+            "example": "141935"
+          },
+          "extension": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "Extension fields",
+              "example": "{\"custom field\":\"custom value\"}"
+            },
+            "description": "Extension fields",
+            "example": {
+              "custom field": "custom value"
+            }
+          },
+          "messages": {
+            "type": "array",
+            "description": "Messages related to document processing",
+            "items": {
+              "$ref": "#/components/schemas/Message"
+            }
+          }
+        }
+      },
+      "Message": {
+        "type": "object",
+        "properties": {
+          "messageType": {
+            "type": "string",
+            "description": "Type of message",
+            "example": "ERROR",
+            "enum": [
+              "SUCCESS",
+              "INFO",
+              "WARN",
+              "ERROR"
+            ]
+          },
+          "message": {
+            "maxLength": 100,
+            "type": "string",
+            "description": "Message content",
+            "example": "This is a message"
+          }
+        },
+        "description": "Messages returned from the document processing"
+      },
+      "StatusResponse": {
+        "type": "object",
+        "properties": {
+          "documentStatusList": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DocumentStatusResponse"
+            }
+          }
+        }
+      },
+      "AdditionalInformation": {
+        "type": "object",
+        "properties": {
+          "observations": {
+            "type": "string",
+            "description": "Observations",
+            "example": "Manually Generated"
+          },
+          "actionReasonCode": {
+            "type": "string",
+            "description": "Action Reason Code",
+            "example": "01"
+          },
+          "actionReason": {
+            "type": "string",
+            "description": "Action Reason Description",
+            "example": "Cancellation after Fiscal Period"
+          },
+          "extension": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "Extension Fields",
+              "example": "{\"custom field\":\"custom value\"}"
+            },
+            "description": "Extension Fields",
+            "example": {
+              "custom field": "custom value"
+            }
+          }
+        },
+        "description": "Additional information"
+      },
+      "Address": {
+        "required": [
+          "cityCode",
+          "region"
+        ],
+        "type": "object",
+        "properties": {
+          "street": {
+            "type": "string",
+            "description": "Street",
+            "example": "Av. Unisinos"
+          },
+          "number": {
+            "type": "string",
+            "description": "Number",
+            "example": "188"
+          },
+          "complement": {
+            "type": "string",
+            "description": "Complement",
+            "example": "Bloco 2"
+          },
+          "floor": {
+            "type": "string",
+            "example": "5"
+          },
+          "district": {
+            "type": "string",
+            "description": "District",
+            "example": "Cristo Rei"
+          },
+          "cityCode": {
+            "type": "string",
+            "description": "City Code",
+            "example": "117854"
+          },
+          "city": {
+            "type": "string",
+            "description": "City Name",
+            "example": "São Leopoldo"
+          },
+          "region": {
+            "type": "string",
+            "description": "Region",
+            "example": "RS"
+          },
+          "postalCode": {
+            "type": "string",
+            "description": "Postal Code",
+            "example": "93022718"
+          },
+          "countryCode": {
+            "type": "string",
+            "description": "Country Code",
+            "example": "BR"
+          },
+          "country": {
+            "type": "string",
+            "description": "Country",
+            "example": "Brazil"
+          },
+          "phone": {
+            "type": "string",
+            "description": "Phone Number",
+            "example": "5130811000"
+          },
+          "fax": {
+            "type": "string",
+            "description": "Fax",
+            "example": "5130811000"
+          },
+          "email": {
+            "type": "string",
+            "description": "Email",
+            "example": "nfe@sap.com"
+          },
+          "extension": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "Extension Fields",
+              "example": "{\"custom field\":\"custom value\"}"
+            },
+            "description": "Extension Fields",
+            "example": {
+              "custom field": "custom value"
+            }
+          }
+        },
+        "description": "Address details"
+      },
+      "Authorization": {
+        "type": "object",
+        "properties": {
+          "header": {
+            "$ref": "#/components/schemas/AuthorizationHeader"
+          },
+          "issuer": {
+            "$ref": "#/components/schemas/Issuer"
+          },
+          "partners": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Partner"
+            }
+          },
+          "payment": {
+            "$ref": "#/components/schemas/Payment"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Item"
+            }
+          },
+          "referenceDocuments": {
+            "$ref": "#/components/schemas/ReferenceDocuments"
+          },
+          "total": {
+            "$ref": "#/components/schemas/Total"
+          },
+          "transport": {
+            "$ref": "#/components/schemas/Transport"
+          },
+          "extension": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "Extension Fields",
+              "example": "{\"custom field\":\"custom value\"}"
+            },
+            "description": "Extension Fields",
+            "example": {
+              "custom field": "custom value"
+            }
+          }
+        }
+      },
+      "ReferenceDocuments": {
+        "type": "object",
+        "properties": {
+          "documentRefNumber": {
+            "type": "string",
+            "description": "Document Reference Number",
+            "example": "123456"
+          },
+          "documentRefType": {
+            "type": "string",
+            "description": "Document Reference Type",
+            "example": "03"
+          },
+          "deductionType": {
+            "type": "string",
+            "description": "Deduction Type",
+            "example": "01"
+          },
+          "deductionDescription": {
+            "type": "string",
+            "description": "Deduction Description",
+            "example": "Deduction relating to the value of materials used in the construction."
+          },
+          "issqnReductionAmount": {
+            "type": "string",
+            "description": "Issqn Reduction Amount",
+            "example": "50.00"
+          },
+          "issqnDeductibleAmount": {
+            "type": "string",
+            "description": "Issqn Deductible Amount",
+            "example": "50.00"
+          },
+          "electronicDocumentKeyType": {
+            "type": "string",
+            "description": "Type of the Electronic Fiscal Document Key",
+            "example": "1"
+          },
+          "accessKeyTypeDescription": {
+            "type": "string",
+            "description": "Description of the Access Key type",
+            "example": "Electronic Transport Knowledge (CT-e) Access Key"
+          },
+          "documentRefKey": {
+            "type": "string",
+            "description": "Document Reference Key",
+            "example": "33112500000000000000081231234567891123456785"
+          },
+          "supplierNif": {
+            "type": "string",
+            "description": "Service Supplier Tax Identification Number (NIF)",
+            "example": "123456789"
+          },
+          "reasonNoSupplierNif": {
+            "type": "string",
+            "description": "Reason for No Service Supplier NIF Information",
+            "example": "1"
+          },
+          "valueTypePartyOperations": {
+            "type": "string",
+            "description": "Value Type for Third-Party Operations, Already Taxed",
+            "example": "01"
+          },
+          "taxReturnDescription": {
+            "type": "string",
+            "description": "Reimbursement or Refund Description",
+            "example": "Reimbursement related to the payment of video production costs."
+          },
+          "calcBaseExclusionAmount": {
+            "type": "string",
+            "description": "Amount For Exclusion from ISS, IBS, CBS Calculation Base",
+            "example": "100.00"
+          },
+          "caepfNumber": {
+            "type": "string",
+            "description": "Service Provider's CAEPF Registration Number",
+            "example": "12345678900010"
+          },
+          "cityCodeDocumentRepository": {
+            "type": "string",
+            "description": "City Code for Fiscal Document Out of National Repository",
+            "example": "3304557"
+          },
+          "fiscalDocumentNumber": {
+            "type": "string",
+            "description": "Fiscal Document Number",
+            "example": "12457"
+          },
+          "documentDescription": {
+            "type": "string",
+            "description": "Document Description",
+            "example": "Internal purchase order #45678"
+          },
+          "documentIssueDate": {
+            "type": "string",
+            "description": "Document Issue Date",
+            "example": "2025-11-27"
+          },
+          "documentEffectiveDate": {
+            "type": "string",
+            "description": "Document Effective Date",
+            "example": "2025-11-27"
+          },
+          "nonFiscalDocumentNumber": {
+            "type": "string",
+            "description": "Non-Fiscal Document Number",
+            "example": "12457"
+          }
+        }
+      },
+      "AuthorizationHeader": {
+        "type": "object",
+        "properties": {
+          "contingency": {
+            "type": "string",
+            "description": "Contingency Indicator",
+            "example": "true"
+          },
+          "documentVersion": {
+            "type": "string",
+            "description": "Document Version",
+            "example": "1.0"
+          },
+          "randomNumber": {
+            "type": "string",
+            "description": "Random Number",
+            "example": "046709160"
+          },
+          "checkDigit": {
+            "type": "string",
+            "description": "Check Digit",
+            "example": "0"
+          },
+          "issuingType": {
+            "type": "string",
+            "description": "Issuing Type",
+            "example": "1"
+          },
+          "contingencyDate": {
+            "type": "string",
+            "description": "Contingency Date",
+            "example": "20201601"
+          },
+          "contingencyTime": {
+            "type": "string",
+            "description": "Contingency Time",
+            "example": "142300"
+          },
+          "contingencyTimeZone": {
+            "type": "string",
+            "description": "Contingency Time zone",
+            "example": "-03:00"
+          },
+          "documentPrintFormat": {
+            "type": "string",
+            "description": "Document Printing Format",
+            "example": "2"
+          },
+          "issuingProcessIdentifier": {
+            "type": "string",
+            "description": "Issuing Process Identifier",
+            "example": "0"
+          },
+          "invoiceDebitType": {
+            "type": "string",
+            "description": "Type of Debit Nota Fiscal",
+            "example": "01"
+          },
+          "invoiceCreditType": {
+            "type": "string",
+            "description": "Type of Credit Nota Fiscal",
+            "example": "01"
+          },
+          "governmentEntityType": {
+            "type": "string",
+            "description": "Government Entity Type",
+            "example": "1"
+          },
+          "opGvmntEntityRealEstateTy": {
+            "type": "string",
+            "description": "Type of Operation with Government Entity or Real Estate",
+            "example": "1"
+          },
+          "substnReasonCode": {
+            "type": "string",
+            "description": "NFS-e Substitution Reason Code",
+            "example": "1"
+          },
+          "foreignIdServiceTaker": {
+            "type": "string",
+            "description": "Service Recipient Tax Identification Number (NIF)",
+            "example": "12345"
+          },
+          "foreignIdRecipient": {
+            "type": "string",
+            "description": "Recipient Tax Identification Number (NIF)",
+            "example": "0"
+          },
+          "issqnMncplTaxRegimeSpecial": {
+            "type": "string",
+            "description": "Recipient Tax Identification Number (NIF)",
+            "example": "0"
+          },
+          "nfseGenerationSystem": {
+            "type": "string",
+            "description": "NFS-e Generation System",
+            "example": "1"
+          },
+          "substnReasonDescription": {
+            "type": "string",
+            "description": "NFS-e Substitution Reason Description",
+            "example": "Authorization for Use of the NF-e"
+          },
+          "idDocumentTechRespy": {
+            "type": "string",
+            "description": "Technical Responsibility Document Identifier",
+            "example": "0"
+          },
+          "advanceInstallmentPayment": {
+            "type": "string",
+            "description": "Advance Installment Payment",
+            "example": "0"
+          },
+          "ibsCbs": {
+            "$ref": "#/components/schemas/IbsCbs",
+            "description": "Header IBS/CBS Map for Authorization Cloud Request"
+          },
+          "extension": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "Extension Fields",
+              "example": "{\"custom field\":\"custom value\"}"
+            },
+            "description": "Extension Fields",
+            "example": {
+              "custom field": "custom value"
+            }
+          }
+        }
+      },
+      "IbsCbs": {
+        "type": "object",
+        "properties": {
+          "taxSituationCode": {
+            "type": "string",
+            "description": "Tax Situation Code for CBS and IBS"
+          },
+          "taxClassificationCode": {
+            "type": "string",
+            "description": "Tax Classification Code for CBS and IBS"
+          },
+          "stateIbsRate": {
+            "type": "string",
+            "description": "State IBS Rate"
+          },
+          "municipalIbsRate": {
+            "type": "string",
+            "description": "Municipal IBS Rate"
+          },
+          "brRealRegistryCode": {
+            "type": "string",
+            "description": "Brazilian Real Estate Registry Code"
+          },
+          "supplyOperationIndicatorCod": {
+            "type": "string",
+            "description": "Supply Operation Indicator Code"
+          },
+          "propertyTaxRegistration": {
+            "type": "string",
+            "description": "Property Tax Registration"
+          },
+          "noForeignIdServiceReason": {
+            "type": "string",
+            "description": "Reason for no Service Recipient NIF Information"
+          },
+          "noForeignIdServiceRcpnt": {
+            "type": "string",
+            "description": "Reason for no Recipient NIF Information"
+          },
+          "idServiceRecipient": {
+            "type": "string",
+            "description": "Service Recipient Identifier"
+          }
+        }
+      },
+      "Cancellation": {
+        "type": "object",
+        "properties": {
+          "issuer": {
+            "$ref": "#/components/schemas/Issuer"
+          },
+          "header": {
+            "$ref": "#/components/schemas/CancellationHeader"
+          }
+        },
+        "description": "Cancellation details"
+      },
+      "CancellationHeader": {
+        "type": "object",
+        "properties": {
+          "serviceCheckCode": {
+            "type": "string",
+            "description": "Service Check Code",
+            "example": "56788DF"
+          },
+          "reasonCode": {
+            "type": "string",
+            "description": "Reason Code",
+            "example": "S1"
+          },
+          "serviceNumber": {
+            "type": "string",
+            "description": "Service Number",
+            "example": "75831"
+          },
+          "authorizationCode": {
+            "type": "string",
+            "description": "Authorization Code",
+            "example": "143180004206945"
+          },
+          "extension": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "Extension Fields",
+              "example": "{\"custom field\":\"custom value\"}"
+            },
+            "description": "Extension Fields",
+            "example": {
+              "custom field": "custom value"
+            }
+          }
+        },
+        "description": "Cancellation header"
+      },
+      "Classification": {
+        "type": "object",
+        "properties": {
+          "operationClassification": {
+            "type": "string",
+            "description": "Operation Classification (e.g. CFOP)",
+            "example": "5101"
+          },
+          "operationClassificationDesc": {
+            "type": "string",
+            "description": "Operation Classification Description",
+            "example": "5101 description"
+          },
+          "internationalArticleNumber": {
+            "type": "string",
+            "description": "International Article Number",
+            "example": "78632045699823"
+          },
+          "tributaryInternationalArtic": {
+            "type": "string",
+            "description": "Tributary Intenational Article",
+            "example": "78632045699823"
+          },
+          "stateFiscalBenefitCode": {
+            "type": "string",
+            "description": "State Fiscal Benefit Code",
+            "example": "0123456789"
+          },
+          "fciNumber": {
+            "type": "string",
+            "description": "FCI Number",
+            "example": "B01F70AF-10BF-4B1F-848C-65FF57F616FE"
+          }
+        },
+        "description": "Item Classification"
+      },
+      "ElectronicDocumentRequest": {
+        "required": [
+          "header",
+          "uuid"
+        ],
+        "type": "object",
+        "properties": {
+          "uuid": {
+            "pattern": "([a-f0-9]{8}(-[a-f0-9]{4}){4}[a-f0-9]{8})",
+            "type": "string",
+            "description": "Unique identifier of the document",
+            "format": "uuid",
+            "example": "ccf9e52b-e2e4-45d8-8884-0721d3246a53"
+          },
+          "header": {
+            "$ref": "#/components/schemas/Header"
+          },
+          "authorization": {
+            "$ref": "#/components/schemas/Authorization"
+          },
+          "cancellation": {
+            "$ref": "#/components/schemas/Cancellation"
+          },
+          "additionalInformation": {
+            "$ref": "#/components/schemas/AdditionalInformation"
+          }
+        },
+        "description": "Electronic document request"
+      },
+      "Header": {
+        "required": [
+          "documentModel",
+          "environmentType"
+        ],
+        "type": "object",
+        "properties": {
+          "fiscalDocumentNumber": {
+            "type": "string",
+            "description": "Fiscal Document Number",
+            "example": "178261"
+          },
+          "documentNumber": {
+            "type": "string",
+            "description": "SAP Document Number",
+            "example": "71925"
+          },
+          "documentKey": {
+            "type": "string",
+            "description": "Document Key",
+            "example": "43191274408900000107590060000003769402870043"
+          },
+          "documentProvisoryNumber": {
+            "type": "string",
+            "description": "Document Provisory Number",
+            "example": "235304"
+          },
+          "documentSeries": {
+            "type": "string",
+            "description": "Document Series",
+            "example": "819"
+          },
+          "documentSubseries": {
+            "type": "string",
+            "description": "Document subseries",
+            "example": "15"
+          },
+          "documentModel": {
+            "type": "string",
+            "description": "Document Model",
+            "example": "00"
+          },
+          "documentType": {
+            "type": "string",
+            "description": "Document Type",
+            "example": "1"
+          },
+          "environmentType": {
+            "type": "string",
+            "description": "Environment Type",
+            "example": "1"
+          },
+          "postDate": {
+            "type": "string",
+            "description": "Posting Date",
+            "example": "20191030"
+          },
+          "issueDate": {
+            "type": "string",
+            "description": "Issue Date",
+            "example": "20191030"
+          },
+          "issueTime": {
+            "type": "string",
+            "description": "Issue Time",
+            "example": "141935"
+          },
+          "timeZone": {
+            "type": "string",
+            "description": "Time Zone",
+            "example": "-03:00"
+          },
+          "applicationVersion": {
+            "type": "string",
+            "description": "Application Version",
+            "example": "NFE CLOUD PE"
+          },
+          "extension": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "Extension Fields",
+              "example": "{\"custom field\":\"custom value\"}"
+            },
+            "description": "Extension Fields",
+            "example": {
+              "custom field": "custom value"
+            }
+          }
+        }
+      },
+      "Issuer": {
+        "type": "object",
+        "properties": {
+          "companyName": {
+            "type": "string",
+            "description": "Company Name",
+            "example": "SAP AG"
+          },
+          "tradeName": {
+            "type": "string",
+            "description": "Trade Name",
+            "example": "SAP Brazil"
+          },
+          "cnpj": {
+            "type": "string",
+            "description": "CNPJ",
+            "example": "74544297000192"
+          },
+          "stateRegistration": {
+            "type": "string",
+            "description": "State Registration Code",
+            "example": "50068749"
+          },
+          "municipalRegistration": {
+            "type": "string",
+            "description": "Municipal Registration Code",
+            "example": "9356"
+          },
+          "taxRegimeCode": {
+            "type": "string",
+            "description": "Tax Regime Code",
+            "example": "3"
+          },
+          "economicActivityCode": {
+            "type": "string",
+            "description": "Economic Activity Code",
+            "example": "2063100"
+          },
+          "specialTaxRegimeCode": {
+            "type": "string",
+            "description": "Special Tax Regime Code",
+            "example": "10"
+          },
+          "stateTaxTaxpayer": {
+            "type": "string",
+            "description": "State Tax Taxpayer",
+            "example": "NC"
+          },
+          "address": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "extension": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "Extension Fields",
+              "example": "{\"custom field\":\"custom value\"}"
+            },
+            "description": "Extension Fields",
+            "example": {
+              "custom field": "custom value"
+            }
+          }
+        },
+        "description": "Issuer details"
+      },
+      "Item": {
+        "type": "object",
+        "properties": {
+          "itemNumber": {
+            "type": "string",
+            "description": "Number",
+            "example": "10"
+          },
+          "itemCode": {
+            "type": "string",
+            "description": "Code",
+            "example": "SERVICE_MASTER"
+          },
+          "itemDescription": {
+            "type": "string",
+            "description": "Description"
+          },
+          "statistical": {
+            "type": "string",
+            "description": "Statistical Item",
+            "example": "false",
+            "enum": [
+              "false",
+              "true"
+            ]
+          },
+          "quantity": {
+            "type": "string",
+            "description": "Quantity",
+            "example": "1.0"
+          },
+          "unitOfMeasure": {
+            "type": "string",
+            "description": "Unit of Measure",
+            "example": "H"
+          },
+          "tributaryQuantity": {
+            "type": "string",
+            "description": "Tributary Quantity",
+            "example": "1.0"
+          },
+          "tributaryUnitOfMeasure": {
+            "maxLength": 3,
+            "type": "string",
+            "description": "Tributary Unit of Measure",
+            "example": "H"
+          },
+          "finalConsumerRate": {
+            "maxLength": 7,
+            "type": "string",
+            "description": "Final Consumer Rate",
+            "example": "17.0"
+          },
+          "percentageOfTaxBurden": {
+            "maxLength": 7,
+            "type": "string",
+            "description": "Percentage of Tax Burden",
+            "example": "10.0"
+          },
+          "sourceOfTaxBurden": {
+            "maxLength": 10,
+            "type": "string",
+            "description": "Source of Tax Burden"
+          },
+          "materialOrigin": {
+            "type": "string",
+            "description": "Material Origin"
+          },
+          "plant": {
+            "maxLength": 4,
+            "type": "string",
+            "description": "Plant",
+            "example": "BR01"
+          },
+          "producerCnpj": {
+            "maxLength": 14,
+            "type": "string",
+            "description": "Producer CNPJ",
+            "example": "74544297000192"
+          },
+          "relevantScaleIndicator": {
+            "type": "string",
+            "description": "Relevant Scale Indicator",
+            "example": "false",
+            "enum": [
+              "false",
+              "true"
+            ]
+          },
+          "grossRevenueSocialSecurity": {
+            "type": "string",
+            "description": "Gross Revenue Social Security",
+            "example": "false"
+          },
+          "destinationCategory": {
+            "type": "string",
+            "description": "Destination Category"
+          },
+          "purchaseOrder": {
+            "maxLength": 15,
+            "type": "string",
+            "description": "Purchase Order Number",
+            "example": "123455"
+          },
+          "purchaseOrderItem": {
+            "maxLength": 6,
+            "type": "string",
+            "description": "Purchase Order Item",
+            "example": "123"
+          },
+          "classification": {
+            "$ref": "#/components/schemas/Classification"
+          },
+          "values": {
+            "$ref": "#/components/schemas/Values"
+          },
+          "service": {
+            "$ref": "#/components/schemas/Service"
+          },
+          "reference": {
+            "$ref": "#/components/schemas/Reference"
+          },
+          "taxes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Tax"
+            }
+          },
+          "badiFields": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "Provided Extension Fields",
+              "example": "{\"custom field\":\"custom value\"}"
+            },
+            "description": "Provided Extension Fields",
+            "example": {
+              "custom field": "custom value"
+            }
+          },
+          "extension": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "Extension Fields",
+              "example": "{\"custom field\":\"custom value\"}"
+            },
+            "description": "Extension Fields",
+            "example": {
+              "custom field": "custom value"
+            }
+          },
+          "ibscbs": {
+            "$ref": "#/components/schemas/IbsCbs"
+          }
+        },
+        "description": "Item being authorized"
+      },
+      "Partner": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Partner Type",
+            "example": "C"
+          },
+          "name": {
+            "type": "string",
+            "description": "Partner Name",
+            "example": "SAP Brazil"
+          },
+          "cnpj": {
+            "type": "string",
+            "description": "CNPJ",
+            "example": "74544297000192"
+          },
+          "cpf": {
+            "type": "string",
+            "description": "CPF",
+            "example": "25796301455"
+          },
+          "stateRegistration": {
+            "type": "string",
+            "description": "State Registration Code",
+            "example": "50068749"
+          },
+          "municipalRegistration": {
+            "type": "string",
+            "description": "Municipal Registration Code",
+            "example": "9356"
+          },
+          "stateTaxTaxpayer": {
+            "type": "string",
+            "description": "State Tax Taxpayer",
+            "example": "NC"
+          },
+          "foreignIdentification": {
+            "type": "string",
+            "description": "Foreign Partner Identification",
+            "example": "00006"
+          },
+          "stateRegistrationSt": {
+            "type": "string",
+            "description": "State Registration ST",
+            "example": "48356"
+          },
+          "economicActivityCode": {
+            "type": "string",
+            "description": "Economic Activity Code",
+            "example": "2063100"
+          },
+          "taxRegimeCode": {
+            "type": "string",
+            "description": "Tax Regime Code",
+            "example": "3"
+          },
+          "placeType": {
+            "type": "string",
+            "description": "Place Type",
+            "example": "0"
+          },
+          "address": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "extension": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "Extension Fields",
+              "example": "{\"custom field\":\"custom value\"}"
+            },
+            "description": "Extension Fields",
+            "example": {
+              "custom field": "custom value"
+            }
+          }
+        }
+      },
+      "Payment": {
+        "type": "object",
+        "properties": {
+          "paymentTermsDescription": {
+            "type": "string"
+          },
+          "paymentMethods": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaymentMethod"
+            }
+          },
+          "change": {
+            "type": "string"
+          },
+          "baselinePaymentDate": {
+            "type": "string"
+          },
+          "extension": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "Extension Fields",
+              "example": "{\"custom field\":\"custom value\"}"
+            },
+            "description": "Extension Fields",
+            "example": {
+              "custom field": "custom value"
+            }
+          }
+        }
+      },
+      "PaymentMethod": {
+        "type": "object",
+        "properties": {
+          "paymentIndicator": {
+            "maxLength": 1,
+            "type": "string",
+            "description": "Payment Form Indicator"
+          },
+          "paymentValue": {
+            "type": "string",
+            "description": "Payment Value",
+            "example": "45.45"
+          },
+          "cardPaymentIntegrationType": {
+            "maxLength": 1,
+            "type": "string",
+            "description": "Payment Integration Type",
+            "example": "1",
+            "enum": [
+              "1",
+              "2"
+            ]
+          },
+          "cardCnpj": {
+            "maxLength": 14,
+            "type": "string",
+            "description": "CNPJ Number",
+            "example": "74544297000192"
+          },
+          "cardCompany": {
+            "maxLength": 2,
+            "minLength": 2,
+            "type": "string",
+            "description": "Credit Card Company",
+            "example": "01"
+          },
+          "cardAuthorizationNumber": {
+            "maxLength": 14,
+            "type": "string",
+            "description": "Authorization Number",
+            "example": "1111111111"
+          },
+          "extension": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "Extension Fields",
+              "example": "{\"custom field\":\"custom value\"}"
+            },
+            "description": "Extension Fields",
+            "example": {
+              "custom field": "custom value"
+            }
+          },
+          "paymentMethod": {
+            "maxLength": 2,
+            "minLength": 2,
+            "type": "string",
+            "description": "Payment Method",
+            "example": "01",
+            "enum": [
+              "01",
+              "02",
+              "03",
+              "04",
+              "05",
+              "10",
+              "11",
+              "12",
+              "13",
+              "14",
+              "15",
+              "90",
+              "99"
+            ]
+          }
+        },
+        "description": "Payment Method used"
+      },
+      "Reference": {
+        "type": "object",
+        "properties": {
+          "itemNumber": {
+            "type": "string",
+            "description": "Item Number of Reference Document",
+            "example": "10"
+          },
+          "header": {
+            "$ref": "#/components/schemas/Header"
+          }
+        },
+        "description": "Item Reference"
+      },
+      "Service": {
+        "type": "object",
+        "properties": {
+          "nomenclatureServicesCode": {
+            "type": "string",
+            "description": "Nomenclature Services Code (NBS)",
+            "example": "1.0402.11.10"
+          },
+          "efdReinfServiceTypeCode": {
+            "type": "string",
+            "description": "EFD REINF Service Type Code",
+            "example": "100000006"
+          },
+          "lcServiceTypeCode": {
+            "type": "string",
+            "description": "LC Service Type Code",
+            "example": "0409"
+          },
+          "serviceProcessNumber": {
+            "type": "string",
+            "description": "Service Process Number",
+            "example": "4574754674564564"
+          },
+          "municipalFiscalBenefitCode": {
+            "type": "string",
+            "description": "Municipal Fiscal Benefit Code",
+            "example": "02"
+          },
+          "serviceCategory": {
+            "type": "string",
+            "description": "Service Category",
+            "example": 2
+          },
+          "issqnNationalTaxationCode": {
+            "type": "string",
+            "description": "ISSQN National Taxation Code",
+            "example": 2
+          },
+          "transpDistrNetworkTotalExt": {
+            "type": "string",
+            "description": "Total Extent of Transportation and Distribution Networks",
+            "example": 2
+          },
+          "utilitiesPolesTotalNumber": {
+            "type": "string",
+            "description": "Total Number of Utilities Poles",
+            "example": 2
+          },
+          "leaseSubleaseUsgeObjType": {
+            "type": "string",
+            "description": "Object Type for Lease, Sublease, Leasing or Usage",
+            "example": 2
+          },
+          "municipalTaxCode": {
+            "type": "string",
+            "description": "Municipal Tax Code for ISSQN",
+            "example": "0"
+          },
+          "municipalBenefitIdCode": {
+            "type": "string",
+            "description": "Municipal Benefit Identification Code",
+            "example": "02"
+          }
+        },
+        "description": "Item Service"
+      },
+      "Tax": {
+        "type": "object",
+        "properties": {
+          "taxGroup": {
+            "type": "string",
+            "description": "Tax Group",
+            "example": "PIS"
+          },
+          "taxType": {
+            "type": "string",
+            "description": "Tax Type",
+            "example": "PIS3"
+          },
+          "taxSituation": {
+            "type": "string",
+            "description": "Tax Situation",
+            "example": "00"
+          },
+          "taxLawDescription": {
+            "type": "string",
+            "description": "Tax Law Description",
+            "example": "PIS Law 1"
+          },
+          "taxRate": {
+            "type": "string",
+            "description": "Tax Rate",
+            "example": "12.0"
+          },
+          "taxValue": {
+            "type": "string",
+            "description": "Tax Value",
+            "example": "15.24"
+          },
+          "baseRate": {
+            "type": "string",
+            "description": "Base Rate",
+            "example": "100.0"
+          },
+          "baseValue": {
+            "type": "string",
+            "description": "Base Amount",
+            "example": "126.98"
+          },
+          "excludedBaseValue": {
+            "type": "string",
+            "description": "Excluded Base Amount",
+            "example": "0.0"
+          },
+          "otherBaseValue": {
+            "type": "string",
+            "description": "Other Base Amount",
+            "example": "0.0"
+          },
+          "taxDifferenceValue": {
+            "type": "string",
+            "description": "Tax difference used for NF item calculation",
+            "example": "15.0"
+          },
+          "taxFactor": {
+            "type": "string",
+            "description": "Tax Factor (Number of Units)",
+            "example": "2"
+          },
+          "unitOfMeasure": {
+            "type": "string",
+            "description": "Unit of Measure",
+            "example": "UN"
+          },
+          "withhold": {
+            "type": "string",
+            "description": "Withholding Tax",
+            "example": "false",
+            "enum": [
+              "false",
+              "true"
+            ]
+          },
+          "includedInNet": {
+            "type": "string",
+            "description": "Tax Already Included in Net Value",
+            "example": "false",
+            "enum": [
+              "false",
+              "true"
+            ]
+          },
+          "taxLocation": {
+            "type": "string",
+            "description": "Tax Jurisdiction Code For Brazilian Tax Calculation",
+            "example": "RS 4318705"
+          },
+          "baseDetermination": {
+            "type": "string",
+            "description": "Base Determination Modality",
+            "example": "5"
+          },
+          "classificationCode": {
+            "type": "string",
+            "description": "Classification Code",
+            "example": "331"
+          },
+          "collectionCode": {
+            "type": "string",
+            "description": "Collection Code",
+            "example": "12"
+          },
+          "incentiveIndicator": {
+            "type": "string",
+            "description": "Incentive Indicator",
+            "example": "0"
+          },
+          "exemptionCode": {
+            "type": "string",
+            "description": "Exemption Code",
+            "example": "01"
+          },
+          "extension": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "Extension Fields",
+              "example": "{\"custom field\":\"custom value\"}"
+            },
+            "description": "Extension Fields",
+            "example": {
+              "custom field": "custom value"
+            }
+          }
+        },
+        "description": "Tax details"
+      },
+      "Total": {
+        "type": "object",
+        "properties": {
+          "itemsValue": {
+            "type": "string",
+            "description": "Services Total Value",
+            "example": "126.98"
+          },
+          "icmsBase": {
+            "type": "string",
+            "description": "ICMS Base Amount",
+            "example": "0.0"
+          },
+          "icmsValue": {
+            "type": "string",
+            "description": "ICMS Value",
+            "example": "0.0"
+          },
+          "ipiValue": {
+            "type": "string",
+            "description": "IPI Value",
+            "example": "22.8"
+          },
+          "pisValue": {
+            "type": "string",
+            "description": "PIS Value",
+            "example": "22.8"
+          },
+          "cofinsValue": {
+            "type": "string",
+            "description": "COFINS Value",
+            "example": "22.8"
+          },
+          "issValue": {
+            "type": "string",
+            "description": "ISS Value",
+            "example": "22.8"
+          },
+          "csllValue": {
+            "type": "string",
+            "description": "CSLL Value",
+            "example": "22.8"
+          },
+          "irrfValue": {
+            "type": "string",
+            "description": "IRRF Value",
+            "example": "22.8"
+          },
+          "totalValue": {
+            "type": "string",
+            "description": "Total Value Including Taxes",
+            "example": "339.48"
+          },
+          "extension": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "Extension Fields",
+              "example": "{\"custom field\":\"custom value\"}"
+            },
+            "description": "Extension Fields",
+            "example": {
+              "custom field": "custom value"
+            }
+          }
+        },
+        "description": "Totals Details"
+      },
+      "Transport": {
+        "type": "object",
+        "properties": {
+          "freightMode": {
+            "type": "string",
+            "description": "Freight Cost Paid by",
+            "example": "1"
+          },
+          "shipmentRegion": {
+            "type": "string",
+            "description": "Shipment Region",
+            "example": "RS"
+          },
+          "shipmentPlace": {
+            "type": "string",
+            "description": "Shipment Place",
+            "example": "0123487"
+          },
+          "dispatchLocation": {
+            "type": "string",
+            "description": "Dispatch Location",
+            "example": "S1"
+          },
+          "deliveryDate": {
+            "pattern": "yyyyMMdd",
+            "type": "string",
+            "description": "Delivery Date",
+            "example": "S1"
+          },
+          "extension": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "Extension Fields",
+              "example": "{\"custom field\":\"custom value\"}"
+            },
+            "description": "Extension Fields",
+            "example": {
+              "custom field": "custom value"
+            }
+          }
+        },
+        "description": "Transport Details"
+      },
+      "Values": {
+        "type": "object",
+        "properties": {
+          "netUnitPrice": {
+            "type": "string",
+            "description": "Net Unit Price",
+            "example": "116.62"
+          },
+          "netValue": {
+            "type": "string",
+            "description": "Net Value",
+            "example": "116.62"
+          },
+          "grossUnitPrice": {
+            "type": "string",
+            "description": "Gross Unit Price",
+            "example": "116.62"
+          },
+          "grossValue": {
+            "type": "string",
+            "description": "Gross Value",
+            "example": "116.62"
+          },
+          "discountValue": {
+            "type": "string",
+            "description": "Discount Value",
+            "example": "12387.01"
+          },
+          "freightValue": {
+            "type": "string",
+            "description": "Freight Value",
+            "example": "9822.12"
+          },
+          "insuranceValue": {
+            "type": "string",
+            "description": "Insurance Value",
+            "example": "12185.9"
+          },
+          "expensesValue": {
+            "type": "string",
+            "description": "Expenses Value",
+            "example": "10.0"
+          },
+          "statisticalAmount": {
+            "type": "string",
+            "description": "Statistical Amount",
+            "example": "0.14"
+          },
+          "approximateTaxValue": {
+            "type": "string",
+            "description": "Approximate Tax Value",
+            "example": "77.88"
+          },
+          "estdTotalTaxAmountInd": {
+            "type": "string",
+            "description": "Estimated Total Tax Amount Indicator",
+            "example": 116.62
+          },
+          "aprxTotalPctgStateTax": {
+            "type": "string",
+            "description": "Approximate Total Percentage of State Taxes",
+            "example": 0.2
+          },
+          "aprxTotalPctgFederalTax": {
+            "type": "string",
+            "description": "Approximate Total Percentage of Federal Taxes",
+            "example": 0.2
+          },
+          "aprxTotalPctgMncplTax": {
+            "type": "string",
+            "description": "Approximate Total Percentage of Municipal Taxes",
+            "example": 0.2
+          },
+          "issqnImmunityType": {
+            "type": "string",
+            "description": "Type of ISSQN Immunity",
+            "example": 1
+          },
+          "serviceTaxBaseStdAmount": {
+            "type": "string",
+            "description": "Standard Amount for Deduction/Reduction of Service Tax Base",
+            "example": 12185.9
+          },
+          "issqnTaxBaseReduction": {
+            "type": "string",
+            "description": "ISSQN Tax Base Reduction Amount",
+            "example": 10.0
+          },
+          "aprxStateTaxTotalAmt": {
+            "type": "string",
+            "description": "Approximate Total Amount of State Taxes",
+            "example": 0.14
+          },
+          "aprxFederalTaxTotalAmt": {
+            "type": "string",
+            "description": "Approximate Total Amount of Federal Taxes",
+            "example": 77.88
+          },
+          "aprxMncplTaxTotalAmt": {
+            "type": "string",
+            "description": "Approximate Total Amount of Municipal Taxes",
+            "example": 116.62
+          },
+          "issqnSuspendedOption": {
+            "type": "string",
+            "description": "Option for ISSQN Suspended Collectibility",
+            "example": 1
+          },
+          "stdPctgServiceValue": {
+            "type": "string",
+            "description": "Standard Percentage for Deduction/Reduction of Service Value",
+            "example": 0.02
+          },
+          "conditionalDiscountAmount": {
+            "type": "string",
+            "description": "Monetary Amount of Conditional Discount",
+            "example": 12387.01
+          },
+          "finalAmountCharged": {
+            "type": "string",
+            "description": "Total Amount Charged for the Provision of the Service",
+            "example": 9822.12
+          },
+          "fineValue": {
+            "type": "string",
+            "description": "Fine Value",
+            "example": 12185.9
+          },
+          "interestValue": {
+            "type": "string",
+            "description": "Interest Value",
+            "example": 10.0
+          }
+        },
+        "description": "Item Values"
+      },
+      "Attachment": {
+        "type": "object",
+        "properties": {
+          "fileType": {
+            "maxLength": 20,
+            "type": "string",
+            "description": "File type",
+            "example": "FISCAL_DOCUMENT"
+          },
+          "fileContentType": {
+            "type": "string",
+            "description": "File media type",
+            "example": "application/xml'"
+          },
+          "fileContent": {
+            "type": "string",
+            "description": "File content",
+            "format": "byte"
+          }
+        },
+        "description": "Data related to the document file"
+      },
+      "PartnerResponse": {
+        "type": "object",
+        "properties": {
+          "officialStatusCode": {
+            "maxLength": 3,
+            "type": "string",
+            "description": "Official status code",
+            "example": "100"
+          },
+          "officialStatusDescription": {
+            "maxLength": 100,
+            "type": "string",
+            "description": "Official status description",
+            "example": "Authorized"
+          },
+          "documentStatus": {
+            "type": "string",
+            "description": "Document status",
+            "example": "APPROVED",
+            "enum": [
+              "PROCESSING",
+              "APPROVED",
+              "REJECTED",
+              "DENIED",
+              "ERROR",
+              "TIMEOUT"
+            ]
+          },
+          "fiscalDocumentNumber": {
+            "maxLength": 9,
+            "type": "string",
+            "description": "Fiscal document number",
+            "example": "000178261"
+          },
+          "protocolNumber": {
+            "maxLength": 15,
+            "type": "string",
+            "description": "Protocol number",
+            "example": "143200000079630"
+          },
+          "processDate": {
+            "pattern": "yyyyMMdd",
+            "type": "string",
+            "description": "Process date",
+            "example": "20191030"
+          },
+          "processTime": {
+            "pattern": "HHmmss",
+            "type": "string",
+            "description": "Process time",
+            "example": "141935"
+          },
+          "attachments": {
+            "type": "array",
+            "description": "Document file data",
+            "items": {
+              "$ref": "#/components/schemas/Attachment"
+            }
+          },
+          "messages": {
+            "type": "array",
+            "description": "Messages related to document processing",
+            "items": {
+              "$ref": "#/components/schemas/Message"
+            }
+          },
+          "extension": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "Extension fields",
+              "example": "{\"custom field\":\"custom value\"}"
+            },
+            "description": "Extension fields",
+            "example": {
+              "custom field": "custom value"
+            }
+          }
+        },
+        "description": "Response expected from the communication with the partner solution"
+      }
+    },
+    "securitySchemes": {
+      "OAuth2": {
+        "type": "oauth2",
+        "flows": {
+          "clientCredentials": {
+            "tokenUrl": "https://nfe-tenant-try-out.authentication.br10.hana.ondemand.com/oauth/token?grant_type=client_credentials",
+            "scopes": {
+              "secure": "Authorization for API functionalities."
+            }
+          }
+        }
+      }
+    }
+  }
+}

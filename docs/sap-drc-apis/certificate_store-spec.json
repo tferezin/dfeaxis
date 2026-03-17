@@ -1,0 +1,438 @@
+{
+    "openapi": "3.0.1",
+    "info": {
+        "title": "Digital Certificate Storage",
+        "description": "Digital Certificate Storage enables you to process digital certificates for SAP Document and Reporting Compliance outbound invoicing option for Brazil. This API allows you to upload, update, retrieve and delete digital certificates.",
+        "version": "1.0.0"
+    },
+    "x-sap-shortText": "Manage your Digital Certificates",
+    "externalDocs": {
+        "description": "SAP Document Compliance, outbound invoicing option for Brazil",
+        "url": "https://help.sap.com/viewer/product/DC_NFe/Cloud/en-US"
+    },
+    "servers": [
+        {
+            "url": "https://sandbox.api.sap.com/DocumentReportingComplianceInvoicing4Brazil/nfe-certificate-store",
+            "description": "Sandbox URL",
+            "variables": {}
+        },
+        {
+            "url": "https://{landscapehost}/nfe-certificate-store",
+            "description": "Production URL",
+            "variables": {
+                "landscapehost": {
+                    "default": "nfe.cfapps.br10.hana.ondemand.com",
+                    "description": "SAP BTP Provider Account" 
+                }
+            }
+        }
+    ],
+    "security": [
+        {
+            "OAuth2": [
+                "secure"
+            ]
+        }
+    ],
+    "paths": {
+        "/v2/certificates": {
+            "get": {
+                "tags": [
+                    "Certificate Store Controller"
+                ],
+                "summary": "Retrieves digital certificates from Credential Store",
+                "description": "Retrieves all the digital certificates from the Credential Store service. When the 'file-content' request parameter is 'true', the content of the certificate is retrieved in the base64 format for all certificates. After you proceed with this operation, the system returns the retrieval status.",
+                "operationId": "listAllCertificatesV2",
+                "parameters": [
+                    {
+                        "name": "file-content",
+                        "in": "query",
+                        "required": false,
+                        "description": "Query parameter which indicates whether the certificate content is retrieved in the base64 format.",
+                        "schema": {
+                            "type": "boolean",
+                            "example": true,
+                            "default": false
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Digital certificates retrieved.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/CertificateDataV2"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "There are no certificates available to retrieve.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string",
+                                    "example": "No certificate was found for the given request."
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Certificate Store Controller"
+                ],
+                "summary": "Updates/uploads digital certificate",
+                "description": "Updates or uploads a new digital certificate in the Credential Store service. After you proceed with this operation, the system returns the posting status.",
+                "operationId": "createUpdateCertificateV2",
+                "requestBody": {
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "certificate": {
+                                        "type": "string",
+                                        "description": "Attach certificate file",
+                                        "format": "binary"
+                                    },
+                                    "password": {
+                                        "type": "string",
+                                        "description": "Certificate password",
+                                        "example": "mypassword"
+                                    },
+                                    "cnpj": {
+                                        "pattern": "^[0-9]{0,14}$",
+                                        "type": "string",
+                                        "description": "Cnpj",
+                                        "example": 74544297000273
+                                    },
+                                    "changedByUser": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "Certificate posted.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CertificateDataV2"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Cannot post certificate.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2": []
+                    }
+                ]
+            }
+        },
+        "/v2/certificates/{cnpj}": {
+            "get": {
+                "tags": [
+                    "Certificate Store Controller"
+                ],
+                "summary": "Retrieves digital certificate from Credential Store by CNPJ",
+                "description": "Retrieves a digital certificate from the Credential Store service based on a CNPJ. To retrieve the root certificate, inform 'root' instead of the CNPJ. When the 'file-content' request parameter is 'true', the certificate content is retrieved in the base64 format. After you proceed with this operation, the system returns the retrieval status.",
+                "operationId": "listCertificateByCnpjV2",
+                "parameters": [
+                    {
+                        "name": "cnpj",
+                        "in": "path",
+                        "required": true,
+                        "description": "The CNPJ used to retrieve the digital certificate.",
+                        "schema": {
+                            "type": "string",
+                            "example": "1234567891234567"
+                        }
+                    },
+                    {
+                        "name": "file-content",
+                        "in": "query",
+                        "required": false,
+                        "description": "Query parameter which indicates whether the certificate content is retrieved in the base64 format.",
+                        "schema": {
+                            "type": "boolean",
+                            "example": true,
+                            "default": false
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Certificate retrieved.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CertificateDataV2"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Certificate not found.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string",
+                                    "example": "No certificate was found for the given request."
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Certificate Store Controller"
+                ],
+                "summary": "Deletes digital certificate from Credential Store based on CNPJ.",
+                "description": "Deletes digital certificates from the Credential Store service based on a CNPJ. To delete the root certificate, inform 'root' instead of the CNPJ. After you proceed with this operation, the system returns the deletion status.",
+                "operationId": "deleteCertificateByCnpjV2",
+                "parameters": [
+                    {
+                        "name": "cnpj",
+                        "in": "path",
+                        "required": true,
+                        "description": "The CNPJ used to retrieve the digital certificate.",
+                        "schema": {
+                            "type": "string",
+                            "example": "1234567891234567"
+                        }
+                    }
+                ],
+                "responses": {
+                    "404": {
+                        "description": "Certificate not found.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string",
+                                    "example": "No certificate was found for the given request."
+                                }
+                            }
+                        }
+                    },
+                    "204": {
+                        "description": "Certificate deleted.",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2": []
+                    }
+                ]
+            }
+        },
+          "/v1/cached-credentials/{cnpj}": {
+            "get": {
+              "tags": [
+                "Cached Credential Controller"
+              ],
+              "summary": "Get certificate credentials.",
+              "description": "Retrieves a certificate from the Credential Store service based on a CNPJ, using caching mechanisms.",
+              "operationId": "retrieveCredential",
+              "parameters": [
+                {
+                  "name": "cnpj",
+                  "in": "path",
+                  "required": true,
+                  "schema": {
+                    "type": "string",
+                    "pattern": "^(root|\\w{1,50})$"
+                  }
+                }
+              ],
+              "responses": {
+                "200": {
+                  "description": "The certificate was retrieved.",
+                  "content": {
+                    "*/*": {
+                      "schema": {
+                        "$ref": "#/components/schemas/CertificateCredential"
+                      }
+                    }
+                  }
+                },
+                "400": {
+                  "description": "Failed to get certificate from Cache Manager.",
+                  "content": {
+                    "*/*": {
+                      "schema": {
+                        "$ref": "#/components/schemas/ErrorResponse"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+    },
+    "components": {
+        "schemas": {
+            "CertificateDataV2": {
+                "type": "object",
+                "properties": {
+                    "cnpj": {
+                        "type": "string",
+                        "description": "Cnpj",
+                        "example": "12345678901234"
+                    },
+                    "validFrom": {
+                        "type": "string",
+                        "description": "Valid from",
+                        "example": "2022-04-12T17:48:39.000+0000"
+                    },
+                    "validTo": {
+                        "type": "string",
+                        "description": "Valid To",
+                        "example": "2122-04-12T17:48:39.000+0000"
+                    },
+                    "certificateAlias": {
+                        "type": "string",
+                        "description": "Certificate alias",
+                        "example": "sap brasil ltda"
+                    },
+                    "certificate": {
+                        "type": "string",
+                        "description": "Certificate content in the base64 format",
+                        "example": "U29tZSBleGFtcGxlIHRleHQ="
+                    }
+                }
+            },
+            "ErrorDetailsFragment": {
+                "type": "object",
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "description": "Message",
+                        "example": "CNPJ format provided is not valid."
+                    },
+                    "index": {
+                        "type": "string",
+                        "description": "Index",
+                        "example": "1"
+                    },
+                    "field": {
+                        "type": "string",
+                        "description": "Field",
+                        "example": "cnpj"
+                    },
+                    "invalidValue": {
+                        "type": "string",
+                        "description": "Invalid value",
+                        "example": "12345"
+                    }
+                },
+                "description": "Detailed error"
+            },
+              "CertificateCredential": {
+                "type": "object",
+                "properties": {
+                  "certificate": {
+                    "type": "string",
+                    "format": "byte",
+                    "description": "Base64 certificate",
+                    "example": "MIIkoAIBAzCCJEoG..."
+                  },
+                  "password": {
+                    "type": "array",
+                    "description": "Password",
+                    "example": "S@PTestPassword",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "cnpj": {
+                    "type": "string",
+                    "description": "Cnpj",
+                    "example": 12345678901234
+                  }
+                }
+              },
+            "ErrorResponse": {
+                "type": "object",
+                "properties": {
+                    "timestamp": {
+                        "type": "integer",
+                        "description": "Timestamp",
+                        "format": "int64",
+                        "example": 1742403359426
+                    },
+                    "status": {
+                        "type": "integer",
+                        "description": "Status",
+                        "format": "int32",
+                        "example": 404
+                    },
+                    "message": {
+                        "type": "string",
+                        "description": "Error message",
+                        "example": "Certificate not found for the provided request."
+                    },
+                    "errors": {
+                        "type": "array",
+                        "description": "Detailed error",
+                        "items": {
+                            "$ref": "#/components/schemas/ErrorDetailsFragment"
+                        }
+                    }
+                },
+                "description": "Error Response"
+            }
+        },
+        "securitySchemes": {
+            "OAuth2": {
+                "type": "oauth2",
+                "flows": {
+                    "clientCredentials": {
+                        "tokenUrl": "https://nfe-tenant-try-out.authentication.br10.hana.ondemand.com/oauth/token?grant_type=client_credentials",
+                        "scopes": {
+                            "secure": "Authorization for API functionalities."
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
