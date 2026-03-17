@@ -1,8 +1,9 @@
 "use client"
 
-import { Building, ShieldCheck, Calendar } from "lucide-react"
+import { Building, ShieldCheck, Calendar, Inbox } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { useSettings } from "@/hooks/use-settings"
 
 interface Empresa {
   id: number
@@ -63,6 +64,25 @@ function extractName(cn: string): string {
 }
 
 export default function EmpresasPage() {
+  const { settings } = useSettings()
+
+  if (!settings.showMockData) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Empresas / CNPJs</h1>
+          <p className="text-sm text-muted-foreground">
+            Dados extraidos automaticamente dos certificados A1. Para adicionar uma empresa, faca o upload do certificado em <strong>Certificados A1</strong>.
+          </p>
+        </div>
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <Inbox className="size-12 text-muted-foreground/30 mb-4" />
+          <p className="text-sm text-muted-foreground">Nenhuma empresa cadastrada. As empresas sao criadas automaticamente ao enviar um certificado A1.</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <div>

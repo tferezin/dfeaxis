@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useSettings } from "@/hooks/use-settings"
 import {
   Select,
   SelectContent,
@@ -26,6 +27,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
+  Inbox,
 } from "lucide-react"
 
 type MdfeStatus = "Autorizado" | "Encerrado" | "Cancelado" | "Pendente"
@@ -69,6 +71,7 @@ const mockData: MdfeRow[] = [
 ]
 
 export default function HistoricoMdfePage() {
+  const { settings } = useSettings()
   const [currentPage, setCurrentPage] = useState(1)
   const [statusFilter, setStatusFilter] = useState("Todos")
   const [searchChave, setSearchChave] = useState("")
@@ -87,6 +90,23 @@ export default function HistoricoMdfePage() {
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   )
+
+  if (!settings.showMockData) {
+    return (
+      <div className="flex flex-col gap-6 p-6">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">MDF-e Recebidos</h1>
+          <p className="text-sm text-muted-foreground">
+            Manifestos eletronicos recebidos via captura automatica
+          </p>
+        </div>
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <Inbox className="size-12 text-muted-foreground/30 mb-4" />
+          <p className="text-sm text-muted-foreground">Nenhum MDF-e capturado. Configure um certificado e execute uma captura para ver documentos reais.</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-6 p-6">

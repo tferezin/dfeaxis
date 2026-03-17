@@ -28,7 +28,9 @@ import {
   RefreshCw,
   ShieldCheck,
   Upload,
+  Inbox,
 } from "lucide-react"
+import { useSettings } from "@/hooks/use-settings"
 
 interface Certificate {
   id: number
@@ -123,6 +125,7 @@ function getValidityLabel(diasRestantes: number) {
 }
 
 export default function CertificadosPage() {
+  const { settings } = useSettings()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [renewCnpj, setRenewCnpj] = useState<string | null>(null)
 
@@ -212,6 +215,12 @@ export default function CertificadosPage() {
       </div>
 
       {/* Cards Grid */}
+      {!settings.showMockData ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <Inbox className="size-12 text-muted-foreground/30 mb-4" />
+          <p className="text-sm text-muted-foreground">Nenhum certificado cadastrado. Clique em &apos;Novo Certificado&apos; para comecar.</p>
+        </div>
+      ) : (
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {mockCertificates.map((cert) => (
           <Card key={cert.id}>
@@ -260,6 +269,7 @@ export default function CertificadosPage() {
           </Card>
         ))}
       </div>
+      )}
     </div>
   )
 }

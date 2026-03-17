@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useSettings } from "@/hooks/use-settings"
 import {
   Select,
   SelectContent,
@@ -27,6 +28,7 @@ import {
   ChevronRight,
   Eye,
   AlertTriangle,
+  Inbox,
 } from "lucide-react"
 
 type NfseStatus = "Emitida" | "Cancelada" | "Substituida" | "Pendente"
@@ -74,6 +76,7 @@ const CNPJS = [
 ]
 
 export default function HistoricoNfsePage() {
+  const { settings } = useSettings()
   const [currentPage, setCurrentPage] = useState(1)
   const [statusFilter, setStatusFilter] = useState("Todos")
   const [searchNumero, setSearchNumero] = useState("")
@@ -92,6 +95,54 @@ export default function HistoricoNfsePage() {
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   )
+
+  if (!settings.showMockData) {
+    return (
+      <div className="flex flex-col gap-6 p-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-semibold tracking-tight">NFS-e Recebidas</h1>
+              <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-[10px]">
+                ADN
+              </Badge>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Notas fiscais de servico recebidas via Ambiente Nacional
+            </p>
+          </div>
+        </div>
+
+        {/* Alert banners */}
+        <div className="space-y-2">
+          <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+            <p>
+              A cobertura de NFS-e depende da adesão do município ao padrão nacional (Reforma Tributária LC 214/2025).
+              Consulte <strong>gov.br/nfse</strong> para verificar a adesão do município.
+            </p>
+          </div>
+          <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4">
+            <div className="shrink-0 mt-0.5 size-5 rounded-full bg-blue-100 flex items-center justify-center">
+              <span className="text-blue-600 text-xs font-bold">i</span>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-blue-900">Captura ativa via Ambiente Nacional — Integração SAP DRC em desenvolvimento</p>
+              <p className="text-xs text-blue-700 mt-1">
+                O DFeAxis captura NFS-e recebidas através do Ambiente Nacional da RFB. A entrega automática para o SAP via DRC ainda não é suportada pela SAP para NFS-e. Os documentos ficam disponíveis para consulta e download neste painel.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <Inbox className="size-12 text-muted-foreground/30 mb-4" />
+          <p className="text-sm text-muted-foreground">Nenhuma NFS-e capturada. Configure um certificado e execute uma captura para ver documentos reais.</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-6 p-6">

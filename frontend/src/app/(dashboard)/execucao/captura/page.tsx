@@ -10,11 +10,13 @@ import {
   Truck,
   Building2,
   FileStack,
+  Inbox,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import { useSettings } from "@/hooks/use-settings"
 
 interface CertEntry {
   id: number
@@ -41,6 +43,7 @@ const docTypes = [
 ]
 
 export default function CapturaManualPage() {
+  const { settings } = useSettings()
   const [certs, setCerts] = useState<CertEntry[]>(mockCerts)
   const [tipos, setTipos] = useState<Record<string, boolean>>(
     Object.fromEntries(docTypes.map((d) => [d.key, d.checked]))
@@ -160,6 +163,12 @@ export default function CapturaManualPage() {
       )}
 
       {/* Lista de CNPJs */}
+      {!settings.showMockData ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <Inbox className="size-12 text-muted-foreground/30 mb-4" />
+          <p className="text-sm text-muted-foreground">Nenhum certificado ativo. Cadastre um certificado para executar capturas.</p>
+        </div>
+      ) : (
       <div className="space-y-3">
         {certs.map((cert) => (
           <Card key={cert.id}>
@@ -233,6 +242,7 @@ export default function CapturaManualPage() {
           </Card>
         ))}
       </div>
+      )}
     </div>
   )
 }

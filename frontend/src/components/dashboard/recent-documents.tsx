@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/table"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
+import { Inbox } from "lucide-react"
 
 type DocumentStatus = "Disponivel" | "Entregue" | "Pendente" | "Cancelada"
 
@@ -134,7 +135,7 @@ const mockDocuments: RecentDocument[] = [
   },
 ]
 
-export function RecentDocuments() {
+export function RecentDocuments({ empty = false }: { empty?: boolean }) {
   return (
     <Card className="transition-shadow hover:shadow-md">
       <CardHeader>
@@ -153,6 +154,12 @@ export function RecentDocuments() {
         </div>
       </CardHeader>
       <CardContent className="px-0">
+        {empty ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <Inbox className="size-12 text-muted-foreground/30 mb-4" />
+            <p className="text-sm text-muted-foreground">Nenhum documento recente.</p>
+          </div>
+        ) : (
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
@@ -212,6 +219,7 @@ export function RecentDocuments() {
             ))}
           </TableBody>
         </Table>
+        )}
       </CardContent>
     </Card>
   )

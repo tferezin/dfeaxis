@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useSettings } from "@/hooks/use-settings"
 import {
   Select,
   SelectContent,
@@ -26,6 +27,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
+  Inbox,
 } from "lucide-react"
 
 type CteStatus = "Autorizado" | "Cancelado" | "Pendente" | "Denegado"
@@ -68,6 +70,7 @@ const mockData: CteRow[] = [
 ]
 
 export default function HistoricoCtePage() {
+  const { settings } = useSettings()
   const [currentPage, setCurrentPage] = useState(1)
   const [statusFilter, setStatusFilter] = useState("Todos")
   const [searchChave, setSearchChave] = useState("")
@@ -86,6 +89,23 @@ export default function HistoricoCtePage() {
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   )
+
+  if (!settings.showMockData) {
+    return (
+      <div className="flex flex-col gap-6 p-6">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">CT-e Recebidos</h1>
+          <p className="text-sm text-muted-foreground">
+            Conhecimentos de transporte recebidos via captura automatica
+          </p>
+        </div>
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <Inbox className="size-12 text-muted-foreground/30 mb-4" />
+          <p className="text-sm text-muted-foreground">Nenhum CT-e capturado. Configure um certificado e execute uma captura para ver documentos reais.</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-6 p-6">

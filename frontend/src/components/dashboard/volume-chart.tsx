@@ -10,6 +10,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Inbox } from "lucide-react"
 
 function generateMockData() {
   const data = []
@@ -41,7 +42,7 @@ const chartConfig = {
   },
 } satisfies ChartConfig
 
-export function VolumeChart() {
+export function VolumeChart({ empty = false }: { empty?: boolean }) {
   return (
     <Card className="transition-shadow hover:shadow-md">
       <CardHeader>
@@ -57,6 +58,12 @@ export function VolumeChart() {
         </div>
       </CardHeader>
       <CardContent>
+        {empty ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <Inbox className="size-12 text-muted-foreground/30 mb-4" />
+            <p className="text-sm text-muted-foreground">Nenhum dado disponivel.</p>
+          </div>
+        ) : (
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
           <AreaChart
             data={chartData}
@@ -111,6 +118,7 @@ export function VolumeChart() {
             />
           </AreaChart>
         </ChartContainer>
+        )}
       </CardContent>
     </Card>
   )
