@@ -71,6 +71,8 @@ export default function HistoricoCtePage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [statusFilter, setStatusFilter] = useState("Todos")
   const [searchChave, setSearchChave] = useState("")
+  const [dateFrom, setDateFrom] = useState("2026-03-01")
+  const [dateTo, setDateTo] = useState("2026-03-16")
   const itemsPerPage = 10
 
   const filteredData = mockData.filter((row) => {
@@ -105,12 +107,12 @@ export default function HistoricoCtePage() {
       <div className="flex flex-wrap items-end gap-3 rounded-lg border p-4">
         <div className="flex flex-col gap-1.5">
           <span className="text-xs font-medium text-muted-foreground">De</span>
-          <Input type="date" className="w-[150px]" defaultValue="2026-03-01" />
+          <Input type="date" className="w-[150px]" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
         </div>
 
         <div className="flex flex-col gap-1.5">
           <span className="text-xs font-medium text-muted-foreground">Ate</span>
-          <Input type="date" className="w-[150px]" defaultValue="2026-03-16" />
+          <Input type="date" className="w-[150px]" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
         </div>
 
         <div className="flex flex-col gap-1.5">

@@ -148,7 +148,7 @@ export default function CertificadosPage() {
             <SheetHeader>
               <SheetTitle>Upload de Certificado</SheetTitle>
               <SheetDescription>
-                Envie um certificado digital A1 (.pfx) para iniciar a captura automatica.
+                Envie o certificado digital A1 (.pfx). A empresa será cadastrada automaticamente.
               </SheetDescription>
             </SheetHeader>
             <div className="flex flex-col gap-4 px-4">
