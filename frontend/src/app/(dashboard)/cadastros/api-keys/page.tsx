@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useSettings } from "@/hooks/use-settings"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -91,6 +92,7 @@ const mockKeys: ApiKey[] = [
 ]
 
 export default function ApiKeysPage() {
+  const { settings } = useSettings()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [newKeyCreated, setNewKeyCreated] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<number | null>(null)
@@ -196,6 +198,12 @@ export default function ApiKeysPage() {
       </div>
 
       {/* Table */}
+      {!settings.showMockData ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <Key className="size-12 text-muted-foreground/30 mb-4" />
+          <p className="text-sm text-muted-foreground">Nenhuma API Key cadastrada. Clique em &quot;Nova Key&quot; para criar.</p>
+        </div>
+      ) : (
       <div className="rounded-lg border">
         <Table>
           <TableHeader>
@@ -262,6 +270,8 @@ export default function ApiKeysPage() {
           </TableBody>
         </Table>
       </div>
+
+      )}
 
       {/* Info text */}
       <p className="text-xs text-muted-foreground">
