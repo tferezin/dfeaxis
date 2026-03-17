@@ -124,6 +124,17 @@ function getValidityLabel(diasRestantes: number) {
 
 export default function CertificadosPage() {
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [renewCnpj, setRenewCnpj] = useState<string | null>(null)
+
+  const openRenew = (cnpj: string) => {
+    setRenewCnpj(cnpj)
+    setSheetOpen(true)
+  }
+
+  const openNew = () => {
+    setRenewCnpj(null)
+    setSheetOpen(true)
+  }
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -135,20 +146,18 @@ export default function CertificadosPage() {
             Gerencie os certificados digitais das suas empresas
           </p>
         </div>
-        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-          <SheetTrigger
-            render={
-              <Button>
-                <Plus className="size-4" />
-                Novo Certificado
-              </Button>
-            }
-          />
+        <Button onClick={openNew}>
+          <Plus className="size-4" />
+          Novo Certificado
+        </Button>
+        <Sheet open={sheetOpen} onOpenChange={(open) => { setSheetOpen(open); if (!open) setRenewCnpj(null) }}>
           <SheetContent side="right">
             <SheetHeader>
-              <SheetTitle>Upload de Certificado</SheetTitle>
+              <SheetTitle>{renewCnpj ? "Renovar Certificado" : "Novo Certificado"}</SheetTitle>
               <SheetDescription>
-                Envie o certificado digital A1 (.pfx). A empresa será cadastrada automaticamente.
+                {renewCnpj
+                  ? `Envie o novo certificado A1 (.pfx) para o CNPJ ${renewCnpj}.`
+                  : "Envie o certificado digital A1 (.pfx). A empresa será cadastrada automaticamente."}
               </SheetDescription>
             </SheetHeader>
             <div className="flex flex-col gap-4 px-4">
@@ -169,6 +178,8 @@ export default function CertificadosPage() {
                 <Input
                   id="cert-cnpj"
                   placeholder="00.000.000/0000-00"
+                  defaultValue={renewCnpj ?? ""}
+                  disabled={!!renewCnpj}
                 />
               </div>
 
@@ -184,7 +195,9 @@ export default function CertificadosPage() {
               <Separator />
 
               <p className="text-xs text-muted-foreground">
-                O modo de operação (automático ou manual) é configurado globalmente em <strong>Configurações</strong> e aplica-se a todos os CNPJs.
+                {renewCnpj
+                  ? "O novo certificado substituirá o anterior para este CNPJ."
+                  : "O modo de operação é configurado em Configurações e aplica-se a todos os CNPJs."}
               </p>
             </div>
             <SheetFooter>
@@ -234,7 +247,7 @@ export default function CertificadosPage() {
               </div>
             </CardContent>
             <CardFooter className="gap-2">
-              <Button variant="outline" size="sm" className="flex-1 gap-1.5">
+              <Button variant="outline" size="sm" className="flex-1 gap-1.5" onClick={() => openRenew(cert.cnpj)}>
                 <RefreshCw className="size-3.5" />
                 Renovar
               </Button>
