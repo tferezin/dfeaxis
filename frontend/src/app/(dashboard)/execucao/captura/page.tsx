@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import {
   Play,
   Loader2,
@@ -11,11 +11,15 @@ import {
   Building2,
   FileStack,
   Inbox,
+  Upload,
+  ShieldCheck,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { useSettings } from "@/hooks/use-settings"
 
 interface CertEntry {
@@ -38,13 +42,42 @@ const mockCerts: CertEntry[] = [
 const docTypes = [
   { key: "nfe", label: "NF-e", icon: FileText, checked: true },
   { key: "cte", label: "CT-e", icon: Truck, checked: true },
-  { key: "mdfe", label: "MDF-e", icon: FileStack, checked: false },
-  { key: "nfse", label: "NFS-e", icon: Building2, checked: false },
+  { key: "mdfe", label: "MDF-e", icon: FileStack, checked: true },
+  { key: "nfse", label: "NFS-e", icon: Building2, checked: true },
 ]
 
 export default function CapturaManualPage() {
   const { settings } = useSettings()
   const [certs, setCerts] = useState<CertEntry[]>(mockCerts)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [testCnpj, setTestCnpj] = useState("")
+  const [testPassword, setTestPassword] = useState("")
+  const [testStatus, setTestStatus] = useState<"idle" | "loading">("idle")
+  const [testResult, setTestResult] = useState<{ error?: string; status?: string; message?: string; pfx_size?: number } | null>(null)
+
+  const handleTestCapture = async () => {
+    const file = fileRef.current?.files?.[0]
+    if (!file || !testCnpj || !testPassword) {
+      setTestResult({ error: "Preencha todos os campos: .pfx, CNPJ e senha." })
+      return
+    }
+    setTestStatus("loading")
+    setTestResult(null)
+    try {
+      const formData = new FormData()
+      formData.append("pfx", file)
+      formData.append("cnpj", testCnpj.replace(/\D/g, ""))
+      formData.append("password", testPassword)
+
+      const res = await fetch("/api/test-capture", { method: "POST", body: formData })
+      const data = await res.json()
+      setTestResult(data)
+    } catch (err) {
+      setTestResult({ error: `Erro: ${String(err)}` })
+    } finally {
+      setTestStatus("idle")
+    }
+  }
   const [tipos, setTipos] = useState<Record<string, boolean>>(
     Object.fromEntries(docTypes.map((d) => [d.key, d.checked]))
   )
@@ -162,11 +195,90 @@ export default function CapturaManualPage() {
         </div>
       )}
 
+      {/* Teste direto — upload de .pfx sem banco de dados */}
+      <Card className="border-amber-200 bg-amber-50/50">
+        <CardHeader className="pb-2">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="size-5 text-amber-600" />
+            <CardTitle className="text-base">Teste rápido com certificado</CardTitle>
+            <Badge variant="secondary" className="text-[10px]">Temporário</Badge>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Faça upload do certificado A1 (.pfx) para testar a conexão com a SEFAZ sem precisar de banco de dados.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-3 pt-0">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Certificado (.pfx)</Label>
+              <Input
+                type="file"
+                accept=".pfx,.p12"
+                className="text-xs"
+                ref={fileRef}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">CNPJ</Label>
+              <Input
+                placeholder="00.000.000/0000-00"
+                className="text-xs"
+                value={testCnpj}
+                onChange={(e) => setTestCnpj(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Senha do certificado</Label>
+              <Input
+                type="password"
+                placeholder="Senha"
+                className="text-xs"
+                value={testPassword}
+                onChange={(e) => setTestPassword(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button
+              size="sm"
+              className="gap-1.5"
+              disabled={testStatus === "loading"}
+              onClick={handleTestCapture}
+            >
+              {testStatus === "loading" ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Upload className="size-3.5" />
+              )}
+              {testStatus === "loading" ? "Consultando SEFAZ..." : "Testar captura"}
+            </Button>
+            {testResult && (
+              <div className="flex-1">
+                {testResult.error ? (
+                  <p className="text-xs text-red-600">{testResult.error}</p>
+                ) : (
+                  <div className="text-xs">
+                    <span className={testResult.status === "backend_offline" ? "text-amber-600" : "text-emerald-600"}>
+                      {testResult.message || `Status: ${testResult.status}`}
+                    </span>
+                    {testResult.pfx_size && (
+                      <span className="text-muted-foreground ml-2">
+                        (.pfx: {Math.round(testResult.pfx_size / 1024)}KB)
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Lista de CNPJs */}
       {!settings.showMockData ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <Inbox className="size-12 text-muted-foreground/30 mb-4" />
-          <p className="text-sm text-muted-foreground">Nenhum certificado ativo. Cadastre um certificado para executar capturas.</p>
+        <div className="flex flex-col items-center justify-center py-8 text-center">
+          <Inbox className="size-10 text-muted-foreground/30 mb-3" />
+          <p className="text-xs text-muted-foreground">Certificados cadastrados aparecerão aqui quando o banco de dados estiver conectado.</p>
         </div>
       ) : (
       <div className="space-y-3">
