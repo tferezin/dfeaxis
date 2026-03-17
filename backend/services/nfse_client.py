@@ -23,8 +23,8 @@ logger = logging.getLogger(__name__)
 
 # Endpoints ADN por ambiente
 NFSE_ADN_ENDPOINTS = {
-    "1": "https://www.nfse.gov.br/SistemaADN/api/v1",
-    "2": "https://hom.nfse.gov.br/SistemaADN/api/v1",
+    "1": "https://adn.nfse.gov.br",
+    "2": "https://adn.producaorestrita.nfse.gov.br",
 }
 
 # Timeout para requisicoes REST ao ADN (segundos)
@@ -147,12 +147,8 @@ class NfseClient:
         try:
             with temp_cert_files(pfx_bytes, pfx_password) as (cert_path, key_path):
                 session = self._create_mtls_session(cert_path, key_path)
-                url = f"{self.base_url}/nfse/cnpj/{cnpj}"
-                params = {
-                    "dataInicio": data_inicio,
-                    "dataFim": data_fim,
-                    "pagina": pagina,
-                }
+                url = f"{self.base_url}/contribuintes/DFe/0"
+                params = {"tipoNSU": "DISTRIBUICAO"}
                 resp = session.get(url, params=params, timeout=ADN_TIMEOUT)
 
             latency_ms = int((time.time() - start_time) * 1000)
@@ -205,7 +201,7 @@ class NfseClient:
         try:
             with temp_cert_files(pfx_bytes, pfx_password) as (cert_path, key_path):
                 session = self._create_mtls_session(cert_path, key_path)
-                url = f"{self.base_url}/nfse/chave/{chave_acesso}"
+                url = f"{self.base_url}/contribuintes/NFSe/{chave_acesso}/Eventos"
                 resp = session.get(url, timeout=ADN_TIMEOUT)
 
             latency_ms = int((time.time() - start_time) * 1000)
@@ -260,12 +256,9 @@ class NfseClient:
         try:
             with temp_cert_files(pfx_bytes, pfx_password) as (cert_path, key_path):
                 session = self._create_mtls_session(cert_path, key_path)
-                url = f"{self.base_url}/dps/distribuicao"
-                payload = {
-                    "cnpj": cnpj,
-                    "ultNSU": ult_nsu,
-                }
-                resp = session.post(url, json=payload, timeout=ADN_TIMEOUT)
+                url = f"{self.base_url}/contribuintes/DFe/{ult_nsu}"
+                params = {"tipoNSU": "DISTRIBUICAO"}
+                resp = session.get(url, params=params, timeout=ADN_TIMEOUT)
 
             latency_ms = int((time.time() - start_time) * 1000)
             circuit_breaker.record_success(cnpj, "nfse")

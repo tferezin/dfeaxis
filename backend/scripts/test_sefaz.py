@@ -82,13 +82,14 @@ def consultar_nfse_adn(pfx_bytes, password, cnpj):
             "Content-Type": "application/json",
         })
 
-        # Distribuição DPS (equivalente ao DistDFeInt SOAP)
-        base_url = "https://hom.nfse.gov.br/SistemaADN/api/v1"
-        url = f"{base_url}/dps/distribuicao"
-        payload = {"cnpj": cnpj, "ultNSU": "000000000000000"}
+        # Distribuição DFe via ADN (equivalente ao DistDFeInt SOAP)
+        base_url = "https://adn.producaorestrita.nfse.gov.br"
+        ult_nsu = 0
+        url = f"{base_url}/contribuintes/DFe/{ult_nsu}"
+        params = {"tipoNSU": "DISTRIBUICAO"}
 
         start = time.time()
-        resp = session.post(url, json=payload, timeout=30)
+        resp = session.get(url, params=params, timeout=30)
         latency = int((time.time() - start) * 1000)
 
         if resp.status_code == 404:
