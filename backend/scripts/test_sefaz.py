@@ -81,12 +81,8 @@ def consultar_sefaz(pfx_bytes, password, cnpj, tipo):
         # Sessão mTLS
         session = requests.Session()
         session.cert = (cert_file.name, key_file.name)
-        # Tenta com verificação SSL; se falhar (CA não reconhecido em cloud), desabilita
-        try:
-            import certifi
-            session.verify = certifi.where()
-        except ImportError:
-            session.verify = True
+        # MDF-e RS usa certificado SSL que nem sempre está na cadeia padrão
+        session.verify = (tipo != "mdfe")
 
         endpoint = SEFAZ_ENDPOINTS.get(tipo)
         if not endpoint:
@@ -95,39 +91,25 @@ def consultar_sefaz(pfx_bytes, password, cnpj, tipo):
         ns = NAMESPACES[tipo]
 
         # Monta XML — versão varia por tipo
-        versao = {"nfe": "1.01", "cte": "1.00", "mdfe": "1.00"}
+        versao = {"nfe": "1.01", "cte": "1.00", "mdfe": "1.00"}.get(tipo, "1.01")
         root = etree.Element("distDFeInt", nsmap={None: ns})
-        root.set("versao", versao.get(tipo, "1.01"))
+        root.set("versao", versao)
         etree.SubElement(root, "tpAmb").text = "2"  # Homologação
         etree.SubElement(root, "cUFAutor").text = "35"  # SP
         etree.SubElement(root, "CNPJ").text = cnpj
         dist_nsu = etree.SubElement(root, "distNSU")
         etree.SubElement(dist_nsu, "ultNSU").text = "000000000000000"
 
-        # SOAP call — tenta com SSL verify, fallback sem verify se CA não reconhecido
-        import urllib3
+        # SOAP call
         start = time.time()
+        transport = Transport(session=session, timeout=30)
+        client = ZeepClient(wsdl=endpoint, transport=transport)
 
-        def _do_soap_call(verify_ssl):
-            s = requests.Session()
-            s.cert = (cert_file.name, key_file.name)
-            s.verify = verify_ssl
-            if not verify_ssl:
-                urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-            t = Transport(session=s, timeout=30)
-            c = ZeepClient(wsdl=endpoint, transport=t)
-            sn = SERVICE_NAMES[tipo]
-            pn = {"nfe": "nfeDadosMsg", "cte": "cteDadosMsg", "mdfe": "mdfeDadosMsg"}
-            return c.service[sn](**{pn.get(tipo, "nfeDadosMsg"): root})
-
-        try:
-            response = _do_soap_call(True)
-        except Exception as ssl_err:
-            if "SSL" in str(ssl_err) or "certificate" in str(ssl_err).lower():
-                response = _do_soap_call(False)
-            else:
-                raise
-
+        service_name = SERVICE_NAMES[tipo]
+        # Cada tipo usa um nome de parâmetro diferente
+        param_names = {"nfe": "nfeDadosMsg", "cte": "cteDadosMsg", "mdfe": "mdfeDadosMsg"}
+        param_name = param_names.get(tipo, "nfeDadosMsg")
+        response = client.service[service_name](**{param_name: root})
         latency = int((time.time() - start) * 1000)
 
         # Parse response
@@ -145,24 +127,7 @@ def consultar_sefaz(pfx_bytes, password, cnpj, tipo):
             return elem.text if elem is not None else None
 
         cstat = find_text(resp_root, ".//ns:cStat") or "999"
-        xmotivo_raw = find_text(resp_root, ".//ns:xMotivo") or ""
-        # Corrige acentos faltantes nas mensagens da SEFAZ
-        xmotivo = xmotivo_raw
-        _accent_fixes = {
-            "Rejeicao": "Rejeição",
-            "versao": "versão",
-            "nao": "não",
-            "operacao": "operação",
-            "Autorizacao": "Autorização",
-            "informacao": "informação",
-            "consulta": "consulta",
-            "distribuicao": "distribuição",
-            "consumo indevido": "consumo indevido",
-            " e ": " é ",
-            "localizado": "localizado",
-        }
-        for wrong, right in _accent_fixes.items():
-            xmotivo = xmotivo.replace(wrong, right)
+        xmotivo = find_text(resp_root, ".//ns:xMotivo") or ""
         ult_nsu = find_text(resp_root, ".//ns:ultNSU") or "000000000000000"
         max_nsu = find_text(resp_root, ".//ns:maxNSU") or ult_nsu
 

@@ -230,7 +230,7 @@ export default function CapturaManualPage() {
               <Input
                 type="file"
                 accept=".pfx,.p12"
-                className="text-xs border border-gray-300"
+                className="text-xs"
                 ref={fileRef}
               />
             </div>
