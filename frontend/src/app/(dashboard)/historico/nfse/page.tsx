@@ -114,13 +114,26 @@ export default function HistoricoNfsePage() {
         </Button>
       </div>
 
-      {/* Alert banner */}
-      <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
-        <p>
-          A cobertura de NFS-e depende da adesao do municipio ao padrao nacional.
-          Consulte gov.br/nfse.
-        </p>
+      {/* Alert banners */}
+      <div className="space-y-2">
+        <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+          <p>
+            A cobertura de NFS-e depende da adesão do município ao padrão nacional (Reforma Tributária LC 214/2025).
+            Consulte <strong>gov.br/nfse</strong> para verificar a adesão do município.
+          </p>
+        </div>
+        <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4">
+          <div className="shrink-0 mt-0.5 size-5 rounded-full bg-blue-100 flex items-center justify-center">
+            <span className="text-blue-600 text-xs font-bold">i</span>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-blue-900">Captura ativa via Ambiente Nacional — Integração SAP DRC em desenvolvimento</p>
+            <p className="text-xs text-blue-700 mt-1">
+              O DFeAxis captura NFS-e recebidas através do Ambiente Nacional da RFB. A entrega automática para o SAP via DRC ainda não é suportada pela SAP para NFS-e. Os documentos ficam disponíveis para consulta e download neste painel.
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Filters */}

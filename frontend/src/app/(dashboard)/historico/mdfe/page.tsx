@@ -104,6 +104,19 @@ export default function HistoricoMdfePage() {
         </Button>
       </div>
 
+      {/* SAP DRC availability notice */}
+      <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4">
+        <div className="shrink-0 mt-0.5 size-5 rounded-full bg-blue-100 flex items-center justify-center">
+          <span className="text-blue-600 text-xs font-bold">i</span>
+        </div>
+        <div>
+          <p className="text-sm font-medium text-blue-900">Captura ativa — Integração SAP DRC em desenvolvimento</p>
+          <p className="text-xs text-blue-700 mt-1">
+            O DFeAxis captura MDF-e recebidos da SEFAZ normalmente. A entrega automática para o SAP via DRC ainda não é suportada pela SAP para este tipo de documento. Os MDF-e ficam disponíveis para consulta e download manual neste painel.
+          </p>
+        </div>
+      </div>
+
       {/* Filters */}
       <div className="flex flex-wrap items-end gap-3 rounded-lg border p-4">
         <div className="flex flex-col gap-1.5">
