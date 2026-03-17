@@ -178,7 +178,8 @@ export default function CertificadosPage() {
                 <Input
                   id="cert-cnpj"
                   placeholder="00.000.000/0000-00"
-                  defaultValue={renewCnpj ?? ""}
+                  value={renewCnpj ?? ""}
+                  onChange={() => {}}
                   disabled={!!renewCnpj}
                 />
               </div>
