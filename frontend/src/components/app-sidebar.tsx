@@ -18,6 +18,7 @@ import {
   ChevronDown,
   LogOut,
   Play,
+  ScrollText,
 } from "lucide-react"
 
 import { supabase } from "@/lib/supabase"
@@ -96,6 +97,12 @@ const navigation: NavSection[] = [
       { title: "Empresas / CNPJs", href: "/cadastros/empresas", icon: Building },
       { title: "API Keys", href: "/cadastros/api-keys", icon: Key },
       { title: "Configurações", href: "/cadastros/configuracoes", icon: Settings },
+    ],
+  },
+  {
+    label: "Monitoramento",
+    items: [
+      { title: "Logs de Captura", href: "/logs", icon: ScrollText },
     ],
   },
   {
