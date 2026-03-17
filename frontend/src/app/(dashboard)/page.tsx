@@ -9,6 +9,7 @@ import {
   CalendarDays,
   ChevronDown,
 } from "lucide-react"
+import { OnboardingGuide } from "@/components/dashboard/onboarding-guide"
 import { StatCard } from "@/components/dashboard/stat-card"
 import { FinancialCard } from "@/components/dashboard/financial-card"
 import { VolumeChart } from "@/components/dashboard/volume-chart"
@@ -21,6 +22,9 @@ export default function DashboardPage() {
   const showMock = settings.showMockData
   return (
     <div className="space-y-6">
+      {/* Onboarding guide — shows when mock data is off (real testing mode) */}
+      <OnboardingGuide />
+
       {/* Top controls */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>

@@ -15,13 +15,13 @@ interface TenantSettings {
 const STORAGE_KEY = "dfeaxis_settings"
 
 const defaultSettings: TenantSettings = {
-  operationMode: "auto",
+  operationMode: "manual",
   sefazAmbiente: "2",
   capturaInterval: "15",
   notifyEmail: "",
   notifyCertExpiry: true,
   notifyNoCredits: true,
-  showMockData: true,
+  showMockData: false,
 }
 
 let listeners: Array<() => void> = []
