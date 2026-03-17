@@ -22,9 +22,14 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
+      // Fixed test credentials (temporary — remove when Supabase is connected)
+      if (email === "admin@dfeaxis.com.br" && password === "dfeaxis2026") {
+        router.push("/dashboard")
+        return
+      }
+
       if (!supabase) {
-        // Demo mode — no Supabase configured
-        router.push("/")
+        setError("Credenciais inválidas.")
         return
       }
 

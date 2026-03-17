@@ -77,7 +77,7 @@ const navigation: NavSection[] = [
     items: [
       {
         title: "Dashboard",
-        href: "/",
+        href: "/dashboard",
         icon: LayoutDashboard,
       },
     ],
