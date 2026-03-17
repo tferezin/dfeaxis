@@ -207,7 +207,7 @@ export default function ConfiguracoesPage() {
               <div>
                 <span className="text-sm font-medium">Exibir dados de demonstração</span>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Desative para testar com dados reais da SEFAZ. Quando desativado, apenas documentos capturados do ambiente real serão exibidos.
+                  Desative para testar com dados da SEFAZ (homologação ou produção). Quando desativado, apenas documentos capturados do ambiente configurado serão exibidos.
                 </p>
               </div>
             </label>
