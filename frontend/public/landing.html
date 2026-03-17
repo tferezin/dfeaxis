@@ -406,7 +406,7 @@ pre{font-family:var(--mn);font-size:12.5px;color:#d1d5db;line-height:1.85}
 <body>
 
 <nav id="nav">
-  <div class="logo"><img src="/logo-dfeaxis.png" alt="DFeAxis" height="36" style="height:36px;object-fit:contain"></div>
+  <div class="logo"><img src="/logo-dfeaxis.png" alt="DFeAxis" height="48" style="height:48px;object-fit:contain"></div>
   <div class="nav-links" id="navLinks">
     <a href="#features">Funcionalidades</a>
     <a href="#security">Seguranca</a>
@@ -415,7 +415,7 @@ pre{font-family:var(--mn);font-size:12.5px;color:#d1d5db;line-height:1.85}
   </div>
   <div class="nav-btns" id="navBtns">
     <button class="btn-out" onclick="openAuth('login')">Entrar</button>
-    <button class="btn-fill" onclick="openAuth('register')">Comecar gratis</button>
+    <button class="btn-fill" onclick="openAuth('login')">Comecar gratis</button>
   </div>
 </nav>
 
@@ -1031,7 +1031,7 @@ function doLogin() {
   }
   curU = { email: em, name: u.nm };
   closeAuth();
-  enterApp();
+  window.location.href = '/dashboard';
 }
 function doReg() {
   var nm = document.getElementById('rnm').value.trim();
@@ -1048,8 +1048,7 @@ function doReg() {
   USERS[em] = { pw: pw, nm: nm };
   curU = { email: em, name: nm };
   closeAuth();
-  enterApp();
-  toast('Conta criada com sucesso!', 'ok');
+  window.location.href = '/dashboard';
 }
 function doLogout() {
   curU = null; pfxF = null; certs = []; logN = 0; qN = 0; docN = 0;
