@@ -19,6 +19,7 @@ import {
   LogOut,
   Play,
   ScrollText,
+  Rocket,
 } from "lucide-react"
 
 import { supabase } from "@/lib/supabase"
@@ -109,6 +110,12 @@ const navigation: NavSection[] = [
     label: "Financeiro",
     items: [
       { title: "Créditos", href: "/financeiro/creditos", icon: CreditCard },
+    ],
+  },
+  {
+    label: "Ajuda",
+    items: [
+      { title: "Primeiros Passos", href: "/getting-started", icon: Rocket },
     ],
   },
 ]
