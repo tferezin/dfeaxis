@@ -24,27 +24,54 @@ export async function POST(request: NextRequest) {
     const pfxBuffer = Buffer.from(await pfxFile.arrayBuffer())
     const pfxBase64 = pfxBuffer.toString("base64")
 
-    // Find the Python script
-    const scriptPath = path.resolve(process.cwd(), "..", "backend", "scripts", "test_sefaz.py")
-
-    // Execute the Python script
     const cleanCnpj = cnpj.replace(/\D/g, "")
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL || "https://dfeaxis-production.up.railway.app"
 
-    const { stdout, stderr } = await execAsync(
-      `python3 "${scriptPath}" "${pfxBase64}" "${password}" "${cleanCnpj}" "${tipos}"`,
-      { timeout: 120000, maxBuffer: 10 * 1024 * 1024 }
-    )
+    // Try calling the backend API on Railway first
+    try {
+      const response = await fetch(`${backendUrl}/api/v1/test-capture`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pfx_base64: pfxBase64,
+          password,
+          cnpj: cleanCnpj,
+          tipos: tipos.split(","),
+        }),
+      })
 
-    if (stderr && !stdout) {
-      return NextResponse.json(
-        { error: "Erro ao executar consulta SEFAZ", details: stderr },
-        { status: 500 }
-      )
+      if (response.ok) {
+        const data = await response.json()
+        return NextResponse.json(data)
+      }
+    } catch {
+      // Backend API endpoint not available, try local Python script
     }
 
-    // Parse Python script output (JSON)
-    const result = JSON.parse(stdout.trim())
-    return NextResponse.json(result)
+    // Fallback: execute Python script locally
+    try {
+      const scriptPath = path.resolve(process.cwd(), "..", "backend", "scripts", "test_sefaz.py")
+
+      const { stdout, stderr } = await execAsync(
+        `python3 "${scriptPath}" "${pfxBase64}" "${password}" "${cleanCnpj}" "${tipos}"`,
+        { timeout: 120000, maxBuffer: 10 * 1024 * 1024 }
+      )
+
+      if (stderr && !stdout) {
+        return NextResponse.json(
+          { error: "Erro ao executar consulta SEFAZ", details: stderr },
+          { status: 500 }
+        )
+      }
+
+      const result = JSON.parse(stdout.trim())
+      return NextResponse.json(result)
+    } catch {
+      return NextResponse.json({
+        error: "Backend não disponível. Verifique se o serviço está rodando.",
+        backend_url: backendUrl,
+      }, { status: 503 })
+    }
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err)
 
