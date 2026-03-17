@@ -53,7 +53,22 @@ export default function CapturaManualPage() {
   const [testCnpj, setTestCnpj] = useState("")
   const [testPassword, setTestPassword] = useState("")
   const [testStatus, setTestStatus] = useState<"idle" | "loading">("idle")
-  const [testResult, setTestResult] = useState<{ error?: string; status?: string; message?: string; pfx_size?: number } | null>(null)
+  const [testResult, setTestResult] = useState<{
+    error?: string;
+    certificate?: { subject: string; valid_from: string; valid_until: string };
+    cnpj?: string;
+    ambiente?: string;
+    results?: Array<{
+      tipo: string;
+      status: string;
+      cstat?: string;
+      xmotivo?: string;
+      docs_found?: number;
+      latency_ms?: number;
+      message?: string;
+    }>;
+    message?: string;
+  } | null>(null)
 
   const handleTestCapture = async () => {
     const file = fileRef.current?.files?.[0]
@@ -68,6 +83,7 @@ export default function CapturaManualPage() {
       formData.append("pfx", file)
       formData.append("cnpj", testCnpj.replace(/\D/g, ""))
       formData.append("password", testPassword)
+      formData.append("tipos", selectedTipos.join(","))
 
       const res = await fetch("/api/test-capture", { method: "POST", body: formData })
       const data = await res.json()
@@ -238,39 +254,73 @@ export default function CapturaManualPage() {
               />
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <Button
-              size="sm"
-              className="gap-1.5"
-              disabled={testStatus === "loading"}
-              onClick={handleTestCapture}
-            >
-              {testStatus === "loading" ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : (
-                <Upload className="size-3.5" />
-              )}
-              {testStatus === "loading" ? "Consultando SEFAZ..." : "Testar captura"}
-            </Button>
-            {testResult && (
-              <div className="flex-1">
-                {testResult.error ? (
-                  <p className="text-xs text-red-600">{testResult.error}</p>
-                ) : (
-                  <div className="text-xs">
-                    <span className={testResult.status === "backend_offline" ? "text-amber-600" : "text-emerald-600"}>
-                      {testResult.message || `Status: ${testResult.status}`}
-                    </span>
-                    {testResult.pfx_size && (
-                      <span className="text-muted-foreground ml-2">
-                        (.pfx: {Math.round(testResult.pfx_size / 1024)}KB)
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
+          <Button
+            size="sm"
+            className="gap-1.5"
+            disabled={testStatus === "loading" || selectedTipos.length === 0}
+            onClick={handleTestCapture}
+          >
+            {testStatus === "loading" ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Upload className="size-3.5" />
             )}
-          </div>
+            {testStatus === "loading" ? "Consultando SEFAZ (homologação)..." : "Testar captura na SEFAZ"}
+          </Button>
+
+          {/* Resultados */}
+          {testResult && (
+            <div className="space-y-2 mt-2">
+              {testResult.error ? (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+                  <p className="text-xs text-red-700 font-medium">{testResult.error}</p>
+                  {testResult.message && <p className="text-xs text-red-600 mt-1">{testResult.message}</p>}
+                </div>
+              ) : (
+                <>
+                  {testResult.certificate && (
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                      <p className="text-xs font-medium text-emerald-800">Certificado válido</p>
+                      <p className="text-xs text-emerald-700 mt-0.5 font-mono">{testResult.certificate.subject}</p>
+                      <p className="text-xs text-emerald-600 mt-0.5">Validade: {testResult.certificate.valid_from} até {testResult.certificate.valid_until}</p>
+                    </div>
+                  )}
+                  {testResult.results?.map((r, i) => (
+                    <div
+                      key={i}
+                      className={`rounded-lg border p-3 ${
+                        r.status === "success"
+                          ? r.cstat === "137" || r.cstat === "138"
+                            ? "border-emerald-200 bg-emerald-50"
+                            : "border-amber-200 bg-amber-50"
+                          : r.status === "skipped"
+                            ? "border-gray-200 bg-gray-50"
+                            : "border-red-200 bg-red-50"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary" className="text-[10px]">{r.tipo}</Badge>
+                          <span className={`text-xs font-medium ${
+                            r.status === "success" ? "text-emerald-700" : r.status === "skipped" ? "text-gray-600" : "text-red-700"
+                          }`}>
+                            {r.status === "success" ? `cStat ${r.cstat}` : r.status === "skipped" ? "Ignorado" : "Erro"}
+                          </span>
+                        </div>
+                        {r.latency_ms && <span className="text-xs text-muted-foreground">{r.latency_ms}ms</span>}
+                      </div>
+                      <p className="text-xs mt-1 text-muted-foreground">
+                        {r.xmotivo || r.message}
+                      </p>
+                      {r.docs_found !== undefined && r.docs_found > 0 && (
+                        <p className="text-xs mt-1 font-medium text-emerald-700">{r.docs_found} documento(s) encontrado(s)</p>
+                      )}
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 

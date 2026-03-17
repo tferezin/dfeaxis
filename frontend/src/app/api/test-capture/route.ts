@@ -1,4 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
+import { exec } from "child_process"
+import { promisify } from "util"
+import path from "path"
+
+const execAsync = promisify(exec)
 
 export async function POST(request: NextRequest) {
   try {
@@ -6,6 +11,7 @@ export async function POST(request: NextRequest) {
     const pfxFile = formData.get("pfx") as File | null
     const password = formData.get("password") as string
     const cnpj = formData.get("cnpj") as string
+    const tipos = formData.get("tipos") as string || "nfe,cte,mdfe"
 
     if (!pfxFile || !password || !cnpj) {
       return NextResponse.json(
@@ -14,47 +20,43 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Read PFX file
+    // Read PFX and convert to base64
     const pfxBuffer = Buffer.from(await pfxFile.arrayBuffer())
     const pfxBase64 = pfxBuffer.toString("base64")
 
-    // Call our backend API (or directly test SEFAZ if backend isn't running)
-    // For now, return the connection test info
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+    // Find the Python script
+    const scriptPath = path.resolve(process.cwd(), "..", "backend", "scripts", "test_sefaz.py")
 
-    try {
-      // Try calling the backend
-      const response = await fetch(`${backendUrl}/api/v1/polling/test`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          pfx_base64: pfxBase64,
-          password,
-          cnpj: cnpj.replace(/\D/g, ""),
-          tipos: ["nfe", "cte"],
-        }),
-      })
+    // Execute the Python script
+    const cleanCnpj = cnpj.replace(/\D/g, "")
 
-      if (response.ok) {
-        const data = await response.json()
-        return NextResponse.json(data)
-      }
-    } catch {
-      // Backend not running — return simulated response
+    const { stdout, stderr } = await execAsync(
+      `python3 "${scriptPath}" "${pfxBase64}" "${password}" "${cleanCnpj}" "${tipos}"`,
+      { timeout: 120000, maxBuffer: 10 * 1024 * 1024 }
+    )
+
+    if (stderr && !stdout) {
+      return NextResponse.json(
+        { error: "Erro ao executar consulta SEFAZ", details: stderr },
+        { status: 500 }
+      )
     }
 
-    // If backend is not available, return a helpful message
-    return NextResponse.json({
-      status: "backend_offline",
-      message: "O backend FastAPI não está rodando. Para testar a captura real, inicie o backend com: cd backend && uvicorn main:app --reload",
-      cnpj: cnpj.replace(/\D/g, ""),
-      pfx_size: pfxBuffer.length,
-      pfx_valid: pfxBuffer.length > 1000, // Basic check
-      timestamp: new Date().toISOString(),
-    })
-  } catch (err) {
+    // Parse Python script output (JSON)
+    const result = JSON.parse(stdout.trim())
+    return NextResponse.json(result)
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err)
+
+    if (message.includes("python3") || message.includes("No such file")) {
+      return NextResponse.json({
+        error: "Python3 não encontrado ou dependências não instaladas.",
+        message: "Execute: cd backend && pip install -r requirements.txt",
+      }, { status: 500 })
+    }
+
     return NextResponse.json(
-      { error: "Erro ao processar requisição", details: String(err) },
+      { error: "Erro ao processar requisição", details: message },
       { status: 500 }
     )
   }
