@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Save, Clock, Globe, Bell, AlertTriangle } from "lucide-react"
+import { Save, Clock, Globe, Bell, AlertTriangle, Eye } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -182,6 +182,35 @@ export default function ConfiguracoesPage() {
                 </p>
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Dados de demonstração */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <Eye className="size-5 text-primary" />
+              <CardTitle className="text-base">Dados de demonstração</CardTitle>
+            </div>
+            <CardDescription>
+              Controle a exibição de dados fictícios nas telas de histórico.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={settings.showMockData}
+                onChange={(e) => updateSettings({ showMockData: e.target.checked })}
+                className="size-4 mt-0.5 shrink-0"
+              />
+              <div>
+                <span className="text-sm font-medium">Exibir dados de demonstração</span>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Desative para testar com dados reais da SEFAZ. Quando desativado, apenas documentos capturados do ambiente real serão exibidos.
+                </p>
+              </div>
+            </label>
           </CardContent>
         </Card>
 

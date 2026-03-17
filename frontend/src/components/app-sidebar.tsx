@@ -84,8 +84,8 @@ const navigation: NavSection[] = [
   {
     label: "Documentos Recebidos",
     items: [
-      { title: "NF-e Recebidas", href: "/historico/nfe", icon: FileText },
-      { title: "CT-e Recebidos", href: "/historico/cte", icon: Truck },
+      { title: "NF-e Recebidas", href: "/historico/nfe", icon: FileText, badge: "SAP" },
+      { title: "CT-e Recebidos", href: "/historico/cte", icon: Truck, badge: "SAP" },
       { title: "NFS-e Recebidas", href: "/historico/nfse", icon: Building2, badge: "ADN" },
       { title: "MDF-e Recebidos", href: "/historico/mdfe", icon: FileStack },
     ],
@@ -130,7 +130,14 @@ function NavItemLink({
         <Icon className="size-4" />
         <span>{item.title}</span>
         {item.badge && (
-          <Badge variant="secondary" className="ml-auto text-[10px] px-1.5 py-0">
+          <Badge
+            variant="secondary"
+            className={cn(
+              "ml-auto text-[10px] px-1.5 py-0",
+              item.badge === "SAP" && "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+              item.badge === "ADN" && "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+            )}
+          >
             {item.badge}
           </Badge>
         )}

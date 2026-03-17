@@ -4,6 +4,8 @@ import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useSettings } from "@/hooks/use-settings"
+import { cn } from "@/lib/utils"
 import {
   Select,
   SelectContent,
@@ -27,6 +29,7 @@ import {
   Loader2,
   CheckCircle2,
   Download,
+  Inbox,
 } from "lucide-react"
 
 type NfeStatus = "Pendente" | "Ciencia" | "Disponivel" | "Entregue" | "Cancelada"
@@ -201,7 +204,11 @@ function ActionCell({ row }: { row: NfeRow }) {
   }
 }
 
+type TabKey = "pendentes" | "completo"
+
 export default function HistoricoNfePage() {
+  const { settings } = useSettings()
+  const [activeTab, setActiveTab] = useState<TabKey>("pendentes")
   const [currentPage, setCurrentPage] = useState(1)
   const [statusFilter, setStatusFilter] = useState("Todos")
   const [searchChave, setSearchChave] = useState("")
@@ -209,7 +216,32 @@ export default function HistoricoNfePage() {
   const [dateTo, setDateTo] = useState("2026-03-17")
   const itemsPerPage = 10
 
-  const filteredData = mockData.filter((row) => {
+  // When showMockData is off, show empty state
+  if (!settings.showMockData) {
+    return (
+      <div className="flex flex-col gap-6 p-6">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">NF-e Recebidas</h1>
+          <p className="text-sm text-muted-foreground">
+            Notas fiscais recebidas de fornecedores via captura automatica
+          </p>
+        </div>
+        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16 gap-3">
+          <Inbox className="size-10 text-muted-foreground/50" />
+          <p className="text-sm text-muted-foreground text-center max-w-md">
+            Nenhum documento capturado. Configure um certificado e execute uma captura para ver documentos reais.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  // Tab-based data: "pendentes" shows only Pendente + Ciencia; "completo" shows last 50 of all statuses
+  const tabData = activeTab === "pendentes"
+    ? mockData.filter((row) => row.status === "Pendente" || row.status === "Ciencia")
+    : mockData.slice(0, 50)
+
+  const filteredData = tabData.filter((row) => {
     if (statusFilter !== "Todos" && row.status !== statusFilter) return false
     if (searchChave && !row.chave.toLowerCase().includes(searchChave.toLowerCase())) return false
     return true
@@ -223,13 +255,13 @@ export default function HistoricoNfePage() {
 
   // Status counts
   const counts = {
-    Pendente: mockData.filter((r) => r.status === "Pendente").length,
-    Ciencia: mockData.filter((r) => r.status === "Ciencia").length,
-    Disponivel: mockData.filter((r) => r.status === "Disponivel").length,
-    Entregue: mockData.filter((r) => r.status === "Entregue").length,
-    Cancelada: mockData.filter((r) => r.status === "Cancelada").length,
+    Pendente: tabData.filter((r) => r.status === "Pendente").length,
+    Ciencia: tabData.filter((r) => r.status === "Ciencia").length,
+    Disponivel: tabData.filter((r) => r.status === "Disponivel").length,
+    Entregue: tabData.filter((r) => r.status === "Entregue").length,
+    Cancelada: tabData.filter((r) => r.status === "Cancelada").length,
   }
-  const total = mockData.length
+  const total = tabData.length
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -245,6 +277,32 @@ export default function HistoricoNfePage() {
           <FileDown className="size-4" />
           Exportar
         </Button>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex items-center gap-1 border-b">
+        <button
+          onClick={() => { setActiveTab("pendentes"); setCurrentPage(1); setStatusFilter("Todos") }}
+          className={cn(
+            "px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px",
+            activeTab === "pendentes"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          )}
+        >
+          Pendentes de ação
+        </button>
+        <button
+          onClick={() => { setActiveTab("completo"); setCurrentPage(1); setStatusFilter("Todos") }}
+          className={cn(
+            "px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px",
+            activeTab === "completo"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          )}
+        >
+          Histórico completo
+        </button>
       </div>
 
       {/* Summary Bar */}

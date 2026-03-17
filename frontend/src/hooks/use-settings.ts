@@ -9,6 +9,7 @@ interface TenantSettings {
   notifyEmail: string
   notifyCertExpiry: boolean
   notifyNoCredits: boolean
+  showMockData: boolean
 }
 
 const STORAGE_KEY = "dfeaxis_settings"
@@ -20,6 +21,7 @@ const defaultSettings: TenantSettings = {
   notifyEmail: "",
   notifyCertExpiry: true,
   notifyNoCredits: true,
+  showMockData: true,
 }
 
 let listeners: Array<() => void> = []
