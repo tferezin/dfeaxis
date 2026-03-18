@@ -113,7 +113,7 @@ def _poll_single_detailed(cert: dict, tipo: str, tenant_data: dict) -> dict:
         }).execute()
 
         if docs_found > 0:
-            # Debit credits
+            # Debit credits (non-blocking — save docs even if credits fail)
             try:
                 sb.rpc("debit_credits", {
                     "p_tenant_id": tenant_id,
@@ -121,13 +121,7 @@ def _poll_single_detailed(cert: dict, tipo: str, tenant_data: dict) -> dict:
                     "p_description": f"Captura manual {tipo.upper()} CNPJ {mask_cnpj(cnpj)}: {docs_found} docs",
                 }).execute()
             except Exception as credit_err:
-                logger.warning(f"Credits error: {credit_err}")
-                return {
-                    "tipo": tipo.upper(), "status": "error", "cstat": response.cstat,
-                    "xmotivo": response.xmotivo, "docs_found": docs_found,
-                    "latency_ms": response.latency_ms,
-                    "error": f"Créditos insuficientes: {credit_err}", "saved_to_db": False,
-                }
+                logger.warning(f"Credits debit skipped (non-blocking): {credit_err}")
 
             # Save documents
             for doc in response.documents:
