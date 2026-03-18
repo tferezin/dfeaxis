@@ -41,7 +41,30 @@ export default function DashboardPage() {
   const [realActivity, setRealActivity] = useState<ActivityEntry[]>([])
   const [realCredits, setRealCredits] = useState<number | null>(null)
   const [realDocuments, setRealDocuments] = useState<Array<{ tipo: string; chave_acesso: string; cnpj: string; nsu: string; status: string; fetched_at: string }>>([])
+  const [realNfeTotal, setRealNfeTotal] = useState(0)
+  const [realCteTotal, setRealCteTotal] = useState(0)
   const [realLoading, setRealLoading] = useState(false)
+
+  // Extract value from XML string using regex (no DOM parser needed)
+  function extractXmlValue(xml: string, tipo: string): number {
+    if (!xml) return 0
+    try {
+      if (tipo === "NFE") {
+        const match = xml.match(/<vNF>([\d.,]+)<\/vNF>/)
+        return match ? parseFloat(match[1].replace(",", ".")) : 0
+      } else if (tipo === "CTE") {
+        const match = xml.match(/<vTPrest>([\d.,]+)<\/vTPrest>/)
+        return match ? parseFloat(match[1].replace(",", ".")) : 0
+      } else if (tipo === "MDFE") {
+        const match = xml.match(/<vCarga>([\d.,]+)<\/vCarga>/)
+        return match ? parseFloat(match[1].replace(",", ".")) : 0
+      } else if (tipo === "NFSE") {
+        const match = xml.match(/<ValorServicos>([\d.,]+)<\/ValorServicos>/)
+        return match ? parseFloat(match[1].replace(",", ".")) : 0
+      }
+    } catch { /* ignore */ }
+    return 0
+  }
 
   const loadRealData = useCallback(async () => {
     setRealLoading(true)
@@ -63,14 +86,27 @@ export default function DashboardPage() {
         nfse: nfseRes.count ?? 0,
       })
 
-      // Recent documents (last 10)
+      // Recent documents with XML for value extraction
       const { data: recentDocs } = await sb
         .from('documents')
-        .select('tipo, chave_acesso, cnpj, nsu, status, fetched_at')
+        .select('tipo, chave_acesso, cnpj, nsu, status, fetched_at, xml_content')
+        .eq('status', 'available')
         .order('fetched_at', { ascending: false })
-        .limit(10)
+        .limit(20)
 
-      if (recentDocs) setRealDocuments(recentDocs)
+      if (recentDocs) {
+        setRealDocuments(recentDocs)
+
+        // Sum values by type
+        let nfeSum = 0, cteSum = 0
+        for (const doc of recentDocs) {
+          const val = extractXmlValue(doc.xml_content || "", doc.tipo)
+          if (doc.tipo === "NFE") nfeSum += val
+          if (doc.tipo === "CTE") cteSum += val
+        }
+        setRealNfeTotal(nfeSum)
+        setRealCteTotal(cteSum)
+      }
 
       // Last 5 polling_log entries for activity feed
       const { data: activityData } = await sb
@@ -169,29 +205,29 @@ export default function DashboardPage() {
       {/* Financial + Chart side by side */}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         <FinancialCard
-          title="NF-e"
+          title="NF-e + CT-e"
           icon={<FileText className="h-4 w-4 text-blue-600" />}
-          totalLabel="Total Líquido"
-          totalValue={showMock ? "R$ 2.847.320,45" : "R$ 0,00"}
+          totalLabel="Total Documentos"
+          totalValue={showMock ? "R$ 2.847.320,45" : `R$ ${(realNfeTotal + realCteTotal).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`}
           period="Mar 2026"
           items={[
             {
-              label: "Autorizadas",
-              value: showMock ? "R$ 2.847.320,45" : "R$ 0,00",
-              amount: showMock ? 2847320 : 0,
-              color: "text-emerald-600",
-              bgColor: "bg-emerald-500",
+              label: `NF-e (${showMock ? "1.247" : realCounts.nfe})`,
+              value: showMock ? "R$ 2.847.320,45" : `R$ ${realNfeTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+              amount: showMock ? 2847320 : realNfeTotal,
+              color: "text-blue-600",
+              bgColor: "bg-blue-500",
             },
             {
-              label: "Canceladas",
-              value: showMock ? "R$ 63.250,00" : "R$ 0,00",
-              amount: showMock ? 63250 : 0,
-              color: "text-gray-500",
-              bgColor: "bg-gray-400",
+              label: `CT-e (${showMock ? "384" : realCounts.cte})`,
+              value: showMock ? "R$ 63.250,00" : `R$ ${realCteTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+              amount: showMock ? 63250 : realCteTotal,
+              color: "text-violet-600",
+              bgColor: "bg-violet-500",
             },
           ]}
         />
-        <VolumeChart empty={!showMock} />
+        <VolumeChart empty={showMock ? false : (realCounts.nfe + realCounts.cte) === 0} />
       </div>
 
       {/* Recent documents */}
