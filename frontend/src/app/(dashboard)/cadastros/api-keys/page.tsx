@@ -222,6 +222,15 @@ export default function ApiKeysPage() {
             </div>
           </div>
 
+          <div className="rounded-lg bg-blue-50 border border-blue-200 p-3">
+            <div className="flex gap-2">
+              <Shield className="size-4 text-blue-600 mt-0.5 shrink-0" />
+              <p className="text-xs text-blue-800">
+                <strong>Multi-CNPJ:</strong> Uma única API Key dá acesso a <strong>todos os CNPJs</strong> cadastrados na sua conta. O SAP escolhe qual CNPJ consultar via parâmetro <code>?cnpj=XXXXX</code>. Cada CNPJ deve ter seu certificado A1 cadastrado em <strong>Cadastros &gt; Certificados A1</strong>.
+              </p>
+            </div>
+          </div>
+
           <div className="rounded-lg bg-amber-50 border border-amber-200 p-3">
             <div className="flex gap-2">
               <AlertTriangle className="size-4 text-amber-600 mt-0.5 shrink-0" />
