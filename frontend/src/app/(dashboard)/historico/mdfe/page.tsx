@@ -1,10 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useSettings } from "@/hooks/use-settings"
+import { getSupabase } from "@/lib/supabase"
 import {
   Select,
   SelectContent,
@@ -28,6 +29,7 @@ import {
   ChevronRight,
   Eye,
   Inbox,
+  Loader2,
 } from "lucide-react"
 
 type MdfeStatus = "Autorizado" | "Encerrado" | "Cancelado" | "Pendente"
@@ -79,6 +81,36 @@ export default function HistoricoMdfePage() {
   const [dateTo, setDateTo] = useState("2026-03-16")
   const itemsPerPage = 10
 
+  const [realData, setRealData] = useState<any[]>([])
+  const [realLoading, setRealLoading] = useState(false)
+
+  const loadRealData = useCallback(async () => {
+    setRealLoading(true)
+    try {
+      const sb = getSupabase()
+      const { data, error } = await sb
+        .from('documents')
+        .select('*')
+        .eq('tipo', 'MDFE')
+        .order('fetched_at', { ascending: false })
+        .limit(100)
+
+      if (!error && data) {
+        setRealData(data)
+      }
+    } catch (e) {
+      console.error("[DFeAxis] Error loading documents:", e)
+    } finally {
+      setRealLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!settings.showMockData) {
+      loadRealData()
+    }
+  }, [settings.showMockData, loadRealData])
+
   const filteredData = mockData.filter((row) => {
     if (statusFilter !== "Todos" && row.status !== statusFilter) return false
     if (searchChave && !row.chave.toLowerCase().includes(searchChave.toLowerCase())) return false
@@ -92,18 +124,192 @@ export default function HistoricoMdfePage() {
   )
 
   if (!settings.showMockData) {
+    const statusMap: Record<string, MdfeStatus> = {
+      available: "Autorizado",
+      delivered: "Encerrado",
+      expired: "Cancelado",
+    }
+
+    const mappedData = realData.map((doc, i) => ({
+      id: i,
+      chave: doc.chave_acesso || "",
+      cnpj: doc.cnpj || "",
+      status: statusMap[doc.status] || (doc.is_resumo ? "Pendente" : "Autorizado"),
+      nsu: doc.nsu || "",
+      fetchedAt: doc.fetched_at ? new Date(doc.fetched_at).toLocaleString("pt-BR") : "",
+    }))
+
+    const filteredReal = mappedData.filter((row) => {
+      if (statusFilter !== "Todos" && row.status !== statusFilter) return false
+      if (searchChave && !row.chave.toLowerCase().includes(searchChave.toLowerCase())) return false
+      return true
+    })
+
+    const totalPagesReal = Math.ceil(filteredReal.length / itemsPerPage)
+    const paginatedReal = filteredReal.slice(
+      (currentPage - 1) * itemsPerPage,
+      currentPage * itemsPerPage
+    )
+
     return (
       <div className="flex flex-col gap-6 p-6">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">MDF-e Recebidos</h1>
-          <p className="text-sm text-muted-foreground">
-            Manifestos eletrônicos recebidos via captura automática
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">MDF-e Recebidos</h1>
+            <p className="text-sm text-muted-foreground">
+              Manifestos eletrônicos recebidos via captura automática
+            </p>
+          </div>
+          <Button variant="outline" onClick={loadRealData} disabled={realLoading}>
+            {realLoading ? <Loader2 className="size-4 animate-spin" /> : <FileDown className="size-4" />}
+            {realLoading ? "Carregando..." : "Atualizar"}
+          </Button>
         </div>
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <Inbox className="size-12 text-muted-foreground/30 mb-4" />
-          <p className="text-sm text-muted-foreground">Nenhum MDF-e capturado. Configure um certificado e execute uma captura para ver documentos reais.</p>
+
+        {/* SAP DRC availability notice */}
+        <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4">
+          <div className="shrink-0 mt-0.5 size-5 rounded-full bg-blue-100 flex items-center justify-center">
+            <span className="text-blue-600 text-xs font-bold">i</span>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-blue-900">Captura ativa — Integração SAP DRC em desenvolvimento</p>
+            <p className="text-xs text-blue-700 mt-1">
+              O DFeAxis captura MDF-e recebidos da SEFAZ normalmente. A entrega automática para o SAP via DRC ainda não é suportada pela SAP para este tipo de documento. Os MDF-e ficam disponíveis para consulta e download manual neste painel.
+            </p>
+          </div>
         </div>
+
+        {/* Filters */}
+        <div className="flex flex-wrap items-end gap-3 rounded-lg border p-4">
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-muted-foreground">Status</span>
+            <Select value={statusFilter} onValueChange={(v) => { if (v) { setStatusFilter(v); setCurrentPage(1) } }}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Todos">Todos</SelectItem>
+                <SelectItem value="Autorizado">Autorizado</SelectItem>
+                <SelectItem value="Encerrado">Encerrado</SelectItem>
+                <SelectItem value="Cancelado">Cancelado</SelectItem>
+                <SelectItem value="Pendente">Pendente</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-muted-foreground">Chave de acesso</span>
+            <Input
+              placeholder="Buscar por chave..."
+              className="w-[220px]"
+              value={searchChave}
+              onChange={(e) => { setSearchChave(e.target.value); setCurrentPage(1) }}
+            />
+          </div>
+          <Button variant="default" className="gap-1.5" onClick={loadRealData} disabled={realLoading}>
+            <Filter className="size-3.5" />
+            Filtrar
+          </Button>
+        </div>
+
+        {realLoading ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-3">
+            <Loader2 className="size-8 animate-spin text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">Carregando documentos...</p>
+          </div>
+        ) : realData.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <Inbox className="size-12 text-muted-foreground/30 mb-4" />
+            <p className="text-sm text-muted-foreground">Nenhum MDF-e capturado. Configure um certificado e execute uma captura para ver documentos reais.</p>
+          </div>
+        ) : (
+          <>
+            <div className="rounded-lg border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Chave de Acesso</TableHead>
+                    <TableHead>CNPJ</TableHead>
+                    <TableHead>NSU</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Capturado em</TableHead>
+                    <TableHead>Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedReal.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell className="max-w-[220px] truncate font-mono text-xs">
+                        {row.chave}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">{row.cnpj}</TableCell>
+                      <TableCell className="font-mono text-xs">{row.nsu}</TableCell>
+                      <TableCell>
+                        <Badge variant={statusConfig[row.status].variant}>
+                          {statusConfig[row.status].label}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-xs">{row.fetchedAt}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon-xs" title="Visualizar XML">
+                            <Eye className="size-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon-xs" title="Download">
+                            <Download className="size-3.5" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {paginatedReal.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                        Nenhum MDF-e encontrado com os filtros aplicados.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Pagination */}
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                Mostrando {filteredReal.length === 0 ? 0 : ((currentPage - 1) * itemsPerPage) + 1} a{" "}
+                {Math.min(currentPage * itemsPerPage, filteredReal.length)} de{" "}
+                {filteredReal.length} registros
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage((p) => p - 1)}
+                >
+                  <ChevronLeft className="size-4" />
+                </Button>
+                {Array.from({ length: Math.min(totalPagesReal, 5) }, (_, i) => i + 1).map((page) => (
+                  <Button
+                    key={page}
+                    variant={page === currentPage ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCurrentPage(page)}
+                  >
+                    {page}
+                  </Button>
+                ))}
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  disabled={currentPage === totalPagesReal || totalPagesReal === 0}
+                  onClick={() => setCurrentPage((p) => p + 1)}
+                >
+                  <ChevronRight className="size-4" />
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     )
   }
