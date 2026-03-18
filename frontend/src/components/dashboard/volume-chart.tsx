@@ -114,10 +114,10 @@ export function VolumeChart({ empty = false, realData }: { empty?: boolean; real
             />
             <ChartTooltip content={<ChartTooltipContent />} />
             <ChartLegend content={<ChartLegendContent />} />
-            <Line dataKey="nfe" type="monotone" stroke="var(--color-nfe)" strokeWidth={2.5} dot={{ r: 4, fill: "var(--color-nfe)" }} activeDot={{ r: 6 }} />
-            <Line dataKey="cte" type="monotone" stroke="var(--color-cte)" strokeWidth={2.5} dot={{ r: 4, fill: "var(--color-cte)" }} activeDot={{ r: 6 }} />
-            <Line dataKey="mdfe" type="monotone" stroke="var(--color-mdfe)" strokeWidth={2.5} dot={{ r: 4, fill: "var(--color-mdfe)" }} activeDot={{ r: 6 }} />
-            <Line dataKey="nfse" type="monotone" stroke="var(--color-nfse)" strokeWidth={2.5} dot={{ r: 4, fill: "var(--color-nfse)" }} activeDot={{ r: 6 }} />
+            <Line dataKey="nfse" type="monotone" stroke="var(--color-nfse)" strokeWidth={2} dot={{ r: 3, fill: "var(--color-nfse)", strokeWidth: 0 }} activeDot={{ r: 6 }} />
+            <Line dataKey="mdfe" type="monotone" stroke="var(--color-mdfe)" strokeWidth={2} dot={{ r: 4, fill: "var(--color-mdfe)", strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 7 }} />
+            <Line dataKey="cte" type="monotone" stroke="var(--color-cte)" strokeWidth={2.5} dot={{ r: 4, fill: "var(--color-cte)", strokeWidth: 0 }} activeDot={{ r: 7 }} />
+            <Line dataKey="nfe" type="monotone" stroke="var(--color-nfe)" strokeWidth={2.5} dot={{ r: 5, fill: "var(--color-nfe)", strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 8 }} />
           </LineChart>
         </ChartContainer>
         ) : (
