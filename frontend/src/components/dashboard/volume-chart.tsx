@@ -41,6 +41,7 @@ const lineConfig = {
   cte: { label: "CT-e", color: "#8b5cf6" },
   mdfe: { label: "MDF-e", color: "#10b981" },
   nfse: { label: "NFS-e", color: "#f59e0b" },
+  overlap: { label: "Sobreposição", color: "#ef4444" },
 } satisfies ChartConfig
 
 export interface VolumeDataPoint {
@@ -51,8 +52,12 @@ export interface VolumeDataPoint {
   nfse: number
 }
 
-function buildMonthDays(rawData: VolumeDataPoint[]): VolumeDataPoint[] {
-  const result: VolumeDataPoint[] = []
+interface ChartDataPoint extends VolumeDataPoint {
+  overlap: number
+}
+
+function buildMonthDays(rawData: VolumeDataPoint[]): ChartDataPoint[] {
+  const result: ChartDataPoint[] = []
   const now = new Date()
   const year = now.getFullYear()
   const month = now.getMonth()
@@ -64,7 +69,13 @@ function buildMonthDays(rawData: VolumeDataPoint[]): VolumeDataPoint[] {
   for (let day = 1; day <= daysInMonth; day++) {
     const date = new Date(year, month, day)
     const key = date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
-    result.push(dataMap[key] || { date: key, nfe: 0, cte: 0, mdfe: 0, nfse: 0 })
+    const d = dataMap[key] || { date: key, nfe: 0, cte: 0, mdfe: 0, nfse: 0 }
+    // Count how many types have values > 0 at this point
+    const typesWithData = [d.nfe, d.cte, d.mdfe, d.nfse].filter(v => v > 0).length
+    // If more than 1 type overlaps at same value, show overlap marker
+    const maxVal = Math.max(d.nfe, d.cte, d.mdfe, d.nfse)
+    const overlap = typesWithData > 1 ? maxVal : 0
+    result.push({ ...d, overlap })
   }
   return result
 }
@@ -114,10 +125,11 @@ export function VolumeChart({ empty = false, realData }: { empty?: boolean; real
             />
             <ChartTooltip content={<ChartTooltipContent />} />
             <ChartLegend content={<ChartLegendContent />} />
-            <Line dataKey="nfse" type="monotone" stroke="var(--color-nfse)" strokeWidth={2} dot={{ r: 3, fill: "var(--color-nfse)", strokeWidth: 0 }} activeDot={{ r: 6 }} />
-            <Line dataKey="mdfe" type="monotone" stroke="var(--color-mdfe)" strokeWidth={2} dot={{ r: 4, fill: "var(--color-mdfe)", strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 7 }} />
-            <Line dataKey="cte" type="monotone" stroke="var(--color-cte)" strokeWidth={2.5} dot={{ r: 4, fill: "var(--color-cte)", strokeWidth: 0 }} activeDot={{ r: 7 }} />
-            <Line dataKey="nfe" type="monotone" stroke="var(--color-nfe)" strokeWidth={2.5} dot={{ r: 5, fill: "var(--color-nfe)", strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 8 }} />
+            <Line dataKey="nfse" type="monotone" stroke="var(--color-nfse)" strokeWidth={2} dot={{ r: 3, fill: "var(--color-nfse)", strokeWidth: 0 }} activeDot={{ r: 6 }} connectNulls={false} />
+            <Line dataKey="mdfe" type="monotone" stroke="var(--color-mdfe)" strokeWidth={2} dot={{ r: 3, fill: "var(--color-mdfe)", strokeWidth: 0 }} activeDot={{ r: 6 }} connectNulls={false} />
+            <Line dataKey="cte" type="monotone" stroke="var(--color-cte)" strokeWidth={2.5} dot={{ r: 3, fill: "var(--color-cte)", strokeWidth: 0 }} activeDot={{ r: 7 }} connectNulls={false} />
+            <Line dataKey="nfe" type="monotone" stroke="var(--color-nfe)" strokeWidth={2.5} dot={{ r: 3, fill: "var(--color-nfe)", strokeWidth: 0 }} activeDot={{ r: 7 }} connectNulls={false} />
+            <Line dataKey="overlap" type="monotone" stroke="var(--color-overlap)" strokeWidth={0} dot={{ r: 6, fill: "var(--color-overlap)", strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 8 }} connectNulls={false} />
           </LineChart>
         </ChartContainer>
         ) : (
