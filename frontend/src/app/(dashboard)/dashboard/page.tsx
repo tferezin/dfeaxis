@@ -37,6 +37,7 @@ export default function DashboardPage() {
   const { settings } = useSettings()
   const showMock = settings.showMockData
 
+  const [realCompanyName, setRealCompanyName] = useState("")
   const [realCounts, setRealCounts] = useState<DashboardCounts>({ nfe: 0, cte: 0, mdfe: 0, nfse: 0 })
   const [realActivity, setRealActivity] = useState<ActivityEntry[]>([])
   const [realCredits, setRealCredits] = useState<number | null>(null)
@@ -83,9 +84,14 @@ export default function DashboardPage() {
         sb.from('documents').select('id', { count: 'exact', head: true }).eq('tipo', 'NFSE'),
       ])
 
-      // Count CNPJs
-      const { data: certData } = await sb.from('certificates').select('cnpj').eq('is_active', true)
+      // Count CNPJs + get company name
+      const { data: certData } = await sb.from('certificates').select('cnpj, company_name').eq('is_active', true)
       setRealCnpjCount(certData?.length ?? 0)
+      if (certData && certData.length > 0 && certData[0].company_name) {
+        // Clean up company name (remove CNPJ suffix if present)
+        const name = certData[0].company_name.split(':')[0].trim()
+        setRealCompanyName(name)
+      }
 
       setRealCounts({
         nfe: nfeRes.count ?? 0,
@@ -178,7 +184,7 @@ export default function DashboardPage() {
         <div className="flex items-center gap-2">
           <button className="inline-flex items-center gap-2 rounded-lg border bg-background px-2.5 py-1.5 text-xs font-medium shadow-sm transition-colors hover:bg-muted">
             <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
-            <span>Tech Solutions Ltda</span>
+            <span>{showMock ? "Tech Solutions Ltda" : (realCompanyName || "Empresa")}</span>
             <ChevronDown className="h-3 w-3 text-muted-foreground" />
           </button>
           <button className="inline-flex items-center gap-2 rounded-lg border bg-background px-2.5 py-1.5 text-xs font-medium shadow-sm transition-colors hover:bg-muted">
