@@ -163,6 +163,7 @@ export default function DashboardPage() {
   const cteValue = showMock ? "384" : realCounts.cte.toLocaleString("pt-BR")
   const mdfeValue = showMock ? "56" : realCounts.mdfe.toLocaleString("pt-BR")
   const nfseValue = showMock ? "12" : realCounts.nfse.toLocaleString("pt-BR")
+  const allFinancialTotal = realNfeTotal + realCteTotal + realMdfeTotal + realNfseTotal
 
   return (
     <div className="space-y-3">
@@ -191,7 +192,7 @@ export default function DashboardPage() {
       {/* Stat cards — all in one row */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
         <StatCard
-          title="NF-e Recebidas"
+          title="NF-e"
           value={nfeValue}
           icon={<FileText className="h-4 w-4" />}
           period="Últimos 30 dias"
@@ -199,7 +200,7 @@ export default function DashboardPage() {
           color="text-blue-600"
         />
         <StatCard
-          title="CT-e Recebidos"
+          title="CT-e"
           value={cteValue}
           icon={<Truck className="h-4 w-4" />}
           period="Últimos 30 dias"
@@ -207,7 +208,7 @@ export default function DashboardPage() {
           color="text-violet-600"
         />
         <StatCard
-          title="MDF-e Recebidos"
+          title="MDF-e"
           value={mdfeValue}
           icon={<FileCheck className="h-4 w-4" />}
           period="Últimos 30 dias"
@@ -215,7 +216,7 @@ export default function DashboardPage() {
           color="text-emerald-600"
         />
         <StatCard
-          title="NFS-e Recebidas"
+          title="NFS-e"
           value={nfseValue}
           icon={<Receipt className="h-4 w-4" />}
           period="Últimos 30 dias"
@@ -246,8 +247,7 @@ export default function DashboardPage() {
       {/* Financial + Chart side by side */}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         {(() => {
-          // MDF-e vCarga é valor da mercadoria, não valor fiscal — não somar
-          const allTotal = realNfeTotal + realCteTotal + realNfseTotal
+          const allTotal = allFinancialTotal
           const fmt = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
           return (
             <FinancialCard
@@ -262,7 +262,7 @@ export default function DashboardPage() {
               ] : [
                 ...(realNfeTotal > 0 ? [{ label: `NF-e (${realCounts.nfe})`, value: fmt(realNfeTotal), amount: realNfeTotal, color: "text-blue-600", bgColor: "bg-blue-500" }] : []),
                 ...(realCteTotal > 0 ? [{ label: `CT-e (${realCounts.cte})`, value: fmt(realCteTotal), amount: realCteTotal, color: "text-violet-600", bgColor: "bg-violet-500" }] : []),
-                ...(realCounts.mdfe > 0 ? [{ label: `MDF-e (${realCounts.mdfe})`, value: `${realCounts.mdfe} doc(s)`, amount: realCounts.mdfe, color: "text-emerald-600", bgColor: "bg-emerald-500" }] : []),
+                ...(realMdfeTotal > 0 ? [{ label: `MDF-e (${realCounts.mdfe})`, value: fmt(realMdfeTotal), amount: realMdfeTotal, color: "text-emerald-600", bgColor: "bg-emerald-500" }] : []),
                 ...(realNfseTotal > 0 ? [{ label: `NFS-e (${realCounts.nfse})`, value: fmt(realNfseTotal), amount: realNfseTotal, color: "text-amber-600", bgColor: "bg-amber-500" }] : []),
               ]}
             />
