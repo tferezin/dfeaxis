@@ -37,10 +37,10 @@ const areaConfig = {
 } satisfies ChartConfig
 
 const lineConfig = {
-  nfe: { label: "NF-e", color: "oklch(0.623 0.214 259.815)" },
-  cte: { label: "CT-e", color: "oklch(0.558 0.189 281.325)" },
-  mdfe: { label: "MDF-e", color: "oklch(0.696 0.17 162.48)" },
-  nfse: { label: "NFS-e", color: "oklch(0.705 0.152 71.519)" },
+  nfe: { label: "NF-e", color: "#3b82f6" },
+  cte: { label: "CT-e", color: "#8b5cf6" },
+  mdfe: { label: "MDF-e", color: "#10b981" },
+  nfse: { label: "NFS-e", color: "#f59e0b" },
 } satisfies ChartConfig
 
 export interface VolumeDataPoint {
@@ -111,10 +111,10 @@ export function VolumeChart({ empty = false, realData }: { empty?: boolean; real
             />
             <ChartTooltip content={<ChartTooltipContent />} />
             <ChartLegend content={<ChartLegendContent />} />
-            <Line dataKey="nfe" type="monotone" stroke="var(--color-nfe)" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
-            <Line dataKey="cte" type="monotone" stroke="var(--color-cte)" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
-            <Line dataKey="mdfe" type="monotone" stroke="var(--color-mdfe)" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
-            <Line dataKey="nfse" type="monotone" stroke="var(--color-nfse)" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+            <Line dataKey="nfe" type="monotone" stroke="var(--color-nfe)" strokeWidth={2.5} dot={{ r: 4, fill: "var(--color-nfe)" }} activeDot={{ r: 6 }} />
+            <Line dataKey="cte" type="monotone" stroke="var(--color-cte)" strokeWidth={2.5} dot={{ r: 4, fill: "var(--color-cte)" }} activeDot={{ r: 6 }} />
+            <Line dataKey="mdfe" type="monotone" stroke="var(--color-mdfe)" strokeWidth={2.5} dot={{ r: 4, fill: "var(--color-mdfe)" }} activeDot={{ r: 6 }} />
+            <Line dataKey="nfse" type="monotone" stroke="var(--color-nfse)" strokeWidth={2.5} dot={{ r: 4, fill: "var(--color-nfse)" }} activeDot={{ r: 6 }} />
           </LineChart>
         </ChartContainer>
         ) : (
