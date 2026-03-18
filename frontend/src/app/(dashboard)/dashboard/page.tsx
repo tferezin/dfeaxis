@@ -9,6 +9,7 @@ import {
   Building2,
   CalendarDays,
   ChevronDown,
+  Loader2,
 } from "lucide-react"
 import { StatCard } from "@/components/dashboard/stat-card"
 import { FinancialCard } from "@/components/dashboard/financial-card"
@@ -170,6 +171,17 @@ export default function DashboardPage() {
   const mdfeValue = showMock ? "56" : realCounts.mdfe.toLocaleString("pt-BR")
   const nfseValue = showMock ? "12" : realCounts.nfse.toLocaleString("pt-BR")
   const allFinancialTotal = realNfeTotal + realCteTotal + realMdfeTotal + realNfseTotal
+
+  if (!showMock && realLoading) {
+    return (
+      <div className="flex items-center justify-center py-32">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="size-8 animate-spin text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">Carregando dados...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-3">
