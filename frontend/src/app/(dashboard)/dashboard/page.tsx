@@ -43,6 +43,8 @@ export default function DashboardPage() {
   const [realDocuments, setRealDocuments] = useState<Array<{ tipo: string; chave_acesso: string; cnpj: string; nsu: string; status: string; fetched_at: string }>>([])
   const [realNfeTotal, setRealNfeTotal] = useState(0)
   const [realCteTotal, setRealCteTotal] = useState(0)
+  const [realMdfeTotal, setRealMdfeTotal] = useState(0)
+  const [realNfseTotal, setRealNfseTotal] = useState(0)
   const [realLoading, setRealLoading] = useState(false)
 
   // Extract value from XML string using regex (no DOM parser needed)
@@ -98,14 +100,18 @@ export default function DashboardPage() {
         setRealDocuments(recentDocs)
 
         // Sum values by type
-        let nfeSum = 0, cteSum = 0
+        let nfeSum = 0, cteSum = 0, mdfeSum = 0, nfseSum = 0
         for (const doc of recentDocs) {
           const val = extractXmlValue(doc.xml_content || "", doc.tipo)
           if (doc.tipo === "NFE") nfeSum += val
           if (doc.tipo === "CTE") cteSum += val
+          if (doc.tipo === "MDFE") mdfeSum += val
+          if (doc.tipo === "NFSE") nfseSum += val
         }
         setRealNfeTotal(nfeSum)
         setRealCteTotal(cteSum)
+        setRealMdfeTotal(mdfeSum)
+        setRealNfseTotal(nfseSum)
       }
 
       // Last 5 polling_log entries for activity feed
@@ -204,30 +210,29 @@ export default function DashboardPage() {
 
       {/* Financial + Chart side by side */}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <FinancialCard
-          title="NF-e + CT-e"
-          icon={<FileText className="h-4 w-4 text-blue-600" />}
-          totalLabel="Total Documentos"
-          totalValue={showMock ? "R$ 2.847.320,45" : `R$ ${(realNfeTotal + realCteTotal).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`}
-          period="Mar 2026"
-          items={[
-            {
-              label: `NF-e (${showMock ? "1.247" : realCounts.nfe})`,
-              value: showMock ? "R$ 2.847.320,45" : `R$ ${realNfeTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
-              amount: showMock ? 2847320 : realNfeTotal,
-              color: "text-blue-600",
-              bgColor: "bg-blue-500",
-            },
-            {
-              label: `CT-e (${showMock ? "384" : realCounts.cte})`,
-              value: showMock ? "R$ 63.250,00" : `R$ ${realCteTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
-              amount: showMock ? 63250 : realCteTotal,
-              color: "text-violet-600",
-              bgColor: "bg-violet-500",
-            },
-          ]}
-        />
-        <VolumeChart empty={showMock ? false : (realCounts.nfe + realCounts.cte) === 0} />
+        {(() => {
+          const allTotal = realNfeTotal + realCteTotal + realMdfeTotal + realNfseTotal
+          const fmt = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
+          return (
+            <FinancialCard
+              title="Documentos Recebidos"
+              icon={<FileText className="h-4 w-4 text-blue-600" />}
+              totalLabel="Total Geral"
+              totalValue={showMock ? "R$ 2.847.320,45" : fmt(allTotal)}
+              period="Mar 2026"
+              items={showMock ? [
+                { label: "Autorizadas", value: "R$ 2.847.320,45", amount: 2847320, color: "text-emerald-600", bgColor: "bg-emerald-500" },
+                { label: "Canceladas", value: "R$ 63.250,00", amount: 63250, color: "text-gray-500", bgColor: "bg-gray-400" },
+              ] : [
+                ...(realNfeTotal > 0 ? [{ label: `NF-e (${realCounts.nfe})`, value: fmt(realNfeTotal), amount: realNfeTotal, color: "text-blue-600", bgColor: "bg-blue-500" }] : []),
+                ...(realCteTotal > 0 ? [{ label: `CT-e (${realCounts.cte})`, value: fmt(realCteTotal), amount: realCteTotal, color: "text-violet-600", bgColor: "bg-violet-500" }] : []),
+                ...(realMdfeTotal > 0 ? [{ label: `MDF-e (${realCounts.mdfe})`, value: fmt(realMdfeTotal), amount: realMdfeTotal, color: "text-emerald-600", bgColor: "bg-emerald-500" }] : []),
+                ...(realNfseTotal > 0 ? [{ label: `NFS-e (${realCounts.nfse})`, value: fmt(realNfseTotal), amount: realNfseTotal, color: "text-amber-600", bgColor: "bg-amber-500" }] : []),
+              ]}
+            />
+          )
+        })()}
+        <VolumeChart empty={!showMock} />
       </div>
 
       {/* Recent documents */}
