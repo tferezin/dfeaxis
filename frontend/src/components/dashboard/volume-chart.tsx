@@ -70,11 +70,14 @@ function buildMonthDays(rawData: VolumeDataPoint[]): ChartDataPoint[] {
     const date = new Date(year, month, day)
     const key = date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
     const d = dataMap[key] || { date: key, nfe: 0, cte: 0, mdfe: 0, nfse: 0 }
-    // Count how many types have values > 0 at this point
-    const typesWithData = [d.nfe, d.cte, d.mdfe, d.nfse].filter(v => v > 0).length
-    // If more than 1 type overlaps at same value, show overlap marker
-    const maxVal = Math.max(d.nfe, d.cte, d.mdfe, d.nfse)
-    const overlap = typesWithData > 1 ? maxVal : 0
+    // Find values that are shared by multiple types (same value > 0)
+    const vals = [d.nfe, d.cte, d.mdfe, d.nfse].filter(v => v > 0)
+    // Group by value to find overlapping ones
+    const valueCounts: Record<number, number> = {}
+    for (const v of vals) valueCounts[v] = (valueCounts[v] || 0) + 1
+    // Find the value where overlap occurs (multiple types with same count)
+    const overlappingValues = Object.entries(valueCounts).filter(([, count]) => count > 1)
+    const overlap = overlappingValues.length > 0 ? Number(overlappingValues[0][0]) : 0
     result.push({ ...d, overlap })
   }
   return result
