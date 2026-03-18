@@ -102,7 +102,11 @@ app = FastAPI(
 
 # CORS — sanitise origins, use explicit methods and headers
 raw_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
-cors_origins = [o.strip() for o in raw_origins if o.strip()]
+cors_origins = [o.strip().rstrip("/") for o in raw_origins if o.strip()]
+# Always allow the Vercel frontend
+if "https://frontend-henna-five-35.vercel.app" not in cors_origins:
+    cors_origins.append("https://frontend-henna-five-35.vercel.app")
+logger.info(f"CORS origins: {cors_origins}")
 
 app.add_middleware(
     CORSMiddleware,
