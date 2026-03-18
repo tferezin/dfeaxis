@@ -667,10 +667,18 @@ pre{font-family:var(--mn);font-size:12.5px;color:#d1d5db;line-height:1.85}
   <div class="sec-tag">Planos</div>
   <h2>Créditos pré-pagos.<br>Sem surpresa no boleto.</h2>
   <p class="sec-sub">Mensalidade por CNPJ + volume de documentos. Sem fatura retroativa. Sem contrato de fidelidade.</p>
+  <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin:32px 0 8px">
+    <span id="lbl-mensal" style="font-size:14px;font-weight:600;color:var(--tx)">Mensal</span>
+    <button id="plan-toggle" onclick="togglePlanPeriod()" style="position:relative;width:52px;height:28px;border-radius:14px;background:var(--gr);border:none;cursor:pointer;padding:0">
+      <span id="plan-toggle-dot" style="position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:transform .2s"></span>
+    </button>
+    <span id="lbl-anual" style="font-size:14px;font-weight:500;color:var(--tx3)">Anual</span>
+    <span style="background:var(--gr-l);color:var(--gr);font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;letter-spacing:.02em">-20%</span>
+  </div>
   <div class="plans">
     <div class="plan">
       <div class="plan-name">Starter</div>
-      <div class="plan-price">R$ 290<span>/mês</span></div>
+      <div class="plan-price"><span class="price-val" data-mensal="290" data-anual="232">R$ 290</span><span>/mês</span></div>
       <div class="plan-desc">Empresas menores migrando do GRC para o DRC.</div>
       <div class="plan-div"></div>
       <div class="plan-f"><div class="chk">&#10003;</div>1 CNPJ</div>
@@ -682,7 +690,7 @@ pre{font-family:var(--mn);font-size:12.5px;color:#d1d5db;line-height:1.85}
     <div class="plan fp">
       <div class="plan-badge">Mais popular</div>
       <div class="plan-name">Business</div>
-      <div class="plan-price">R$ 690<span>/mês</span></div>
+      <div class="plan-price"><span class="price-val" data-mensal="690" data-anual="552">R$ 690</span><span>/mês</span></div>
       <div class="plan-desc">Médias empresas com múltiplos CNPJs e integração SAP.</div>
       <div class="plan-div"></div>
       <div class="plan-f"><div class="chk">&#10003;</div>Até 5 CNPJs</div>
@@ -693,7 +701,7 @@ pre{font-family:var(--mn);font-size:12.5px;color:#d1d5db;line-height:1.85}
     </div>
     <div class="plan">
       <div class="plan-name">Enterprise</div>
-      <div class="plan-price">R$ 1.490<span>/mês</span></div>
+      <div class="plan-price"><span class="price-val" data-mensal="1.490" data-anual="1.192">R$ 1.490</span><span>/mês</span></div>
       <div class="plan-desc">Grandes grupos e holdings com alto volume.</div>
       <div class="plan-div"></div>
       <div class="plan-f"><div class="chk">&#10003;</div>Até 50 CNPJs</div>
@@ -1102,6 +1110,19 @@ pre{font-family:var(--mn);font-size:12.5px;color:#d1d5db;line-height:1.85}
 </div>
 
 <script>
+var planAnual=false;
+function togglePlanPeriod(){
+  planAnual=!planAnual;
+  document.getElementById('plan-toggle-dot').style.transform=planAnual?'translateX(24px)':'none';
+  document.getElementById('lbl-mensal').style.color=planAnual?'var(--tx3)':'var(--tx)';
+  document.getElementById('lbl-mensal').style.fontWeight=planAnual?'500':'600';
+  document.getElementById('lbl-anual').style.color=planAnual?'var(--tx)':'var(--tx3)';
+  document.getElementById('lbl-anual').style.fontWeight=planAnual?'600':'500';
+  document.querySelectorAll('.price-val').forEach(function(el){
+    var v=planAnual?el.getAttribute('data-anual'):el.getAttribute('data-mensal');
+    el.textContent='R$ '+v;
+  });
+}
 function toggleMenu(){
   var l=document.getElementById('navLinks'),b=document.getElementById('navBtns'),btn=document.getElementById('menuBtn');
   var open=l.classList.toggle('open');
