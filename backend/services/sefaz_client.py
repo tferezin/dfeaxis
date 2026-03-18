@@ -179,8 +179,25 @@ class SefazClient:
 
             # Nome do service/operation e parâmetro variam por tipo
             service_name = self._get_service_name(tipo)
-            param_name = {"nfe": "nfeDadosMsg", "cte": "cteDadosMsg", "mdfe": "mdfeDadosMsg"}[tipo]
-            response = client.service[service_name](**{param_name: xml_request})
+            param_name = {"nfe": "nfeDadosMsg", "cte": "cteDadosMsg", "mdfe": "_value_1"}[tipo]
+
+            if tipo == "mdfe":
+                # MDF-e: raw_response para evitar ComplexType
+                with client.settings(raw_response=True):
+                    raw_resp = client.service[service_name](**{param_name: xml_request})
+                raw_root = etree.fromstring(raw_resp.content)
+                # Busca retDistDFeInt dentro do SOAP envelope
+                response = raw_root.find(f".//{{{ns}}}retDistDFeInt")
+                if response is None:
+                    for elem in raw_root.iter():
+                        tag_local = elem.tag.split('}')[-1] if '}' in elem.tag else elem.tag
+                        if tag_local == 'retDistDFeInt':
+                            response = elem
+                            break
+                if response is None:
+                    response = raw_root
+            else:
+                response = client.service[service_name](**{param_name: xml_request})
 
         latency_ms = int((time.time() - start_time) * 1000)
         return self._parse_response(response, tipo, latency_ms)

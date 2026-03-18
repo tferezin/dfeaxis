@@ -198,9 +198,10 @@ def consultar_sefaz(pfx_bytes, password, cnpj, tipo):
         dist_nsu = etree.SubElement(root, "distNSU")
         etree.SubElement(dist_nsu, "ultNSU").text = "000000000000000"
 
-        # SOAP call
+        # SOAP call — usa raw_response para MDF-e (evita ComplexType)
         start = time.time()
         transport = Transport(session=session, timeout=30)
+        settings = {"raw_response": True} if tipo == "mdfe" else {}
         client = ZeepClient(wsdl=endpoint, transport=transport)
 
         service_name = SERVICE_NAMES[tipo]
@@ -208,41 +209,39 @@ def consultar_sefaz(pfx_bytes, password, cnpj, tipo):
         # MDF-e SVRS usa '_value_1' como parâmetro genérico
         param_names = {"nfe": "nfeDadosMsg", "cte": "cteDadosMsg", "mdfe": "_value_1"}
         param_name = param_names.get(tipo, "nfeDadosMsg")
-        response = client.service[service_name](**{param_name: root})
-        latency = int((time.time() - start) * 1000)
 
-        # Parse response
-        if isinstance(response, str):
-            resp_root = etree.fromstring(response.encode())
-        elif isinstance(response, bytes):
-            resp_root = etree.fromstring(response)
-        elif hasattr(response, 'find'):
-            resp_root = response
+        if tipo == "mdfe":
+            # MDF-e: usar raw_response para obter XML direto
+            with client.settings(**settings):
+                raw_resp = client.service[service_name](**{param_name: root})
+            latency = int((time.time() - start) * 1000)
+            # raw_resp é um requests.Response
+            resp_root = etree.fromstring(raw_resp.content)
+            # Precisamos buscar dentro do SOAP envelope
+            # O retDistDFeInt está dentro do Body
+            body_ns = "http://www.w3.org/2003/05/soap-envelope"
+            ret = resp_root.find(f".//{{{ns}}}retDistDFeInt")
+            if ret is None:
+                # Tenta sem namespace específico
+                for elem in resp_root.iter():
+                    if 'retDistDFeInt' in (elem.tag.split('}')[-1] if '}' in elem.tag else elem.tag):
+                        ret = elem
+                        break
+            if ret is not None:
+                resp_root = ret
         else:
-            # zeep retornou ComplexType (ex: MDF-e) — serializar via helpers
-            from zeep.helpers import serialize_object
-            serialized = serialize_object(response)
-            if isinstance(serialized, dict):
-                cstat = str(serialized.get("cStat", "999"))
-                xmotivo = str(serialized.get("xMotivo", ""))
-                ult_nsu = str(serialized.get("ultNSU", "000000000000000"))
-                max_nsu = str(serialized.get("maxNSU", ult_nsu))
-                lote = serialized.get("loteDistDFe")
-                doc_count = 0
-                if lote:
-                    doc_zips = lote.get("docZip", []) if isinstance(lote, dict) else getattr(lote, "docZip", [])
-                    doc_count = len(doc_zips) if doc_zips else 0
-                return {
-                    "tipo": tipo.upper(),
-                    "status": "success",
-                    "cstat": cstat,
-                    "xmotivo": xmotivo,
-                    "ult_nsu": ult_nsu,
-                    "max_nsu": max_nsu,
-                    "docs_found": doc_count,
-                    "latency_ms": latency,
-                }
-            resp_root = etree.Element("empty")
+            response = client.service[service_name](**{param_name: root})
+            latency = int((time.time() - start) * 1000)
+
+            # Parse response
+            if isinstance(response, str):
+                resp_root = etree.fromstring(response.encode())
+            elif isinstance(response, bytes):
+                resp_root = etree.fromstring(response)
+            elif hasattr(response, 'find'):
+                resp_root = response
+            else:
+                resp_root = etree.Element("empty")
 
         nsmap = {"ns": ns}
 
