@@ -23,11 +23,12 @@ export default function LoginPage() {
 
     try {
       if (!supabase) {
-        setError("Sistema não configurado. Tente novamente mais tarde.")
+        setError("Sistema não configurado. Verifique as variáveis de ambiente.")
+        console.error("Supabase client is null — NEXT_PUBLIC_SUPABASE_URL may be missing")
         return
       }
 
-      const { error: authError } = await supabase.auth.signInWithPassword({
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
@@ -41,8 +42,8 @@ export default function LoginPage() {
         return
       }
 
-      router.push("/dashboard")
-      router.refresh()
+      // Full reload to ensure cookies are sent to middleware
+      window.location.href = "/dashboard"
     } catch {
       setError("Erro inesperado. Tente novamente.")
     } finally {
