@@ -1,4 +1,5 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { createBrowserClient } from '@supabase/ssr'
+import { type SupabaseClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
@@ -10,12 +11,13 @@ export function getSupabase(): SupabaseClient {
     if (!supabaseUrl || !supabaseAnonKey) {
       throw new Error('Supabase URL and Anon Key must be set in environment variables')
     }
-    _client = createClient(supabaseUrl, supabaseAnonKey)
+    _client = createBrowserClient(supabaseUrl, supabaseAnonKey)
   }
   return _client
 }
 
-// Lazy-initialized — safe for build time
-export const supabase = typeof window !== 'undefined' && supabaseUrl
-  ? createClient(supabaseUrl, supabaseAnonKey)
-  : (null as unknown as SupabaseClient)
+// Lazy-initialized — uses cookie-based storage for SSR compatibility
+export const supabase: SupabaseClient | null =
+  typeof window !== 'undefined' && supabaseUrl && supabaseAnonKey
+    ? createBrowserClient(supabaseUrl, supabaseAnonKey)
+    : null

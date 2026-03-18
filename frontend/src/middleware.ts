@@ -53,7 +53,7 @@ export async function middleware(request: NextRequest) {
 
   // Redirect authenticated users away from /login
   if (user && isAuthPage) {
-    const dashboardUrl = new URL("/", request.url)
+    const dashboardUrl = new URL("/dashboard", request.url)
     return NextResponse.redirect(dashboardUrl)
   }
 

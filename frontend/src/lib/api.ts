@@ -1,4 +1,4 @@
-import { supabase } from './supabase'
+import { getSupabase } from './supabase'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'
 
@@ -6,7 +6,8 @@ export async function apiFetch<T = unknown>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const { data: { session } } = await supabase.auth.getSession()
+  const sb = getSupabase()
+  const { data: { session } } = await sb.auth.getSession()
   const token = session?.access_token
 
   const res = await fetch(`${API_BASE}${path}`, {
