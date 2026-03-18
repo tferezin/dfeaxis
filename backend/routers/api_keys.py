@@ -4,6 +4,7 @@ import hashlib
 import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel
 
 from db.supabase import get_supabase_client
 from middleware.lgpd import audit_log
@@ -12,10 +13,13 @@ from middleware.security import verify_jwt_token
 router = APIRouter()
 
 
+class CreateApiKeyRequest(BaseModel):
+    description: str = "API Key"
+
 @router.post("/api-keys", status_code=201)
 async def create_api_key(
     request: Request,
-    description: str = "",
+    body: CreateApiKeyRequest = CreateApiKeyRequest(),
     auth: dict = Depends(verify_jwt_token),
 ):
     """Gera uma nova API key para integracao SAP DRC.
@@ -26,6 +30,7 @@ async def create_api_key(
     user_id = auth.get("user_id")
     client_ip = request.client.host if request.client else None
 
+    description = body.description
     raw_key = f"dfa_{secrets.token_urlsafe(32)}"
     key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
     key_prefix = raw_key[:8]
@@ -44,7 +49,7 @@ async def create_api_key(
         "tenant_id": tenant_id,
         "key_hash": key_hash,
         "key_prefix": key_prefix,
-        "description": description or "API Key",
+        "description": description,
     }).execute()
 
     # Audit log

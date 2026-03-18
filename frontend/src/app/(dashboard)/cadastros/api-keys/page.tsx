@@ -1,283 +1,329 @@
 "use client"
 
-import { useState } from "react"
-import { useSettings } from "@/hooks/use-settings"
+import { useState, useEffect, useCallback } from "react"
+import { getSupabase } from "@/lib/supabase"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet"
-import {
-  Plus,
-  Copy,
-  Trash2,
-  Check,
-  Key,
+  Plus, Copy, Trash2, Check, Key, Server, Shield, AlertTriangle, Loader2,
 } from "lucide-react"
 
-interface ApiKey {
-  id: number
-  prefix: string
-  descricao: string
-  ultimoUso: string | null
-  status: "Ativa" | "Revogada"
-  criacao: string
+const API_BASE_URL = "https://dfeaxis-production.up.railway.app"
+
+interface ApiKeyEntry {
+  id: string
+  key_prefix: string
+  description: string
+  last_used_at: string | null
+  is_active: boolean
+  created_at: string
 }
 
-const mockKeys: ApiKey[] = [
-  {
-    id: 1,
-    prefix: "dfe_live_7kX3...m9Pq",
-    descricao: "Produção - ERP Principal",
-    ultimoUso: "16/03/2026 08:45",
-    status: "Ativa",
-    criacao: "01/01/2026",
-  },
-  {
-    id: 2,
-    prefix: "dfe_live_2bR8...n4Wz",
-    descricao: "Produção - Integração Contábil",
-    ultimoUso: "15/03/2026 22:10",
-    status: "Ativa",
-    criacao: "15/01/2026",
-  },
-  {
-    id: 3,
-    prefix: "dfe_test_9mK1...j5Yt",
-    descricao: "Homologação - Testes QA",
-    ultimoUso: "14/03/2026 16:30",
-    status: "Ativa",
-    criacao: "01/02/2026",
-  },
-  {
-    id: 4,
-    prefix: "dfe_live_4hN6...s8Lp",
-    descricao: "Produção - App Mobile",
-    ultimoUso: "10/03/2026 09:15",
-    status: "Ativa",
-    criacao: "20/02/2026",
-  },
-  {
-    id: 5,
-    prefix: "dfe_test_1cF3...w7Rx",
-    descricao: "Homologação - Sprint 12",
-    ultimoUso: "05/03/2026 11:00",
-    status: "Revogada",
-    criacao: "01/03/2026",
-  },
-  {
-    id: 6,
-    prefix: "dfe_live_6qD9...v2Hn",
-    descricao: "Produção - Webhook Server",
-    ultimoUso: null,
-    status: "Revogada",
-    criacao: "10/12/2025",
-  },
-]
-
 export default function ApiKeysPage() {
-  const { settings } = useSettings()
-  const [sheetOpen, setSheetOpen] = useState(false)
-  const [newKeyCreated, setNewKeyCreated] = useState<string | null>(null)
-  const [copiedId, setCopiedId] = useState<number | null>(null)
-  const [confirmRevokeId, setConfirmRevokeId] = useState<number | null>(null)
+  const [keys, setKeys] = useState<ApiKeyEntry[]>([])
+  const [loading, setLoading] = useState(true)
+  const [creating, setCreating] = useState(false)
+  const [newKeyFull, setNewKeyFull] = useState<string | null>(null)
+  const [newKeyDesc, setNewKeyDesc] = useState("")
+  const [copiedField, setCopiedField] = useState<string | null>(null)
+  const [confirmRevokeId, setConfirmRevokeId] = useState<string | null>(null)
+  const [cnpjs, setCnpjs] = useState<string[]>([])
+  const [error, setError] = useState<string | null>(null)
 
-  const handleCreateKey = () => {
-    setNewKeyCreated("dfe_live_8xT5mNqR2vBcYwK7jL9pA3dFgH0sU6iE1oW4zXnJkM")
-  }
+  const getToken = useCallback(async () => {
+    const sb = getSupabase()
+    const { data: { session } } = await sb.auth.getSession()
+    return session?.access_token || null
+  }, [])
 
-  const handleCopy = (id: number, text: string) => {
-    navigator.clipboard.writeText(text)
-    setCopiedId(id)
-    setTimeout(() => setCopiedId(null), 2000)
-  }
+  const loadKeys = useCallback(async () => {
+    const token = await getToken()
+    if (!token) return
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/api-keys`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setKeys(Array.isArray(data) ? data : [])
+      }
+    } catch { /* ignore */ }
+  }, [getToken])
 
-  const handleRevoke = (id: number) => {
-    if (confirmRevokeId === id) {
-      setConfirmRevokeId(null)
-      // Would call API here
-    } else {
-      setConfirmRevokeId(id)
-      setTimeout(() => setConfirmRevokeId(null), 3000)
+  const loadCnpjs = useCallback(async () => {
+    const token = await getToken()
+    if (!token) return
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/certificates`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setCnpjs(data.map((c: { cnpj: string }) => c.cnpj))
+      }
+    } catch { /* ignore */ }
+  }, [getToken])
+
+  useEffect(() => {
+    Promise.all([loadKeys(), loadCnpjs()]).finally(() => setLoading(false))
+  }, [loadKeys, loadCnpjs])
+
+  const handleCreate = async () => {
+    if (!newKeyDesc.trim()) {
+      setError("Informe uma descrição para a chave.")
+      return
+    }
+    setCreating(true)
+    setError(null)
+    const token = await getToken()
+    if (!token) return
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/api-keys`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ description: newKeyDesc }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setNewKeyFull(data.api_key || data.raw_key || data.key || null)
+        await loadKeys()
+      } else {
+        const err = await res.json().catch(() => ({}))
+        setError(err.detail || "Erro ao criar API Key")
+      }
+    } catch (e) {
+      setError(String(e))
+    } finally {
+      setCreating(false)
     }
   }
 
+  const handleRevoke = async (id: string) => {
+    if (confirmRevokeId !== id) {
+      setConfirmRevokeId(id)
+      setTimeout(() => setConfirmRevokeId(null), 3000)
+      return
+    }
+    const token = await getToken()
+    if (!token) return
+    try {
+      await fetch(`${API_BASE_URL}/api/v1/api-keys/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      setConfirmRevokeId(null)
+      await loadKeys()
+    } catch { /* ignore */ }
+  }
+
+  const copyToClipboard = (text: string, field: string) => {
+    navigator.clipboard.writeText(text)
+    setCopiedField(field)
+    setTimeout(() => setCopiedField(null), 2000)
+  }
+
+  const CopyBtn = ({ text, field, label }: { text: string; field: string; label?: string }) => (
+    <Button
+      variant="outline"
+      size="sm"
+      className="gap-1.5 text-xs shrink-0"
+      onClick={() => copyToClipboard(text, field)}
+    >
+      {copiedField === field ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5" />}
+      {label || (copiedField === field ? "Copiado" : "Copiar")}
+    </Button>
+  )
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
   return (
-    <div className="flex flex-col gap-6 p-6">
+    <div className="flex flex-col gap-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">API Keys</h1>
-          <p className="text-sm text-muted-foreground">
-            Gerencie as chaves de acesso para integração com a API do DFeAxis
-          </p>
-        </div>
-        <Sheet open={sheetOpen} onOpenChange={(open) => { setSheetOpen(open); if (!open) setNewKeyCreated(null) }}>
-          <SheetTrigger
-            render={
-              <Button>
-                <Plus className="size-4" />
-                Nova Key
-              </Button>
-            }
-          />
-          <SheetContent side="right">
-            <SheetHeader>
-              <SheetTitle>Criar API Key</SheetTitle>
-              <SheetDescription>
-                Gere uma nova chave de acesso para integrar com a API.
-              </SheetDescription>
-            </SheetHeader>
-            <div className="flex flex-col gap-4 px-4">
-              {!newKeyCreated ? (
-                <>
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor="key-desc">Descrição</Label>
-                    <Input
-                      id="key-desc"
-                      placeholder="Ex: Produção - ERP Principal"
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    A chave será exibida apenas uma vez após a criação. Certifique-se de
-                    copiar e armazenar em local seguro.
-                  </p>
-                </>
-              ) : (
-                <div className="flex flex-col gap-3">
-                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-800 dark:bg-emerald-950/30">
-                    <p className="mb-2 text-xs font-medium text-emerald-700 dark:text-emerald-300">
-                      Chave criada com sucesso! Copie-a agora - ela não será exibida novamente.
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <code className="flex-1 break-all rounded bg-white px-2 py-1.5 font-mono text-xs dark:bg-black">
-                        {newKeyCreated}
-                      </code>
-                      <Button
-                        variant="outline"
-                        size="icon-sm"
-                        onClick={() => handleCopy(-1, newKeyCreated)}
-                      >
-                        {copiedId === -1 ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">API Keys</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Gerencie as chaves de acesso para integração SAP DRC com a API do DFeAxis.
+        </p>
+      </div>
+
+      {/* Integration Info Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Server className="size-5" />
+            Dados de Integração
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3">
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">URL Base da API</p>
+                <code className="text-sm font-mono">{API_BASE_URL}/api/v1</code>
+              </div>
+              <CopyBtn text={`${API_BASE_URL}/api/v1`} field="url" />
             </div>
-            <SheetFooter>
-              {!newKeyCreated ? (
-                <Button className="w-full gap-2" onClick={handleCreateKey}>
-                  <Key className="size-4" />
-                  Gerar Key
-                </Button>
-              ) : (
-                <Button variant="outline" className="w-full" onClick={() => { setSheetOpen(false); setNewKeyCreated(null) }}>
-                  Fechar
-                </Button>
-              )}
-            </SheetFooter>
-          </SheetContent>
-        </Sheet>
-      </div>
 
-      {/* Table */}
-      {!settings.showMockData ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <Key className="size-12 text-muted-foreground/30 mb-4" />
-          <p className="text-sm text-muted-foreground">Nenhuma API Key cadastrada. Clique em &quot;Nova Key&quot; para criar.</p>
-        </div>
-      ) : (
-      <div className="rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Prefixo</TableHead>
-              <TableHead>Descrição</TableHead>
-              <TableHead>Último uso</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Criação</TableHead>
-              <TableHead>Ações</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {mockKeys.map((apiKey) => (
-              <TableRow key={apiKey.id}>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <Key className="size-3.5 text-muted-foreground" />
-                    <code className="font-mono text-xs">{apiKey.prefix}</code>
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">Header de Autenticação</p>
+                <code className="text-sm font-mono">X-API-Key: &lt;sua_chave&gt;</code>
+              </div>
+              <CopyBtn text="X-API-Key" field="header" />
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">CNPJs Cadastrados</p>
+                {cnpjs.length > 0 ? (
+                  <code className="text-sm font-mono">{cnpjs.join(", ")}</code>
+                ) : (
+                  <span className="text-sm text-muted-foreground">Nenhum certificado cadastrado</span>
+                )}
+              </div>
+              {cnpjs.length > 0 && <CopyBtn text={cnpjs[0]} field="cnpj" />}
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">Buscar documentos</p>
+                <code className="text-sm font-mono">GET /api/v1/documentos?cnpj={cnpjs[0] || "SEU_CNPJ"}&tipo=nfe</code>
+              </div>
+              <CopyBtn
+                text={`curl -s "${API_BASE_URL}/api/v1/documentos?cnpj=${cnpjs[0] || "SEU_CNPJ"}&tipo=nfe" -H "X-API-Key: SUA_CHAVE"`}
+                field="curl"
+                label="curl"
+              />
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">Confirmar recebimento</p>
+                <code className="text-sm font-mono">POST /api/v1/documentos/&#123;chave_44_digitos&#125;/confirmar</code>
+              </div>
+              <CopyBtn
+                text={`curl -s -X POST "${API_BASE_URL}/api/v1/documentos/CHAVE_44_DIGITOS/confirmar" -H "X-API-Key: SUA_CHAVE"`}
+                field="curl-confirm"
+                label="curl"
+              />
+            </div>
+          </div>
+
+          <div className="rounded-lg bg-amber-50 border border-amber-200 p-3">
+            <div className="flex gap-2">
+              <AlertTriangle className="size-4 text-amber-600 mt-0.5 shrink-0" />
+              <p className="text-xs text-amber-800">
+                <strong>Tipos suportados:</strong> <code>nfe</code>, <code>cte</code>, <code>mdfe</code>, <code>nfse</code>. O XML é retornado em base64 no campo <code>xml_b64</code>. Após processar no SAP, chame <code>/confirmar</code> para limpar do DFeAxis.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Create API Key */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Shield className="size-5" />
+            Chaves de Acesso
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* New key form */}
+          {!newKeyFull ? (
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <Input
+                  placeholder="Descrição (ex: SAP Produção - ERP Principal)"
+                  value={newKeyDesc}
+                  onChange={(e) => setNewKeyDesc(e.target.value)}
+                />
+              </div>
+              <Button onClick={handleCreate} disabled={creating} className="gap-1.5">
+                {creating ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+                Gerar API Key
+              </Button>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 space-y-3">
+              <p className="text-sm font-medium text-emerald-800">
+                API Key criada com sucesso! Copie agora — ela não será exibida novamente.
+              </p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 break-all rounded bg-white px-3 py-2 font-mono text-xs border">
+                  {newKeyFull}
+                </code>
+                <CopyBtn text={newKeyFull} field="newkey" />
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => { setNewKeyFull(null); setNewKeyDesc("") }}
+              >
+                Fechar
+              </Button>
+            </div>
+          )}
+
+          {error && (
+            <p className="text-sm text-destructive">{error}</p>
+          )}
+
+          {/* Keys list */}
+          {keys.length > 0 ? (
+            <div className="rounded-lg border divide-y">
+              {keys.map((k) => (
+                <div key={k.id} className="flex items-center gap-4 p-4">
+                  <Key className="size-4 text-muted-foreground shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <code className="font-mono text-xs">{k.key_prefix}...</code>
+                      <Badge variant={k.is_active ? "default" : "destructive"} className="text-xs">
+                        {k.is_active ? "Ativa" : "Revogada"}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {k.description || "Sem descrição"} — criada em {new Date(k.created_at).toLocaleDateString("pt-BR")}
+                      {k.last_used_at && ` — último uso: ${new Date(k.last_used_at).toLocaleDateString("pt-BR")}`}
+                    </p>
                   </div>
-                </TableCell>
-                <TableCell className="font-medium">{apiKey.descricao}</TableCell>
-                <TableCell className="text-muted-foreground">
-                  {apiKey.ultimoUso ?? "Nunca utilizada"}
-                </TableCell>
-                <TableCell>
-                  <Badge variant={apiKey.status === "Ativa" ? "default" : "destructive"}>
-                    {apiKey.status}
-                  </Badge>
-                </TableCell>
-                <TableCell>{apiKey.criacao}</TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-1">
+                  {k.is_active && (
                     <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      title="Copiar prefixo"
-                      onClick={() => handleCopy(apiKey.id, apiKey.prefix)}
+                      variant={confirmRevokeId === k.id ? "destructive" : "ghost"}
+                      size="sm"
+                      onClick={() => handleRevoke(k.id)}
+                      className="gap-1.5"
                     >
-                      {copiedId === apiKey.id ? (
-                        <Check className="size-3.5 text-emerald-600" />
-                      ) : (
-                        <Copy className="size-3.5" />
-                      )}
+                      <Trash2 className="size-3.5" />
+                      {confirmRevokeId === k.id ? "Confirmar?" : "Revogar"}
                     </Button>
-                    {apiKey.status === "Ativa" && (
-                      <Button
-                        variant={confirmRevokeId === apiKey.id ? "destructive" : "ghost"}
-                        size={confirmRevokeId === apiKey.id ? "sm" : "icon-xs"}
-                        title="Revogar"
-                        onClick={() => handleRevoke(apiKey.id)}
-                      >
-                        {confirmRevokeId === apiKey.id ? (
-                          <span className="text-xs">Confirmar?</span>
-                        ) : (
-                          <Trash2 className="size-3.5" />
-                        )}
-                      </Button>
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-
-      )}
-
-      {/* Info text */}
-      <p className="text-xs text-muted-foreground">
-        As API Keys concedem acesso a todos os endpoints da API do DFeAxis vinculados
-        à sua conta. Revogue imediatamente qualquer chave comprometida.
-      </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <Key className="size-10 text-muted-foreground/30 mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">
+                Nenhuma API Key criada. Gere uma para integrar com o SAP.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }
