@@ -42,10 +42,11 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Redirect unauthenticated users to /login (except for auth pages)
+  // Public pages that don't require auth
   const isAuthPage = pathname.startsWith("/login")
+  const isPublicPage = pathname === "/" || pathname.startsWith("/landing") || pathname.startsWith("/api/")
 
-  if (!user && !isAuthPage) {
+  if (!user && !isAuthPage && !isPublicPage) {
     const loginUrl = new URL("/login", request.url)
     return NextResponse.redirect(loginUrl)
   }
@@ -68,6 +69,6 @@ export const config = {
      * - favicon.ico (browser icon)
      * - public assets
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|landing\\.html|hero-bg\\.jpg|logo-dfeaxis\\.png|apple-icon\\.png|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 }
