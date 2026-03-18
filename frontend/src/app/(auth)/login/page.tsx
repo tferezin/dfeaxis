@@ -22,14 +22,8 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      // Fixed test credentials (temporary — remove when Supabase is connected)
-      if (email === "admin@dfeaxis.com.br" && password === "dfeaxis2026") {
-        router.push("/dashboard")
-        return
-      }
-
       if (!supabase) {
-        setError("Credenciais inválidas.")
+        setError("Sistema não configurado. Tente novamente mais tarde.")
         return
       }
 
@@ -39,11 +33,15 @@ export default function LoginPage() {
       })
 
       if (authError) {
-        setError(authError.message)
+        if (authError.message === "Invalid login credentials") {
+          setError("E-mail ou senha incorretos.")
+        } else {
+          setError(authError.message)
+        }
         return
       }
 
-      router.push("/")
+      router.push("/dashboard")
       router.refresh()
     } catch {
       setError("Erro inesperado. Tente novamente.")
