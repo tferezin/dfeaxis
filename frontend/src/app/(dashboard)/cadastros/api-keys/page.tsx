@@ -13,6 +13,11 @@ import {
 
 const API_BASE_URL = "https://dfeaxis-production.up.railway.app"
 
+function formatCnpj(cnpj: string) {
+  if (cnpj.length !== 14) return cnpj
+  return `${cnpj.slice(0,2)}.${cnpj.slice(2,5)}.${cnpj.slice(5,8)}/${cnpj.slice(8,12)}-${cnpj.slice(12)}`
+}
+
 interface ApiKeyEntry {
   id: string
   key_prefix: string
@@ -54,18 +59,14 @@ export default function ApiKeysPage() {
   }, [getToken])
 
   const loadCnpjs = useCallback(async () => {
-    const token = await getToken()
-    if (!token) return
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/certificates`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (res.ok) {
-        const data = await res.json()
+      const sb = getSupabase()
+      const { data } = await sb.from('certificates').select('cnpj').eq('is_active', true)
+      if (data) {
         setCnpjs(data.map((c: { cnpj: string }) => c.cnpj))
       }
     } catch { /* ignore */ }
-  }, [getToken])
+  }, [])
 
   useEffect(() => {
     Promise.all([loadKeys(), loadCnpjs()]).finally(() => setLoading(false))
@@ -189,7 +190,7 @@ export default function ApiKeysPage() {
               <div>
                 <p className="text-xs font-medium text-muted-foreground">CNPJs Cadastrados</p>
                 {cnpjs.length > 0 ? (
-                  <code className="text-sm font-mono">{cnpjs.join(", ")}</code>
+                  <code className="text-sm font-mono">{cnpjs.map(formatCnpj).join(", ")}</code>
                 ) : (
                   <span className="text-sm text-muted-foreground">Nenhum certificado cadastrado</span>
                 )}
