@@ -213,7 +213,8 @@ class SefazClient:
         nsmap = {None: ns}
 
         root = etree.Element(f"distDFeInt", nsmap=nsmap)
-        root.set("versao", "1.01")
+        versao = {"nfe": "1.01", "cte": "1.00", "mdfe": "1.00"}.get(tipo, "1.01")
+        root.set("versao", versao)
 
         etree.SubElement(root, "tpAmb").text = effective_ambiente
         etree.SubElement(root, "cUFAutor").text = cuf_autor
@@ -235,11 +236,13 @@ class SefazClient:
         self, response, tipo: str, latency_ms: int
     ) -> SefazResponse:
         """Faz parse da resposta SOAP da SEFAZ."""
-        # A resposta pode ser string XML ou objeto zeep
+        # A resposta pode ser string XML, etree Element, ou objeto zeep
         if isinstance(response, str):
             root = etree.fromstring(response.encode())
         elif isinstance(response, bytes):
             root = etree.fromstring(response)
+        elif isinstance(response, etree._Element):
+            root = response
         elif hasattr(response, '_raw_elements'):
             # zeep retornou objeto com elementos XML internos
             root = response._raw_elements[0] if response._raw_elements else etree.Element("empty")
