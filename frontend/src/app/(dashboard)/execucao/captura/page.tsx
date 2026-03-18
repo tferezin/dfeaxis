@@ -13,6 +13,7 @@ import {
   Inbox,
   Upload,
   ShieldCheck,
+  Database,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -21,6 +22,7 @@ import { Separator } from "@/components/ui/separator"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useSettings } from "@/hooks/use-settings"
+import { getSupabase } from "@/lib/supabase"
 
 interface CertEntry {
   id: number
@@ -78,16 +80,84 @@ export default function CapturaManualPage() {
     }
     setTestStatus("loading")
     setTestResult(null)
+
+    const cleanCnpj = testCnpj.replace(/\D/g, "")
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL || "https://dfeaxis-production.up.railway.app/api/v1"
+
     try {
+      // Get auth token
+      const sb = getSupabase()
+      const { data: { session } } = await sb.auth.getSession()
+      const token = session?.access_token
+
+      if (!token) {
+        setTestResult({ error: "Sessão expirada. Faça login novamente." })
+        return
+      }
+
+      const authHeaders = {
+        "Authorization": `Bearer ${token}`,
+      }
+
+      // Step 1: Upload certificate to backend (registers in DB)
+      const uploadForm = new FormData()
+      uploadForm.append("pfx_file", file)
+      uploadForm.append("cnpj", cleanCnpj)
+      uploadForm.append("senha", testPassword)
+      uploadForm.append("polling_mode", "manual")
+
+      const uploadRes = await fetch(`${backendUrl}/certificates/upload`, {
+        method: "POST",
+        headers: authHeaders,
+        body: uploadForm,
+      })
+
+      if (!uploadRes.ok) {
+        const uploadErr = await uploadRes.json().catch(() => ({}))
+        setTestResult({ error: `Erro ao cadastrar certificado: ${uploadErr.detail || uploadRes.statusText}` })
+        return
+      }
+
+      const uploadData = await uploadRes.json()
+
+      // Step 2: Trigger polling (queries SEFAZ + saves to DB)
+      const pollingRes = await fetch(`${backendUrl}/polling/trigger`, {
+        method: "POST",
+        headers: { ...authHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cnpj: cleanCnpj,
+          tipos: selectedTipos,
+        }),
+      })
+
+      if (!pollingRes.ok) {
+        const pollingErr = await pollingRes.json().catch(() => ({}))
+        // Still show cert was uploaded OK
+        setTestResult({
+          certificate: { subject: `Certificado cadastrado (${uploadData.cnpj})`, valid_from: "", valid_until: String(uploadData.valid_until || "") },
+          cnpj: cleanCnpj,
+          error: `Certificado cadastrado, mas erro na captura: ${pollingErr.detail || pollingRes.statusText}`,
+        })
+        return
+      }
+
+      const pollingData = await pollingRes.json()
+
+      // Step 3: Also run test-capture for detailed SEFAZ response display
       const formData = new FormData()
       formData.append("pfx", file)
-      formData.append("cnpj", testCnpj.replace(/\D/g, ""))
+      formData.append("cnpj", cleanCnpj)
       formData.append("password", testPassword)
       formData.append("tipos", selectedTipos.join(","))
 
-      const res = await fetch("/api/test-capture", { method: "POST", body: formData })
-      const data = await res.json()
-      setTestResult(data)
+      const testRes = await fetch("/api/test-capture", { method: "POST", body: formData })
+      const testData = await testRes.json()
+
+      // Merge info: show test-capture details + saved count
+      setTestResult({
+        ...testData,
+        message: `Certificado cadastrado. ${pollingData.docs_found || 0} documento(s) salvo(s) no banco.`,
+      })
     } catch (err) {
       setTestResult({ error: `Erro: ${String(err)}` })
     } finally {
@@ -283,6 +353,12 @@ export default function CapturaManualPage() {
                       <p className="text-xs font-medium text-emerald-800">Certificado válido</p>
                       <p className="text-xs text-emerald-700 mt-0.5 font-mono">{testResult.certificate.subject}</p>
                       <p className="text-xs text-emerald-600 mt-0.5">Validade: {testResult.certificate.valid_from} até {testResult.certificate.valid_until}</p>
+                    </div>
+                  )}
+                  {testResult.message && (
+                    <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 flex items-center gap-2">
+                      <Database className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                      <p className="text-xs font-medium text-blue-800">{testResult.message}</p>
                     </div>
                   )}
                   {testResult.results?.map((r, i) => (

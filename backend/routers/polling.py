@@ -98,7 +98,7 @@ async def trigger_polling(
 
     total_docs = 0
     for tipo in body.tipos:
-        if tipo not in ("nfe", "cte", "mdfe"):
+        if tipo not in ("nfe", "cte", "mdfe", "nfse"):
             continue
         docs = _poll_single(cert, tipo, tenant.data)
         total_docs += docs
