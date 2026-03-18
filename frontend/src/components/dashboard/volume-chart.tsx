@@ -51,15 +51,18 @@ export interface VolumeDataPoint {
   nfse: number
 }
 
-function buildLast30Days(rawData: VolumeDataPoint[]): VolumeDataPoint[] {
+function buildMonthDays(rawData: VolumeDataPoint[]): VolumeDataPoint[] {
   const result: VolumeDataPoint[] = []
   const now = new Date()
+  const year = now.getFullYear()
+  const month = now.getMonth()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+
   const dataMap: Record<string, VolumeDataPoint> = {}
   for (const d of rawData) dataMap[d.date] = d
 
-  for (let i = 29; i >= 0; i--) {
-    const date = new Date(now)
-    date.setDate(date.getDate() - i)
+  for (let day = 1; day <= daysInMonth; day++) {
+    const date = new Date(year, month, day)
     const key = date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
     result.push(dataMap[key] || { date: key, nfe: 0, cte: 0, mdfe: 0, nfse: 0 })
   }
@@ -68,7 +71,7 @@ function buildLast30Days(rawData: VolumeDataPoint[]): VolumeDataPoint[] {
 
 export function VolumeChart({ empty = false, realData }: { empty?: boolean; realData?: VolumeDataPoint[] }) {
   const hasReal = realData && realData.some(d => d.nfe + d.cte + d.mdfe + d.nfse > 0)
-  const chartData = hasReal ? buildLast30Days(realData) : null
+  const chartData = hasReal ? buildMonthDays(realData) : null
 
   return (
     <Card className="transition-shadow hover:shadow-md">
