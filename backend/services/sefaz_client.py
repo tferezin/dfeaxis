@@ -167,7 +167,8 @@ class SefazClient:
             # Sessão HTTP com mTLS
             session = requests.Session()
             session.cert = (cert_path, key_path)
-            session.verify = True
+            # MDF-e RS homologação usa cert SSL que não está na cadeia padrão
+            session.verify = (tipo != "mdfe")
 
             transport = Transport(session=session, timeout=30)
             client = ZeepClient(wsdl=endpoint, transport=transport)
