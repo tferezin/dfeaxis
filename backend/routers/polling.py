@@ -13,8 +13,8 @@ from pydantic import BaseModel
 
 from db.supabase import get_supabase_client
 from middleware.security import verify_api_key, verify_jwt_token
-from models.schemas import PollingTriggerRequest, PollingTriggerResponse
-from scheduler.polling_job import _poll_single
+from models.schemas import PollingTriggerRequest, PollingTriggerResponse, PollingTipoResult
+from scheduler.polling_job import _poll_single_detailed
 
 router = APIRouter()
 
@@ -97,17 +97,20 @@ async def trigger_polling(
     ).eq("id", tenant_id).single().execute()
 
     total_docs = 0
+    results = []
     for tipo in body.tipos:
         if tipo not in ("nfe", "cte", "mdfe", "nfse"):
             continue
-        docs = _poll_single(cert, tipo, tenant.data)
-        total_docs += docs
+        result = _poll_single_detailed(cert, tipo, tenant.data)
+        results.append(result)
+        total_docs += result["docs_found"]
 
     return PollingTriggerResponse(
         status="completed",
         cnpj=body.cnpj,
         tipos=body.tipos,
         docs_found=total_docs,
+        results=[PollingTipoResult(**r) for r in results],
     )
 
 

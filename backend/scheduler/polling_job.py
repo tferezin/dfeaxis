@@ -55,6 +55,126 @@ def polling_job():
             _poll_single(cert, tipo, tenant_data)
 
 
+def _poll_single_detailed(cert: dict, tipo: str, tenant_data: dict) -> dict:
+    """Executa polling e retorna detalhes completos para a UI."""
+    if tipo == "nfse":
+        docs = _poll_nfse(cert, tenant_data)
+        return {
+            "tipo": tipo.upper(),
+            "status": "success",
+            "cstat": "138" if docs > 0 else "137",
+            "xmotivo": "documento localizado." if docs > 0 else "Nenhum documento localizado",
+            "docs_found": docs,
+            "latency_ms": 0,
+            "saved_to_db": docs > 0,
+        }
+
+    sb = get_supabase_client()
+    tenant_id = cert["tenant_id"]
+    cnpj = cert["cnpj"]
+    ult_nsu = cert.get(f"last_nsu_{tipo}", "000000000000000")
+    pfx_password = _get_pfx_password(cert["id"], tenant_id)
+
+    if not pfx_password:
+        return {
+            "tipo": tipo.upper(), "status": "error", "cstat": "999",
+            "xmotivo": "", "docs_found": 0, "latency_ms": 0,
+            "error": "Senha do certificado não encontrada", "saved_to_db": False,
+        }
+
+    pfx_encrypted = cert["pfx_encrypted"]
+    pfx_iv = cert["pfx_iv"]
+    if isinstance(pfx_encrypted, str):
+        pfx_encrypted = bytes.fromhex(pfx_encrypted.replace("\\x", ""))
+    if pfx_iv and isinstance(pfx_iv, str):
+        pfx_iv = bytes.fromhex(pfx_iv.replace("\\x", ""))
+
+    ambiente = tenant_data.get("sefaz_ambiente", "2")
+
+    try:
+        response = sefaz_client.consultar_distribuicao(
+            cnpj=cnpj, tipo=tipo, ult_nsu=ult_nsu,
+            pfx_encrypted=pfx_encrypted, pfx_iv=pfx_iv,
+            tenant_id=tenant_id, pfx_password=pfx_password,
+            ambiente=ambiente,
+        )
+
+        docs_found = len(response.documents)
+        saved = False
+
+        # Log
+        sb.table("polling_log").insert({
+            "tenant_id": tenant_id, "cnpj": cnpj, "tipo": tipo,
+            "triggered_by": "manual",
+            "status": "success" if response.cstat in ("137", "138") else "error",
+            "docs_found": docs_found, "ult_nsu": response.ult_nsu,
+            "latency_ms": response.latency_ms,
+            "error_message": response.xmotivo if response.cstat not in ("137", "138") else None,
+        }).execute()
+
+        if docs_found > 0:
+            # Debit credits
+            try:
+                sb.rpc("debit_credits", {
+                    "p_tenant_id": tenant_id,
+                    "p_amount": -docs_found,
+                    "p_description": f"Captura manual {tipo.upper()} CNPJ {mask_cnpj(cnpj)}: {docs_found} docs",
+                }).execute()
+            except Exception as credit_err:
+                logger.warning(f"Credits error: {credit_err}")
+                return {
+                    "tipo": tipo.upper(), "status": "error", "cstat": response.cstat,
+                    "xmotivo": response.xmotivo, "docs_found": docs_found,
+                    "latency_ms": response.latency_ms,
+                    "error": f"Créditos insuficientes: {credit_err}", "saved_to_db": False,
+                }
+
+            # Save documents
+            for doc in response.documents:
+                is_resumo = doc.schema.startswith("res")
+                is_nfe = tipo == "nfe"
+                if is_resumo and is_nfe:
+                    manif_status = "pendente"
+                    doc_status = "pending_manifestacao"
+                elif is_resumo:
+                    manif_status = "nao_aplicavel"
+                    doc_status = "available"
+                else:
+                    manif_status = "nao_aplicavel" if not is_nfe else None
+                    doc_status = "available"
+
+                sb.table("documents").upsert({
+                    "tenant_id": tenant_id, "cnpj": cnpj,
+                    "tipo": doc.tipo, "chave_acesso": doc.chave,
+                    "nsu": doc.nsu,
+                    "xml_content": doc.xml_content if not is_resumo else None,
+                    "status": doc_status, "is_resumo": is_resumo,
+                    "manifestacao_status": manif_status,
+                }, on_conflict="tenant_id,chave_acesso").execute()
+
+            saved = True
+            nsu_controller.update_last_nsu(cert["id"], tipo, response.ult_nsu)
+
+        return {
+            "tipo": tipo.upper(), "status": "success", "cstat": response.cstat,
+            "xmotivo": response.xmotivo, "docs_found": docs_found,
+            "latency_ms": response.latency_ms, "saved_to_db": saved,
+        }
+
+    except Exception as e:
+        logger.error(f"Erro polling {mask_cnpj(cnpj)}/{tipo}: {e}")
+        sb.table("polling_log").insert({
+            "tenant_id": tenant_id, "cnpj": cnpj, "tipo": tipo,
+            "triggered_by": "manual", "status": "error",
+            "error_message": str(e),
+        }).execute()
+        return {
+            "tipo": tipo.upper(), "status": "error", "cstat": "999",
+            "xmotivo": "", "docs_found": 0, "latency_ms": 0,
+            "error": str(e), "saved_to_db": False,
+        }
+
+
 def _poll_single(cert: dict, tipo: str, tenant_data: dict) -> int:
     """Executa polling de um único CNPJ/tipo. Retorna quantidade de docs encontrados."""
     # NFS-e usa ADN (REST) em vez de SEFAZ (SOAP)

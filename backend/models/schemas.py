@@ -141,11 +141,22 @@ class PollingTriggerRequest(BaseModel):
     tipos: list[str] = Field(default=["nfe", "cte"])
 
 
+class PollingTipoResult(BaseModel):
+    tipo: str
+    status: str
+    cstat: str = ""
+    xmotivo: str = ""
+    docs_found: int = 0
+    latency_ms: int = 0
+    error: Optional[str] = None
+    saved_to_db: bool = False
+
 class PollingTriggerResponse(BaseModel):
     status: str
     cnpj: str
     tipos: list[str]
     docs_found: int = 0
+    results: list[PollingTipoResult] = []
 
 
 # --- Créditos ---

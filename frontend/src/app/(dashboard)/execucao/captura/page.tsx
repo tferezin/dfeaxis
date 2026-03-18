@@ -143,20 +143,26 @@ export default function CapturaManualPage() {
 
       const pollingData = await pollingRes.json()
 
-      // Step 3: Also run test-capture for detailed SEFAZ response display
-      const formData = new FormData()
-      formData.append("pfx", file)
-      formData.append("cnpj", cleanCnpj)
-      formData.append("password", testPassword)
-      formData.append("tipos", selectedTipos.join(","))
+      // Build results from polling response (no second SEFAZ call needed)
+      const results = (pollingData.results || []).map((r: { tipo: string; status: string; cstat: string; xmotivo: string; docs_found: number; latency_ms: number; error?: string; saved_to_db: boolean }) => ({
+        tipo: r.tipo,
+        status: r.error ? "error" : "success",
+        cstat: r.cstat,
+        xmotivo: r.xmotivo,
+        docs_found: r.docs_found,
+        latency_ms: r.latency_ms,
+        message: r.error || (r.saved_to_db ? `${r.docs_found} doc(s) salvo(s)` : ""),
+      }))
 
-      const testRes = await fetch("/api/test-capture", { method: "POST", body: formData })
-      const testData = await testRes.json()
-
-      // Merge info: show test-capture details + saved count
       setTestResult({
-        ...testData,
-        message: `Certificado cadastrado. ${pollingData.docs_found || 0} documento(s) salvo(s) no banco.`,
+        certificate: {
+          subject: `Certificado cadastrado (${uploadData.cnpj})`,
+          valid_from: "",
+          valid_until: String(uploadData.valid_until || ""),
+        },
+        cnpj: cleanCnpj,
+        results,
+        message: `Certificado cadastrado. ${pollingData.docs_found || 0} documento(s) capturado(s) e salvo(s) no banco.`,
       })
     } catch (err) {
       setTestResult({ error: `Erro: ${String(err)}` })
