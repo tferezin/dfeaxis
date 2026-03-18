@@ -1,9 +1,11 @@
 "use client"
 
-import { Building, ShieldCheck, Calendar, Inbox } from "lucide-react"
+import { useState, useEffect, useCallback } from "react"
+import { Building, ShieldCheck, Calendar, Inbox, Loader2 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useSettings } from "@/hooks/use-settings"
+import { getSupabase } from "@/lib/supabase"
 
 interface Empresa {
   id: number
@@ -63,10 +65,82 @@ function extractName(cn: string): string {
   return parts[0]
 }
 
+function formatCnpj(raw: string): string {
+  const digits = raw.replace(/\D/g, "")
+  if (digits.length !== 14) return raw
+  return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`
+}
+
 export default function EmpresasPage() {
   const { settings } = useSettings()
 
-  if (!settings.showMockData) {
+  const [realEmpresas, setRealEmpresas] = useState<Empresa[]>([])
+  const [realLoading, setRealLoading] = useState(false)
+
+  const loadRealData = useCallback(async () => {
+    setRealLoading(true)
+    try {
+      const sb = getSupabase()
+      const { data, error } = await sb
+        .from('certificates')
+        .select('id, company_name, cnpj, valid_from, valid_until, is_active')
+        .order('created_at', { ascending: false })
+
+      if (!error && data) {
+        const mapped: Empresa[] = data.map((cert: any, i: number) => {
+          const now = new Date()
+          const validUntil = cert.valid_until ? new Date(cert.valid_until) : null
+          const isExpired = validUntil ? validUntil < now : false
+
+          const validFrom = cert.valid_from
+            ? new Date(cert.valid_from).toLocaleDateString("pt-BR")
+            : "--"
+          const validTo = validUntil
+            ? validUntil.toLocaleDateString("pt-BR")
+            : "--"
+
+          return {
+            id: i + 1,
+            razaoSocial: cert.company_name || cert.cnpj || "Sem nome",
+            cnpj: cert.cnpj ? formatCnpj(cert.cnpj) : "--",
+            certificadoValidade: `${validFrom} - ${validTo}`,
+            certificadoStatus: isExpired ? "Expirado" : "Ativo",
+            ultimaCaptura: null,
+          }
+        })
+        setRealEmpresas(mapped)
+      }
+    } catch (e) {
+      console.error("[DFeAxis] Error loading empresas:", e)
+    } finally {
+      setRealLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!settings.showMockData) loadRealData()
+  }, [settings.showMockData, loadRealData])
+
+  const empresas = settings.showMockData ? mockEmpresas : realEmpresas
+
+  if (!settings.showMockData && realLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Empresas / CNPJs</h1>
+          <p className="text-sm text-muted-foreground">
+            Dados extraídos automaticamente dos certificados A1. Para adicionar uma empresa, faça o upload do certificado em <strong>Certificados A1</strong>.
+          </p>
+        </div>
+        <div className="flex flex-col items-center justify-center py-16 gap-3">
+          <Loader2 className="size-8 animate-spin text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">Carregando empresas...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!settings.showMockData && realEmpresas.length === 0) {
     return (
       <div className="space-y-6">
         <div>
@@ -93,7 +167,7 @@ export default function EmpresasPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {mockEmpresas.map((emp) => (
+        {empresas.map((emp) => (
           <Card key={emp.id}>
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">

@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect, useCallback } from "react"
 import {
   FileText,
   Truck,
@@ -14,10 +15,86 @@ import { FinancialCard } from "@/components/dashboard/financial-card"
 import { VolumeChart } from "@/components/dashboard/volume-chart"
 import { RecentDocuments } from "@/components/dashboard/recent-documents"
 import { useSettings } from "@/hooks/use-settings"
+import { getSupabase } from "@/lib/supabase"
+
+interface DashboardCounts {
+  nfe: number
+  cte: number
+  mdfe: number
+  nfse: number
+}
+
+interface ActivityEntry {
+  id: string
+  tipo: string
+  cnpj: string
+  status: string
+  docs_found: number
+  created_at: string
+}
 
 export default function DashboardPage() {
   const { settings } = useSettings()
   const showMock = settings.showMockData
+
+  const [realCounts, setRealCounts] = useState<DashboardCounts>({ nfe: 0, cte: 0, mdfe: 0, nfse: 0 })
+  const [realActivity, setRealActivity] = useState<ActivityEntry[]>([])
+  const [realCredits, setRealCredits] = useState<number | null>(null)
+  const [realLoading, setRealLoading] = useState(false)
+
+  const loadRealData = useCallback(async () => {
+    setRealLoading(true)
+    try {
+      const sb = getSupabase()
+
+      // Count documents by tipo with status='available'
+      const [nfeRes, cteRes, mdfeRes, nfseRes] = await Promise.all([
+        sb.from('documents').select('id', { count: 'exact', head: true }).eq('tipo', 'NFE').eq('status', 'available'),
+        sb.from('documents').select('id', { count: 'exact', head: true }).eq('tipo', 'CTE').eq('status', 'available'),
+        sb.from('documents').select('id', { count: 'exact', head: true }).eq('tipo', 'MDFE').eq('status', 'available'),
+        sb.from('documents').select('id', { count: 'exact', head: true }).eq('tipo', 'NFSE').eq('status', 'available'),
+      ])
+
+      setRealCounts({
+        nfe: nfeRes.count ?? 0,
+        cte: cteRes.count ?? 0,
+        mdfe: mdfeRes.count ?? 0,
+        nfse: nfseRes.count ?? 0,
+      })
+
+      // Last 5 polling_log entries for activity feed
+      const { data: activityData } = await sb
+        .from('polling_log')
+        .select('id, tipo, cnpj, status, docs_found, created_at')
+        .order('created_at', { ascending: false })
+        .limit(5)
+
+      if (activityData) setRealActivity(activityData)
+
+      // Credits balance from tenants
+      const { data: tenantData } = await sb
+        .from('tenants')
+        .select('credits_balance')
+        .limit(1)
+        .single()
+
+      if (tenantData) setRealCredits(tenantData.credits_balance)
+    } catch (e) {
+      console.error("[DFeAxis] Error loading dashboard data:", e)
+    } finally {
+      setRealLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!settings.showMockData) loadRealData()
+  }, [settings.showMockData, loadRealData])
+
+  const nfeValue = showMock ? "1.247" : realCounts.nfe.toLocaleString("pt-BR")
+  const cteValue = showMock ? "384" : realCounts.cte.toLocaleString("pt-BR")
+  const mdfeValue = showMock ? "56" : realCounts.mdfe.toLocaleString("pt-BR")
+  const nfseValue = showMock ? "12" : realCounts.nfse.toLocaleString("pt-BR")
+
   return (
     <div className="space-y-3">
       {/* Top controls */}
@@ -46,7 +123,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
           title="NF-e Recebidas"
-          value={showMock ? "1.247" : "\u2014"}
+          value={nfeValue}
           icon={<FileText className="h-4 w-4" />}
           period="Últimos 30 dias"
           trend={showMock ? { value: 12.5, label: "vs. mês anterior" } : undefined}
@@ -54,7 +131,7 @@ export default function DashboardPage() {
         />
         <StatCard
           title="CT-e Recebidos"
-          value={showMock ? "384" : "\u2014"}
+          value={cteValue}
           icon={<Truck className="h-4 w-4" />}
           period="Últimos 30 dias"
           trend={showMock ? { value: 8.3, label: "vs. mês anterior" } : undefined}
@@ -62,7 +139,7 @@ export default function DashboardPage() {
         />
         <StatCard
           title="MDF-e Recebidos"
-          value={showMock ? "56" : "\u2014"}
+          value={mdfeValue}
           icon={<FileCheck className="h-4 w-4" />}
           period="Últimos 30 dias"
           trend={showMock ? { value: -3.2, label: "vs. mês anterior" } : undefined}
@@ -70,7 +147,7 @@ export default function DashboardPage() {
         />
         <StatCard
           title="NFS-e Recebidas"
-          value={showMock ? "12" : "\u2014"}
+          value={nfseValue}
           icon={<Receipt className="h-4 w-4" />}
           period="Últimos 30 dias"
           trend={showMock ? { value: 4.1, label: "vs. mês anterior" } : undefined}
