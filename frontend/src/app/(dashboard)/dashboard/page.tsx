@@ -45,6 +45,8 @@ export default function DashboardPage() {
   const [realCteTotal, setRealCteTotal] = useState(0)
   const [realMdfeTotal, setRealMdfeTotal] = useState(0)
   const [realNfseTotal, setRealNfseTotal] = useState(0)
+  const [realCnpjCount, setRealCnpjCount] = useState(0)
+  const [realVolumeData, setRealVolumeData] = useState<Array<{ date: string; nfe: number; cte: number; mdfe: number; nfse: number }>>([])
   const [realLoading, setRealLoading] = useState(false)
 
   // Extract value from XML string using regex (no DOM parser needed)
@@ -73,13 +75,17 @@ export default function DashboardPage() {
     try {
       const sb = getSupabase()
 
-      // Count documents by tipo with status='available'
+      // Count ALL documents by tipo (total transacionado, não só available)
       const [nfeRes, cteRes, mdfeRes, nfseRes] = await Promise.all([
-        sb.from('documents').select('id', { count: 'exact', head: true }).eq('tipo', 'NFE').eq('status', 'available'),
-        sb.from('documents').select('id', { count: 'exact', head: true }).eq('tipo', 'CTE').eq('status', 'available'),
-        sb.from('documents').select('id', { count: 'exact', head: true }).eq('tipo', 'MDFE').eq('status', 'available'),
-        sb.from('documents').select('id', { count: 'exact', head: true }).eq('tipo', 'NFSE').eq('status', 'available'),
+        sb.from('documents').select('id', { count: 'exact', head: true }).eq('tipo', 'NFE'),
+        sb.from('documents').select('id', { count: 'exact', head: true }).eq('tipo', 'CTE'),
+        sb.from('documents').select('id', { count: 'exact', head: true }).eq('tipo', 'MDFE'),
+        sb.from('documents').select('id', { count: 'exact', head: true }).eq('tipo', 'NFSE'),
       ])
+
+      // Count CNPJs
+      const { data: certData } = await sb.from('certificates').select('cnpj').eq('is_active', true)
+      setRealCnpjCount(certData?.length ?? 0)
 
       setRealCounts({
         nfe: nfeRes.count ?? 0,
@@ -112,6 +118,17 @@ export default function DashboardPage() {
         setRealCteTotal(cteSum)
         setRealMdfeTotal(mdfeSum)
         setRealNfseTotal(nfseSum)
+
+        // Build volume chart data (group by day)
+        const byDay: Record<string, { nfe: number; cte: number; mdfe: number; nfse: number }> = {}
+        for (const doc of recentDocs) {
+          const day = new Date(doc.fetched_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
+          if (!byDay[day]) byDay[day] = { nfe: 0, cte: 0, mdfe: 0, nfse: 0 }
+          const key = doc.tipo.toLowerCase() as "nfe" | "cte" | "mdfe" | "nfse"
+          if (key in byDay[day]) byDay[day][key]++
+        }
+        const volumeData = Object.entries(byDay).map(([date, counts]) => ({ date, ...counts }))
+        setRealVolumeData(volumeData)
       }
 
       // Last 5 polling_log entries for activity feed
@@ -208,6 +225,26 @@ export default function DashboardPage() {
         />
       </div>
 
+      {/* Extra info cards */}
+      {!showMock && (
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard
+            title="CNPJs Cadastrados"
+            value={realCnpjCount.toString()}
+            icon={<Building2 className="h-4 w-4" />}
+            period="Certificados ativos"
+            color="text-slate-600"
+          />
+          <StatCard
+            title="Créditos Disponíveis"
+            value={realCredits?.toLocaleString("pt-BR") ?? "—"}
+            icon={<Receipt className="h-4 w-4" />}
+            period="Saldo atual"
+            color="text-emerald-600"
+          />
+        </div>
+      )}
+
       {/* Financial + Chart side by side */}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         {(() => {
@@ -232,7 +269,7 @@ export default function DashboardPage() {
             />
           )
         })()}
-        <VolumeChart empty={!showMock} />
+        <VolumeChart empty={false} realData={showMock ? undefined : realVolumeData} />
       </div>
 
       {/* Recent documents */}
