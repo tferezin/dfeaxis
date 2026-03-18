@@ -82,12 +82,30 @@ def _poll_single_detailed(cert: dict, tipo: str, tenant_data: dict) -> dict:
             "error": "Senha do certificado não encontrada", "saved_to_db": False,
         }
 
+    # pfx_encrypted comes from Supabase as hex string
+    # v2 format stored as text: "v2:<hex>" — pass as-is to sefaz_client
+    # Legacy BYTEA comes as "\x<hex>" — convert to bytes
     pfx_encrypted = cert["pfx_encrypted"]
     pfx_iv = cert["pfx_iv"]
-    if isinstance(pfx_encrypted, str):
-        pfx_encrypted = bytes.fromhex(pfx_encrypted.replace("\\x", ""))
+
+    # If stored as text "v2:..." pass as string (sefaz_client handles it)
+    # If stored as Supabase BYTEA "\x..." convert to bytes
+    if isinstance(pfx_encrypted, str) and not pfx_encrypted.startswith("v2:"):
+        # Legacy BYTEA hex from Supabase: "\x<hex>"
+        clean = pfx_encrypted.replace("\\x", "").replace("\\\\x", "")
+        # Check if it's actually v2 encoded as hex bytes
+        try:
+            decoded = bytes.fromhex(clean)
+            decoded_str = decoded.decode("ascii", errors="ignore")
+            if decoded_str.startswith("v2:"):
+                pfx_encrypted = decoded_str
+            else:
+                pfx_encrypted = decoded
+        except (ValueError, UnicodeDecodeError):
+            pfx_encrypted = clean
+
     if pfx_iv and isinstance(pfx_iv, str):
-        pfx_iv = bytes.fromhex(pfx_iv.replace("\\x", ""))
+        pfx_iv = bytes.fromhex(pfx_iv.replace("\\x", "").replace("\\\\x", ""))
 
     ambiente = tenant_data.get("sefaz_ambiente", "2")
 
@@ -156,7 +174,8 @@ def _poll_single_detailed(cert: dict, tipo: str, tenant_data: dict) -> dict:
         }
 
     except Exception as e:
-        logger.error(f"Erro polling {mask_cnpj(cnpj)}/{tipo}: {e}")
+        import traceback
+        logger.error(f"Erro polling {mask_cnpj(cnpj)}/{tipo}: {e}\n{traceback.format_exc()}")
         sb.table("polling_log").insert({
             "tenant_id": tenant_id, "cnpj": cnpj, "tipo": tipo,
             "triggered_by": "manual", "status": "error",
