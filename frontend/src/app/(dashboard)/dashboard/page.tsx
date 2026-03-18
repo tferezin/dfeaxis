@@ -188,8 +188,8 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      {/* Stat cards — all in one row */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
         <StatCard
           title="NF-e Recebidas"
           value={nfeValue}
@@ -223,32 +223,31 @@ export default function DashboardPage() {
           badge="ADN"
           color="text-amber-600"
         />
+        {!showMock && (
+          <>
+            <StatCard
+              title="CNPJs"
+              value={realCnpjCount.toString()}
+              icon={<Building2 className="h-4 w-4" />}
+              period="Certificados ativos"
+              color="text-slate-600"
+            />
+            <StatCard
+              title="Créditos"
+              value={realCredits?.toLocaleString("pt-BR") ?? "—"}
+              icon={<Receipt className="h-4 w-4" />}
+              period="Saldo atual"
+              color="text-emerald-600"
+            />
+          </>
+        )}
       </div>
-
-      {/* Extra info cards */}
-      {!showMock && (
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatCard
-            title="CNPJs Cadastrados"
-            value={realCnpjCount.toString()}
-            icon={<Building2 className="h-4 w-4" />}
-            period="Certificados ativos"
-            color="text-slate-600"
-          />
-          <StatCard
-            title="Créditos Disponíveis"
-            value={realCredits?.toLocaleString("pt-BR") ?? "—"}
-            icon={<Receipt className="h-4 w-4" />}
-            period="Saldo atual"
-            color="text-emerald-600"
-          />
-        </div>
-      )}
 
       {/* Financial + Chart side by side */}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         {(() => {
-          const allTotal = realNfeTotal + realCteTotal + realMdfeTotal + realNfseTotal
+          // MDF-e vCarga é valor da mercadoria, não valor fiscal — não somar
+          const allTotal = realNfeTotal + realCteTotal + realNfseTotal
           const fmt = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
           return (
             <FinancialCard
@@ -263,7 +262,7 @@ export default function DashboardPage() {
               ] : [
                 ...(realNfeTotal > 0 ? [{ label: `NF-e (${realCounts.nfe})`, value: fmt(realNfeTotal), amount: realNfeTotal, color: "text-blue-600", bgColor: "bg-blue-500" }] : []),
                 ...(realCteTotal > 0 ? [{ label: `CT-e (${realCounts.cte})`, value: fmt(realCteTotal), amount: realCteTotal, color: "text-violet-600", bgColor: "bg-violet-500" }] : []),
-                ...(realMdfeTotal > 0 ? [{ label: `MDF-e (${realCounts.mdfe})`, value: fmt(realMdfeTotal), amount: realMdfeTotal, color: "text-emerald-600", bgColor: "bg-emerald-500" }] : []),
+                ...(realCounts.mdfe > 0 ? [{ label: `MDF-e (${realCounts.mdfe})`, value: `${realCounts.mdfe} doc(s)`, amount: realCounts.mdfe, color: "text-emerald-600", bgColor: "bg-emerald-500" }] : []),
                 ...(realNfseTotal > 0 ? [{ label: `NFS-e (${realCounts.nfse})`, value: fmt(realNfseTotal), amount: realNfseTotal, color: "text-amber-600", bgColor: "bg-amber-500" }] : []),
               ]}
             />
