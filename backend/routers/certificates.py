@@ -55,13 +55,8 @@ async def upload_certificate(
             detail="Arquivo deve ter extensao .pfx",
         )
 
-    # Validate content type
-    content_type = pfx_file.content_type or ""
-    if content_type not in _ALLOWED_PFX_CONTENT_TYPES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Content-Type invalido: {content_type}. Esperado: application/x-pkcs12 ou application/octet-stream",
-        )
+    # Content type check (relaxed — browsers may send various types for .pfx)
+    # Validation of the actual file content happens in extract_cert_info below
 
     # Le o arquivo
     pfx_bytes = await pfx_file.read()
