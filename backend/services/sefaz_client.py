@@ -217,7 +217,9 @@ class SefazClient:
         root.set("versao", versao)
 
         etree.SubElement(root, "tpAmb").text = effective_ambiente
-        etree.SubElement(root, "cUFAutor").text = cuf_autor
+        # MDF-e não tem cUFAutor — vai direto para CNPJ
+        if tipo != "mdfe":
+            etree.SubElement(root, "cUFAutor").text = cuf_autor
         etree.SubElement(root, "CNPJ").text = cnpj
 
         dist_nsu = etree.SubElement(root, "distNSU")
