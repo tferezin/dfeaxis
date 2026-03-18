@@ -80,26 +80,33 @@ export default function CapturaManualPage() {
     }
     setTestStatus("loading")
     setTestResult(null)
+    console.log("[DFeAxis] ===== CAPTURA MANUAL INICIADA =====")
+    console.log("[DFeAxis] Arquivo:", file.name, "CNPJ:", testCnpj, "Tipos:", selectedTipos)
 
     const cleanCnpj = testCnpj.replace(/\D/g, "")
     const backendUrl = process.env.NEXT_PUBLIC_API_URL || "https://dfeaxis-production.up.railway.app/api/v1"
+    console.log("[DFeAxis] Backend URL:", backendUrl)
 
     try {
       // Get auth token
+      console.log("[DFeAxis] 🔐 Obtendo sessão...")
       const sb = getSupabase()
       const { data: { session } } = await sb.auth.getSession()
       const token = session?.access_token
 
       if (!token) {
+        console.error("[DFeAxis] ❌ Sem token — sessão expirada")
         setTestResult({ error: "Sessão expirada. Faça login novamente." })
         return
       }
+      console.log("[DFeAxis] ✅ Token obtido")
 
       const authHeaders = {
         "Authorization": `Bearer ${token}`,
       }
 
       // Step 1: Upload certificate to backend (registers in DB)
+      console.log(`[DFeAxis] 📤 Step 1: Upload certificado para ${backendUrl}/certificates/upload`)
       const uploadForm = new FormData()
       uploadForm.append("pfx_file", file)
       uploadForm.append("cnpj", cleanCnpj)
@@ -112,15 +119,20 @@ export default function CapturaManualPage() {
         body: uploadForm,
       })
 
+      console.log(`[DFeAxis] Upload response: ${uploadRes.status} ${uploadRes.statusText}`)
+
       if (!uploadRes.ok) {
         const uploadErr = await uploadRes.json().catch(() => ({}))
+        console.error("[DFeAxis] ❌ Erro upload:", uploadErr)
         setTestResult({ error: `Erro ao cadastrar certificado: ${uploadErr.detail || uploadRes.statusText}` })
         return
       }
 
       const uploadData = await uploadRes.json()
+      console.log("[DFeAxis] ✅ Certificado cadastrado:", uploadData)
 
       // Step 2: Trigger polling (queries SEFAZ + saves to DB)
+      console.log(`[DFeAxis] 🔄 Step 2: Polling SEFAZ para tipos: ${selectedTipos.join(", ")}`)
       const pollingRes = await fetch(`${backendUrl}/polling/trigger`, {
         method: "POST",
         headers: { ...authHeaders, "Content-Type": "application/json" },
@@ -130,9 +142,11 @@ export default function CapturaManualPage() {
         }),
       })
 
+      console.log(`[DFeAxis] Polling response: ${pollingRes.status} ${pollingRes.statusText}`)
+
       if (!pollingRes.ok) {
         const pollingErr = await pollingRes.json().catch(() => ({}))
-        // Still show cert was uploaded OK
+        console.error("[DFeAxis] ❌ Erro polling:", pollingErr)
         setTestResult({
           certificate: { subject: `Certificado cadastrado (${uploadData.cnpj})`, valid_from: "", valid_until: String(uploadData.valid_until || "") },
           cnpj: cleanCnpj,
@@ -142,6 +156,7 @@ export default function CapturaManualPage() {
       }
 
       const pollingData = await pollingRes.json()
+      console.log("[DFeAxis] ✅ Polling completo:", JSON.stringify(pollingData, null, 2))
 
       // Build results from polling response (no second SEFAZ call needed)
       const results = (pollingData.results || []).map((r: { tipo: string; status: string; cstat: string; xmotivo: string; docs_found: number; latency_ms: number; error?: string; saved_to_db: boolean }) => ({
