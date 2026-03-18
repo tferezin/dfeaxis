@@ -135,7 +135,31 @@ const mockDocuments: RecentDocument[] = [
   },
 ]
 
-export function RecentDocuments({ empty = false }: { empty?: boolean }) {
+interface RealDocument {
+  tipo: string
+  chave_acesso: string
+  cnpj: string
+  nsu: string
+  status: string
+  fetched_at: string
+}
+
+const tipoLabels: Record<string, string> = { NFE: "NF-e", CTE: "CT-e", MDFE: "MDF-e", NFSE: "NFS-e" }
+const tipoColors: Record<string, string> = {
+  NFE: "bg-blue-50 text-blue-700",
+  CTE: "bg-violet-50 text-violet-700",
+  MDFE: "bg-emerald-50 text-emerald-700",
+  NFSE: "bg-amber-50 text-amber-700",
+}
+
+function formatCnpj(cnpj: string) {
+  if (cnpj.length !== 14) return cnpj
+  return `${cnpj.slice(0,2)}.${cnpj.slice(2,5)}.${cnpj.slice(5,8)}/${cnpj.slice(8,12)}-${cnpj.slice(12)}`
+}
+
+export function RecentDocuments({ empty = false, documents }: { empty?: boolean; documents?: RealDocument[] }) {
+  const showReal = documents && documents.length > 0
+
   return (
     <Card className="transition-shadow hover:shadow-md">
       <CardHeader>
@@ -154,11 +178,55 @@ export function RecentDocuments({ empty = false }: { empty?: boolean }) {
         </div>
       </CardHeader>
       <CardContent className="px-0">
-        {empty ? (
+        {empty && !showReal ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <Inbox className="size-12 text-muted-foreground/30 mb-4" />
             <p className="text-sm text-muted-foreground">Nenhum documento recente.</p>
           </div>
+        ) : showReal ? (
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="pl-4">CNPJ</TableHead>
+              <TableHead>Data</TableHead>
+              <TableHead>Tipo</TableHead>
+              <TableHead>NSU</TableHead>
+              <TableHead>Chave de Acesso</TableHead>
+              <TableHead className="pr-4 text-right">Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {documents.map((doc, i) => (
+              <TableRow key={i} className="group cursor-pointer">
+                <TableCell className="pl-4">
+                  <p className="font-mono text-xs">{formatCnpj(doc.cnpj)}</p>
+                </TableCell>
+                <TableCell className="text-muted-foreground text-sm">
+                  {new Date(doc.fetched_at).toLocaleDateString("pt-BR")}
+                </TableCell>
+                <TableCell>
+                  <span className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold", tipoColors[doc.tipo] || "bg-gray-50 text-gray-700")}>
+                    {tipoLabels[doc.tipo] || doc.tipo}
+                  </span>
+                </TableCell>
+                <TableCell className="font-mono text-xs text-muted-foreground">
+                  {doc.nsu}
+                </TableCell>
+                <TableCell className="font-mono text-xs text-muted-foreground">
+                  {doc.chave_acesso.slice(0, 12)}...{doc.chave_acesso.slice(-6)}
+                </TableCell>
+                <TableCell className="pr-4 text-right">
+                  <span className={cn(
+                    "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset",
+                    doc.status === "available" ? statusStyles.Disponivel : doc.status === "delivered" ? statusStyles.Entregue : statusStyles.Pendente
+                  )}>
+                    {doc.status === "available" ? "Disponível" : doc.status === "delivered" ? "Entregue" : doc.status}
+                  </span>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
         ) : (
         <Table>
           <TableHeader>
@@ -185,14 +253,7 @@ export function RecentDocuments({ empty = false }: { empty?: boolean }) {
                   {doc.emissao}
                 </TableCell>
                 <TableCell>
-                  <span
-                    className={cn(
-                      "inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold",
-                      doc.tipo === "NF-e"
-                        ? "bg-blue-50 text-blue-700"
-                        : "bg-violet-50 text-violet-700"
-                    )}
-                  >
+                  <span className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold", doc.tipo === "NF-e" ? "bg-blue-50 text-blue-700" : "bg-violet-50 text-violet-700")}>
                     {doc.tipo}
                   </span>
                 </TableCell>
@@ -206,12 +267,7 @@ export function RecentDocuments({ empty = false }: { empty?: boolean }) {
                   {doc.valor}
                 </TableCell>
                 <TableCell className="pr-4 text-right">
-                  <span
-                    className={cn(
-                      "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset",
-                      statusStyles[doc.status]
-                    )}
-                  >
+                  <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset", statusStyles[doc.status])}>
                     {doc.status}
                   </span>
                 </TableCell>

@@ -40,6 +40,7 @@ export default function DashboardPage() {
   const [realCounts, setRealCounts] = useState<DashboardCounts>({ nfe: 0, cte: 0, mdfe: 0, nfse: 0 })
   const [realActivity, setRealActivity] = useState<ActivityEntry[]>([])
   const [realCredits, setRealCredits] = useState<number | null>(null)
+  const [realDocuments, setRealDocuments] = useState<Array<{ tipo: string; chave_acesso: string; cnpj: string; nsu: string; status: string; fetched_at: string }>>([])
   const [realLoading, setRealLoading] = useState(false)
 
   const loadRealData = useCallback(async () => {
@@ -62,6 +63,15 @@ export default function DashboardPage() {
         nfse: nfseRes.count ?? 0,
       })
 
+      // Recent documents (last 10)
+      const { data: recentDocs } = await sb
+        .from('documents')
+        .select('tipo, chave_acesso, cnpj, nsu, status, fetched_at')
+        .order('fetched_at', { ascending: false })
+        .limit(10)
+
+      if (recentDocs) setRealDocuments(recentDocs)
+
       // Last 5 polling_log entries for activity feed
       const { data: activityData } = await sb
         .from('polling_log')
@@ -74,11 +84,11 @@ export default function DashboardPage() {
       // Credits balance from tenants
       const { data: tenantData } = await sb
         .from('tenants')
-        .select('credits_balance')
+        .select('credits')
         .limit(1)
         .single()
 
-      if (tenantData) setRealCredits(tenantData.credits_balance)
+      if (tenantData) setRealCredits(tenantData.credits)
     } catch (e) {
       console.error("[DFeAxis] Error loading dashboard data:", e)
     } finally {
@@ -185,7 +195,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Recent documents */}
-      <RecentDocuments empty={!showMock} />
+      <RecentDocuments empty={showMock ? false : realDocuments.length === 0} documents={showMock ? undefined : realDocuments} />
     </div>
   )
 }
