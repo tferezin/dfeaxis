@@ -109,7 +109,7 @@ export function VolumeChart({ empty = false, realData }: { empty?: boolean; real
           </div>
         ) : chartData ? (
         <ChartContainer config={lineConfig} className="h-[300px] w-full">
-          <LineChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+          <LineChart data={chartData} margin={{ top: 4, right: 30, bottom: 0, left: -20 }}>
             <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-muted" />
             <XAxis
               dataKey="date"
