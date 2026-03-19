@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /cadastros/
+Disallow: /execucao/
+Disallow: /historico/
+Disallow: /financeiro/
+Disallow: /logs
+Disallow: /getting-started
+
+Sitemap: https://dfeaxis.com.br/sitemap.xml
