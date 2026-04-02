@@ -1,5 +1,7 @@
 """Endpoints de tenant/onboarding."""
 
+from datetime import datetime, timedelta, timezone
+
 from fastapi import APIRouter, Body, Depends, HTTPException
 
 from db.supabase import get_supabase_client
@@ -26,6 +28,8 @@ async def register_tenant(
     if existing.data:
         return {"tenant_id": existing.data[0]["id"], "status": "already_exists"}
 
+    trial_expires = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
+
     result = sb.table("tenants").insert({
         "user_id": user_id,
         "company_name": company_name,
@@ -33,6 +37,9 @@ async def register_tenant(
         "plan": "starter",
         "credits": 100,  # créditos iniciais de teste
         "manifestacao_mode": "manual",
+        "trial_expires_at": trial_expires,
+        "trial_active": True,
+        "subscription_status": "trial",
     }).execute()
 
     return {"tenant_id": result.data[0]["id"], "status": "created"}
@@ -85,3 +92,32 @@ async def update_settings(
         raise HTTPException(status_code=404, detail="Tenant não encontrado")
 
     return result.data[0]
+
+
+@router.get("/tenants/trial-status")
+async def get_trial_status(auth: dict = Depends(verify_jwt_token)):
+    """Retorna status do período de teste do tenant."""
+    sb = get_supabase_client()
+    result = sb.table("tenants").select(
+        "trial_active, trial_expires_at, subscription_status"
+    ).eq("id", auth["tenant_id"]).single().execute()
+
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Tenant não encontrado")
+
+    data = result.data
+    now = datetime.now(timezone.utc)
+    expires_at = data.get("trial_expires_at")
+
+    days_remaining = 0
+    if expires_at:
+        expires_dt = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+        delta = expires_dt - now
+        days_remaining = max(0, delta.days)
+
+    return {
+        "trial_active": data.get("trial_active", False),
+        "trial_expires_at": expires_at,
+        "days_remaining": days_remaining,
+        "subscription_status": data.get("subscription_status", "trial"),
+    }

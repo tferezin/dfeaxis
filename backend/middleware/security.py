@@ -8,6 +8,7 @@ import time
 import uuid
 from collections import defaultdict
 from contextvars import ContextVar
+from datetime import datetime, timezone
 
 from fastapi import Request, HTTPException, Security
 from fastapi.security import APIKeyHeader
@@ -294,3 +295,89 @@ async def verify_jwt_token(request: Request) -> dict:
         )
 
     return {"tenant_id": tenant_id, "user_id": user.id}
+
+
+# --- Paths exempt from trial expiration check ---
+
+_TRIAL_EXEMPT_PATHS = (
+    "/tenants/me",
+    "/tenants/settings",
+    "/tenants/register",
+    "/tenants/trial-status",
+    "/credits/",
+)
+
+
+def _is_trial_exempt(path: str) -> bool:
+    """Return True if the request path is exempt from trial checks."""
+    return any(exempt in path for exempt in _TRIAL_EXEMPT_PATHS)
+
+
+async def verify_trial_active(request: Request, auth: dict) -> None:
+    """Check if the tenant's trial is still active.
+
+    If the trial has expired, updates the tenant and raises 403.
+    Called after verify_jwt_token for protected endpoints.
+    """
+    if _is_trial_exempt(request.url.path):
+        return
+
+    tenant_id = auth.get("tenant_id")
+    if not tenant_id:
+        return
+
+    sb = get_supabase_client()
+    result = sb.table("tenants").select(
+        "subscription_status, trial_expires_at, trial_active"
+    ).eq("id", tenant_id).single().execute()
+
+    if not result.data:
+        return
+
+    data = result.data
+    status = data.get("subscription_status")
+
+    # Only check trial-related statuses
+    if status not in ("trial",):
+        if status == "expired":
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "message": "Período de teste expirado. Realize o pagamento para continuar usando o DFeAxis.",
+                    "code": "TRIAL_EXPIRED",
+                },
+            )
+        return
+
+    expires_at = data.get("trial_expires_at")
+    if not expires_at:
+        return
+
+    expires_dt = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+    now = datetime.now(timezone.utc)
+
+    if now >= expires_dt:
+        # Trial expired — update tenant
+        sb.table("tenants").update({
+            "subscription_status": "expired",
+            "trial_active": False,
+        }).eq("id", tenant_id).execute()
+
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "message": "Período de teste expirado. Realize o pagamento para continuar usando o DFeAxis.",
+                "code": "TRIAL_EXPIRED",
+            },
+        )
+
+
+async def verify_jwt_with_trial(request: Request) -> dict:
+    """Combined dependency: JWT auth + trial expiration check.
+
+    Use this instead of verify_jwt_token on endpoints that should be blocked
+    when the trial has expired.
+    """
+    auth = await verify_jwt_token(request)
+    await verify_trial_active(request, auth)
+    return auth

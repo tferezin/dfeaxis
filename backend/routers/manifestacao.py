@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from db.supabase import get_supabase_client
 from middleware.lgpd import mask_cnpj
-from middleware.security import verify_api_key, verify_jwt_token
+from middleware.security import verify_api_key, verify_jwt_token, verify_jwt_with_trial
 from models.schemas import (
     DocumentoPendenteOut,
     ManifestacaoBatchRequest,
@@ -55,7 +55,7 @@ def _get_cert_and_password(tenant_id: str, cnpj: str) -> tuple:
 @router.get("/manifestacao/pendentes", response_model=list[DocumentoPendenteOut])
 async def listar_pendentes(
     cnpj: str = Query(..., min_length=14, max_length=14),
-    auth: dict = Depends(verify_jwt_token),
+    auth: dict = Depends(verify_jwt_with_trial),
 ):
     """Lista documentos NF-e pendentes de manifestação.
 

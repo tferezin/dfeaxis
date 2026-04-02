@@ -12,7 +12,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from db.supabase import get_supabase_client
-from middleware.security import verify_api_key, verify_jwt_token
+from middleware.security import verify_api_key, verify_jwt_token, verify_jwt_with_trial
 from models.schemas import PollingTriggerRequest, PollingTriggerResponse, PollingTipoResult
 from scheduler.polling_job import _poll_single_detailed
 
@@ -75,7 +75,7 @@ async def test_capture(body: TestCaptureRequest):
 @router.post("/polling/trigger", response_model=PollingTriggerResponse)
 async def trigger_polling(
     body: PollingTriggerRequest,
-    auth: dict = Depends(verify_jwt_token),
+    auth: dict = Depends(verify_jwt_with_trial),
 ):
     """Força polling manual imediato para um CNPJ (modo teste)."""
     sb = get_supabase_client()
@@ -115,7 +115,7 @@ async def trigger_polling(
 
 
 @router.get("/logs/stream")
-async def stream_logs(auth: dict = Depends(verify_jwt_token)):
+async def stream_logs(auth: dict = Depends(verify_jwt_with_trial)):
     """Server-Sent Events em tempo real dos eventos de polling."""
     tenant_id = auth["tenant_id"]
 

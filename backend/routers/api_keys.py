@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from db.supabase import get_supabase_client
 from middleware.lgpd import audit_log
-from middleware.security import verify_jwt_token
+from middleware.security import verify_jwt_token, verify_jwt_with_trial
 
 router = APIRouter()
 
@@ -20,7 +20,7 @@ class CreateApiKeyRequest(BaseModel):
 async def create_api_key(
     request: Request,
     body: CreateApiKeyRequest = CreateApiKeyRequest(),
-    auth: dict = Depends(verify_jwt_token),
+    auth: dict = Depends(verify_jwt_with_trial),
 ):
     """Gera uma nova API key para integracao SAP DRC.
 
@@ -70,7 +70,7 @@ async def create_api_key(
 
 
 @router.get("/api-keys")
-async def list_api_keys(auth: dict = Depends(verify_jwt_token)):
+async def list_api_keys(auth: dict = Depends(verify_jwt_with_trial)):
     """Lista API keys do tenant (sem expor a key completa)."""
     sb = get_supabase_client()
     result = sb.table("api_keys").select(
@@ -84,7 +84,7 @@ async def list_api_keys(auth: dict = Depends(verify_jwt_token)):
 async def revoke_api_key(
     key_id: str,
     request: Request,
-    auth: dict = Depends(verify_jwt_token),
+    auth: dict = Depends(verify_jwt_with_trial),
 ):
     """Revoga uma API key."""
     sb = get_supabase_client()

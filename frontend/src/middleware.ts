@@ -44,7 +44,7 @@ export async function middleware(request: NextRequest) {
 
   // Public pages that don't require auth
   const isAuthPage = pathname.startsWith("/login") || pathname.startsWith("/signup")
-  const isPublicPage = pathname === "/" || pathname.startsWith("/landing") || pathname.startsWith("/api/")
+  const isPublicPage = pathname === "/" || pathname.startsWith("/landing") || pathname.startsWith("/api/") || pathname.startsWith("/termos") || pathname.startsWith("/privacidade")
 
   if (!user && !isAuthPage && !isPublicPage) {
     const loginUrl = new URL("/login", request.url)

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 
 from db.supabase import get_supabase_client
 from middleware.lgpd import audit_log, mask_cnpj
-from middleware.security import verify_jwt_token
+from middleware.security import verify_jwt_token, verify_jwt_with_trial
 from models.schemas import CertificateOut, CertificateUploadResponse, _validate_cnpj
 from services.cert_manager import encrypt_pfx, encrypt_password, extract_cert_info
 
@@ -28,7 +28,7 @@ async def upload_certificate(
     cnpj: str = Form(..., min_length=14, max_length=18),
     senha: str = Form(...),
     polling_mode: str = Form("manual"),
-    auth: dict = Depends(verify_jwt_token),
+    auth: dict = Depends(verify_jwt_with_trial),
 ):
     """Upload de certificado A1 (.pfx).
 
@@ -142,7 +142,7 @@ async def upload_certificate(
 
 
 @router.get("/certificates", response_model=list[CertificateOut])
-async def list_certificates(auth: dict = Depends(verify_jwt_token)):
+async def list_certificates(auth: dict = Depends(verify_jwt_with_trial)):
     """Lista certificados do tenant."""
     sb = get_supabase_client()
 
@@ -158,7 +158,7 @@ async def list_certificates(auth: dict = Depends(verify_jwt_token)):
 async def delete_certificate(
     cert_id: str,
     request: Request,
-    auth: dict = Depends(verify_jwt_token),
+    auth: dict = Depends(verify_jwt_with_trial),
 ):
     """Remove certificado do tenant."""
     sb = get_supabase_client()
