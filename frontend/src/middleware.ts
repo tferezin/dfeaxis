@@ -43,7 +43,7 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   // Public pages that don't require auth
-  const isAuthPage = pathname.startsWith("/login")
+  const isAuthPage = pathname.startsWith("/login") || pathname.startsWith("/signup")
   const isPublicPage = pathname === "/" || pathname.startsWith("/landing") || pathname.startsWith("/api/")
 
   if (!user && !isAuthPage && !isPublicPage) {
