@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>DFeAxis OG Image</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:1200px;height:630px;overflow:hidden}
+  body{
+    font-family:'Outfit',sans-serif;
+    background:linear-gradient(135deg,#0d1f1c 0%,#1a3a33 50%,#0d1f1c 100%);
+    color:#fff;
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+    padding:72px 88px;
+    position:relative;
+  }
+  /* Subtle grid overlay */
+  body::before{
+    content:"";
+    position:absolute;inset:0;
+    background-image:
+      linear-gradient(rgba(52,211,153,.04) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(52,211,153,.04) 1px,transparent 1px);
+    background-size:60px 60px;
+    pointer-events:none;
+  }
+  /* Accent glow */
+  body::after{
+    content:"";
+    position:absolute;
+    top:-200px;right:-200px;
+    width:600px;height:600px;
+    background:radial-gradient(circle,rgba(52,211,153,.18) 0%,transparent 70%);
+    border-radius:50%;
+    pointer-events:none;
+  }
+  .top{
+    display:flex;
+    align-items:center;
+    gap:20px;
+    position:relative;
+    z-index:1;
+  }
+  .top img{
+    height:72px;
+    width:auto;
+  }
+  .top-tag{
+    font-size:13px;
+    font-weight:700;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:#34d399;
+    padding:8px 16px;
+    border:1px solid rgba(52,211,153,.4);
+    border-radius:999px;
+    margin-left:auto;
+  }
+  .main{
+    position:relative;
+    z-index:1;
+  }
+  h1{
+    font-family:'Fraunces',serif;
+    font-weight:300;
+    font-size:76px;
+    line-height:1.05;
+    letter-spacing:-.03em;
+    color:#fff;
+    margin-bottom:28px;
+  }
+  h1 em{
+    font-style:italic;
+    color:#34d399;
+  }
+  .sub{
+    font-size:26px;
+    font-weight:300;
+    color:rgba(255,255,255,.65);
+    line-height:1.4;
+    max-width:900px;
+  }
+  .bottom{
+    display:flex;
+    align-items:center;
+    gap:32px;
+    position:relative;
+    z-index:1;
+  }
+  .badge{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    font-size:16px;
+    font-weight:500;
+    color:rgba(255,255,255,.75);
+  }
+  .badge::before{
+    content:"";
+    width:8px;height:8px;
+    background:#34d399;
+    border-radius:50%;
+    box-shadow:0 0 12px rgba(52,211,153,.8);
+  }
+</style>
+</head>
+<body>
+  <div class="top">
+    <img src="/logo-dfeaxis.png" alt="DFeAxis">
+    <span class="top-tag">SAP DRC · TOTVS · Oracle</span>
+  </div>
+  <div class="main">
+    <h1>Captura automática de<br>NF-e, CT-e e MDF-e<br><em>na SEFAZ.</em></h1>
+    <p class="sub">Entrega direta ao seu ERP via API REST. Zero armazenamento. Trial grátis.</p>
+  </div>
+  <div class="bottom">
+    <div class="badge">Polling automático a cada 15 min</div>
+    <div class="badge">Zero-retention por design</div>
+    <div class="badge">LGPD compliant</div>
+  </div>
+</body>
+</html>
