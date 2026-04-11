@@ -103,12 +103,18 @@ DEFAULT_PLAN_CATALOG: list[dict] = [
 ]
 
 
+_PLAN_FIELDS = {f for f in Plan.__dataclass_fields__}
+
+
 @lru_cache(maxsize=1)
 def load_plans() -> list[Plan]:
     """Loads plans from data/stripe_plans.json (created by seed script).
 
     If the file doesn't exist, returns plans with empty price IDs (useful
     for tests / dev environments without Stripe configured yet).
+
+    Extra fields in the JSON (e.g., stripe_product_id) are silently ignored
+    so the Plan dataclass stays lean and the seed file can carry metadata.
     """
     catalog: list[dict] = []
     if PLANS_FILE.exists():
@@ -121,7 +127,15 @@ def load_plans() -> list[Plan]:
     if not catalog:
         catalog = [{**p, "price_id_monthly": "", "price_id_yearly": ""} for p in DEFAULT_PLAN_CATALOG]
 
-    return [Plan(**p) for p in catalog]
+    plans: list[Plan] = []
+    for p in catalog:
+        # Filter to known fields only — drop extras like stripe_product_id
+        clean = {k: v for k, v in p.items() if k in _PLAN_FIELDS}
+        try:
+            plans.append(Plan(**clean))
+        except TypeError as e:
+            logger.error("Invalid plan in catalog (skipping): %s — %s", p.get("key"), e)
+    return plans
 
 
 def get_plan_by_key(key: str) -> Plan | None:
