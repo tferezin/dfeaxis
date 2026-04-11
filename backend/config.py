@@ -25,6 +25,14 @@ class Settings(BaseSettings):
     resend_api_key: str = ""
     resend_from_email: str = "DFeAxis <noreply@dfeaxis.com.br>"
 
+    # Stripe billing
+    stripe_publishable_key: str = ""
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
+    stripe_portal_return_url: str = "http://localhost:3000/dashboard"
+    stripe_checkout_success_url: str = "http://localhost:3000/dashboard?checkout=success"
+    stripe_checkout_cancel_url: str = "http://localhost:3000/financeiro/creditos"
+
     # SEFAZ
     sefaz_ambiente: str = "2"  # ALWAYS default to homologação
 
@@ -48,3 +56,7 @@ class Settings(BaseSettings):
 @lru_cache()
 def get_settings() -> Settings:
     return Settings()
+
+
+# Convenience module-level singleton (backward compatible name)
+settings = get_settings()
