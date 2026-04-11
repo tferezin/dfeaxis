@@ -46,9 +46,12 @@ def sync_subscription_to_db(stripe_subscription: dict) -> None:
     db_status = _map_status(status)
 
     items = (sub.get("items") or {}).get("data") or []
-    price_id = items[0]["price"]["id"] if items else None
+    first_item = items[0] if items else {}
+    price_id = (first_item.get("price") or {}).get("id") if first_item else None
 
-    period_end = sub.get("current_period_end")
+    # In newer Stripe API versions, current_period_end is on the subscription
+    # ITEM, not on the subscription root. Read from item first, fall back to root.
+    period_end = first_item.get("current_period_end") or sub.get("current_period_end")
     period_end_iso = (
         datetime.fromtimestamp(period_end, tz=timezone.utc).isoformat()
         if period_end
