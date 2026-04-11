@@ -9,6 +9,14 @@ import { PortalButton } from "@/components/billing/portal-button"
 import { useTrial } from "@/hooks/use-trial"
 
 export default function BillingPage() {
+  return (
+    <React.Suspense fallback={<div className="py-16 text-center text-sm text-slate-500">Carregando...</div>}>
+      <BillingPageInner />
+    </React.Suspense>
+  )
+}
+
+function BillingPageInner() {
   const search = useSearchParams()
   const checkoutResult = search?.get("checkout")
   const { subscriptionStatus } = useTrial()
