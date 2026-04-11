@@ -707,6 +707,22 @@ def start_scheduler() -> BackgroundScheduler:
     except Exception as exc:  # noqa: BLE001
         logger.warning("Não foi possível agendar trial email jobs: %s", exc)
 
+    # LGPD: cleanup de .pfx após 30 dias de inatividade (1x/dia)
+    try:
+        from scheduler.pfx_cleanup_job import cleanup_inactive_pfx
+
+        scheduler.add_job(
+            cleanup_inactive_pfx,
+            "interval",
+            hours=24,
+            id="pfx_cleanup",
+            name="LGPD: cleanup de .pfx após 30 dias inatividade",
+            replace_existing=True,
+        )
+        logger.info("pfx_cleanup_job agendado: 1x/dia")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Não foi possível agendar pfx_cleanup_job: %s", exc)
+
     scheduler.start()
     logger.info("Scheduler iniciado: polling a cada 15 minutos")
     return scheduler

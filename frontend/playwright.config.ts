@@ -22,11 +22,11 @@ export default defineConfig({
     },
   ],
   webServer: {
-    // Use production server (next start) — much faster cold-start than turbopack dev
+    // Use production server (next start) — much faster cold-start than turbopack dev.
     // Run `npm run build` first manually if .next is missing.
     command: "npx next start -p 3000",
     url: "http://localhost:3000",
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: true,
     timeout: 60_000,
     stdout: "pipe",
     stderr: "pipe",
