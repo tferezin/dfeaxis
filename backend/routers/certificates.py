@@ -1,5 +1,8 @@
 """Endpoints de gestao de certificados A1 (.pfx)."""
 
+import hashlib
+import secrets
+
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 
 from db.supabase import get_supabase_client
@@ -72,6 +75,18 @@ async def upload_certificate(
             detail=f"Certificado invalido ou senha incorreta: {e}",
         )
 
+    # Anti-fraude: o CNPJ informado no form deve bater com o do certificado
+    cert_cnpj = cert_info.get("cnpj")
+    if cert_cnpj and cert_cnpj != cnpj:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"CNPJ informado ({mask_cnpj(cnpj)}) não confere com o do "
+                f"certificado ({mask_cnpj(cert_cnpj)}). Use o certificado "
+                "correspondente ao CNPJ cadastrado."
+            ),
+        )
+
     # Cifra o .pfx com AES-256-GCM (v2) and the password
     encrypted, meta = encrypt_pfx(pfx_bytes, tenant_id)
     senha_encrypted = encrypt_password(senha, tenant_id)
@@ -81,6 +96,27 @@ async def upload_certificate(
     pfx_hex = f"{meta['version']}:{encrypted.hex()}"
 
     sb = get_supabase_client()
+
+    # --- Anti-abuse: 1 CNPJ = 1 trial na vida ---
+    # Verifica se algum OUTRO tenant já usou este CNPJ
+    cnpj_taken = sb.table("tenants").select("id").eq(
+        "cnpj", cnpj
+    ).neq("id", tenant_id).execute()
+
+    if cnpj_taken.data:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Este CNPJ já passou pelo período de teste. "
+                "Entre em contato com o suporte."
+            ),
+        )
+
+    # Busca CNPJ atual do tenant para saber se precisa gravar
+    tenant_row = sb.table("tenants").select("cnpj").eq(
+        "id", tenant_id
+    ).single().execute()
+    current_tenant_cnpj = (tenant_row.data or {}).get("cnpj")
 
     # Verifica se CNPJ ja existe para este tenant
     existing = sb.table("certificates").select("id").eq(
@@ -112,11 +148,14 @@ async def upload_certificate(
 
         cert_id = result.data[0]["id"]
 
-    # Atualiza polling_mode no tenant se informado
+    # Atualiza tenant: polling_mode + CNPJ (se ainda não tiver)
+    tenant_updates: dict = {}
     if polling_mode in ("manual", "auto"):
-        sb.table("tenants").update(
-            {"polling_mode": polling_mode}
-        ).eq("id", tenant_id).execute()
+        tenant_updates["polling_mode"] = polling_mode
+    if not current_tenant_cnpj:
+        tenant_updates["cnpj"] = cnpj
+    if tenant_updates:
+        sb.table("tenants").update(tenant_updates).eq("id", tenant_id).execute()
 
     # Audit log
     audit_log(
@@ -134,10 +173,56 @@ async def upload_certificate(
         ip_address=client_ip,
     )
 
+    # --- Auto-geração de API key (apenas se tenant não tem nenhuma ativa) ---
+    generated_api_key: str | None = None
+    generated_api_key_id: str | None = None
+    try:
+        existing_keys = sb.table("api_keys").select("id").eq(
+            "tenant_id", tenant_id
+        ).eq("is_active", True).execute()
+
+        if not existing_keys.data:
+            raw_key = f"dfa_{secrets.token_urlsafe(32)}"
+            key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
+            key_prefix = raw_key[:8]
+
+            key_result = sb.table("api_keys").insert({
+                "tenant_id": tenant_id,
+                "key_hash": key_hash,
+                "key_prefix": key_prefix,
+                "description": (
+                    "Chave gerada automaticamente após upload do certificado"
+                ),
+            }).execute()
+
+            generated_api_key = raw_key
+            generated_api_key_id = (
+                key_result.data[0]["id"] if key_result.data else None
+            )
+
+            audit_log(
+                tenant_id=tenant_id,
+                user_id=user_id,
+                action="api_key.create",
+                resource_type="api_key",
+                resource_id=generated_api_key_id,
+                details={
+                    "key_prefix": key_prefix,
+                    "description": "auto-generated on cert upload",
+                },
+                ip_address=client_ip,
+            )
+    except Exception:
+        # Falha ao gerar API key não deve bloquear o upload do certificado
+        generated_api_key = None
+        generated_api_key_id = None
+
     return CertificateUploadResponse(
         certificate_id=cert_id,
         cnpj=cnpj,
         valid_until=cert_info["valid_until"],
+        api_key=generated_api_key,
+        api_key_id=generated_api_key_id,
     )
 
 

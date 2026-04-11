@@ -4,6 +4,9 @@ import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { supabase } from "@/lib/supabase"
+import { apiFetch } from "@/lib/api"
+import { formatPhone, unmaskPhone } from "@/lib/masks"
+import { isValidBrazilianPhone } from "@/lib/validators"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -11,12 +14,28 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 export default function SignupPage() {
   const [name, setName] = React.useState("")
+  const [phone, setPhone] = React.useState("")
   const [email, setEmail] = React.useState("")
   const [password, setPassword] = React.useState("")
   const [confirmPassword, setConfirmPassword] = React.useState("")
   const [error, setError] = React.useState<string | null>(null)
+  const [phoneError, setPhoneError] = React.useState<string | null>(null)
   const [success, setSuccess] = React.useState(false)
   const [loading, setLoading] = React.useState(false)
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const masked = formatPhone(e.target.value)
+    setPhone(masked)
+    if (phoneError) setPhoneError(null)
+  }
+
+  const phoneValid = isValidBrazilianPhone(phone)
+  const formValid =
+    name.trim().length > 0 &&
+    phoneValid &&
+    email.trim().length > 0 &&
+    password.length >= 8 &&
+    password === confirmPassword
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -26,6 +45,13 @@ export default function SignupPage() {
     if (!supabase) {
       setError("Sistema não configurado. Verifique as variáveis de ambiente.")
       console.error("Supabase client is null — NEXT_PUBLIC_SUPABASE_URL may be missing")
+      setLoading(false)
+      return
+    }
+
+    if (!isValidBrazilianPhone(phone)) {
+      setPhoneError("Informe um telefone válido com DDD.")
+      setError("Informe um telefone válido com DDD.")
       setLoading(false)
       return
     }
@@ -42,12 +68,14 @@ export default function SignupPage() {
       return
     }
 
+    const phoneDigits = unmaskPhone(phone)
+
     try {
       const { data, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: { name },
+          data: { name, phone: phoneDigits },
         },
       })
 
@@ -60,8 +88,22 @@ export default function SignupPage() {
         return
       }
 
-      // If email confirmation is disabled, user is immediately confirmed
+      // Register tenant on backend (CNPJ will be collected later via cert upload).
+      // Only attempt if we already have a session — otherwise email confirmation
+      // is pending and the backend call will happen on first login.
       if (data.session) {
+        try {
+          await apiFetch("/tenants/register", {
+            method: "POST",
+            body: JSON.stringify({ name, email, phone: phoneDigits }),
+          })
+        } catch (registerErr) {
+          console.error("Tenant registration failed:", registerErr)
+          setError(
+            "Conta criada, mas houve um erro ao configurar seu workspace. Tente fazer login novamente."
+          )
+          return
+        }
         window.location.href = "/dashboard"
       } else {
         setSuccess(true)
@@ -121,6 +163,30 @@ export default function SignupPage() {
                 </div>
 
                 <div className="flex flex-col gap-2">
+                  <Label htmlFor="phone">Telefone celular</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="(11) 99999-9999"
+                    value={phone}
+                    onChange={handlePhoneChange}
+                    onBlur={() => {
+                      if (phone && !isValidBrazilianPhone(phone)) {
+                        setPhoneError("Informe um telefone válido com DDD.")
+                      }
+                    }}
+                    required
+                    autoComplete="tel"
+                    inputMode="numeric"
+                    maxLength={16}
+                    aria-invalid={phoneError ? true : undefined}
+                  />
+                  {phoneError && (
+                    <p className="text-xs text-destructive">{phoneError}</p>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-2">
                   <Label htmlFor="email">E-mail</Label>
                   <Input
                     id="email"
@@ -165,7 +231,7 @@ export default function SignupPage() {
                   <p className="text-sm text-destructive">{error}</p>
                 )}
 
-                <Button type="submit" className="w-full" disabled={loading}>
+                <Button type="submit" className="w-full" disabled={loading || !formValid}>
                   {loading ? "Criando conta..." : "Criar conta"}
                 </Button>
 

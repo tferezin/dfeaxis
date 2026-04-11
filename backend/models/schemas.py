@@ -132,6 +132,14 @@ class CertificateUploadResponse(BaseModel):
     certificate_id: str
     cnpj: str
     valid_until: Optional[date]
+    api_key: Optional[str] = None
+    api_key_id: Optional[str] = None
+
+
+class TenantRegisterRequest(BaseModel):
+    company_name: str
+    email: str
+    phone: Optional[str] = None
 
 
 # --- Polling ---

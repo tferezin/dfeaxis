@@ -7,33 +7,27 @@ import { AppFooter } from "@/components/app-footer"
 import { Separator } from "@/components/ui/separator"
 import { TrialBanner } from "@/components/trial-banner"
 import { TrialExpiredOverlay } from "@/components/trial-expired-overlay"
-import { useTrial } from "@/hooks/use-trial"
+import { ReadOnlyProvider, useReadOnly } from "@/contexts/read-only-context"
 
-/** Paths that remain accessible even after the trial expires. */
+/** Paths that remain fully accessible even when the account is read-only. */
 const TRIAL_EXEMPT_PATHS = [
   "/cadastros/configuracoes",
   "/financeiro/creditos",
 ]
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const { subscriptionStatus, trialActive, loading } = useTrial()
+  const { isReadOnly } = useReadOnly()
 
-  const isExpired =
-    subscriptionStatus === "expired" ||
-    (!trialActive && subscriptionStatus === "trial")
-
-  const isExemptPage = TRIAL_EXEMPT_PATHS.some((p) => pathname?.startsWith(p))
-  const showOverlay = !loading && isExpired && !isExemptPage
+  const isExemptPage = TRIAL_EXEMPT_PATHS.some((p) =>
+    pathname?.startsWith(p)
+  )
+  const showOverlay = isReadOnly && !isExemptPage
 
   return (
     <SidebarProvider>
       <AppSidebar />
-      <main className="flex flex-1 flex-col overflow-auto">
+      <main className="relative flex flex-1 flex-col overflow-auto">
         <TrialBanner />
         <header className="flex h-14 shrink-0 items-center gap-4 border-b bg-background px-6">
           <SidebarTrigger />
@@ -44,10 +38,33 @@ export default function DashboardLayout({
             Homologacao
           </div>
         </header>
-        <div className="flex-1 p-6">{children}</div>
+        <div className="relative flex-1">
+          <div
+            className={
+              showOverlay
+                ? "pointer-events-none select-none p-6 blur-[2px]"
+                : "p-6"
+            }
+            aria-hidden={showOverlay || undefined}
+          >
+            {children}
+          </div>
+          {showOverlay && <TrialExpiredOverlay />}
+        </div>
         <AppFooter />
-        {showOverlay && <TrialExpiredOverlay />}
       </main>
     </SidebarProvider>
+  )
+}
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <ReadOnlyProvider>
+      <DashboardShell>{children}</DashboardShell>
+    </ReadOnlyProvider>
   )
 }

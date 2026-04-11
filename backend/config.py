@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     mp_access_token: str = ""
     mp_webhook_secret: str = ""
 
+    # Resend (transactional email)
+    resend_api_key: str = ""
+    resend_from_email: str = "DFeAxis <noreply@dfeaxis.com.br>"
+
     # SEFAZ
     sefaz_ambiente: str = "2"  # ALWAYS default to homologação
 

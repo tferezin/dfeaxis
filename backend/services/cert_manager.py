@@ -190,7 +190,19 @@ def decrypt_password(encrypted_hex: str, tenant_id: str) -> str:
 # ---------------------------------------------------------------------------
 
 def extract_cert_info(pfx_bytes: bytes, password: str) -> dict:
-    """Extrai informações do certificado A1 (.pfx)."""
+    """Extrai informações do certificado A1 (.pfx) ICP-Brasil.
+
+    Retorna dict com subject_cn, cnpj (14 dígitos), valid_from, valid_until,
+    serial_number. O CNPJ é extraído de duas formas (em ordem de preferência):
+
+    1. subjectAltName otherName OID 2.16.76.1.3.3 (padrão ICP-Brasil PJ)
+    2. Common Name no formato 'NOME RAZAO SOCIAL:CNPJ' (fallback)
+    """
+    import re
+
+    from cryptography import x509
+    from cryptography.x509.oid import ExtensionOID
+
     private_key, certificate, _ = pkcs12.load_key_and_certificates(
         pfx_bytes, password.encode()
     )
@@ -206,12 +218,62 @@ def extract_cert_info(pfx_bytes: bytes, password: str) -> dict:
             cn = attr.value
             break
 
+    # Extrai CNPJ
+    cnpj = _extract_cnpj_from_cert(certificate, cn)
+
     return {
         "subject_cn": cn,
+        "cnpj": cnpj,
         "valid_from": certificate.not_valid_before_utc.date(),
         "valid_until": certificate.not_valid_after_utc.date(),
         "serial_number": str(certificate.serial_number),
     }
+
+
+def _extract_cnpj_from_cert(certificate, cn: str | None) -> str | None:
+    """Extrai CNPJ do certificado ICP-Brasil PJ.
+
+    Tenta primeiro o subjectAltName otherName (OID 2.16.76.1.3.3), que é o padrão
+    oficial. Se não achar, faz fallback parsing do CN no formato 'NOME:CNPJ'.
+    Retorna apenas os 14 dígitos (sem máscara).
+    """
+    import re
+
+    # Estratégia 1: subjectAltName otherName OID 2.16.76.1.3.3 (ICP-Brasil PJ)
+    try:
+        ext = certificate.extensions.get_extension_for_oid(
+            ExtensionOID.SUBJECT_ALTERNATIVE_NAME
+        )
+        san = ext.value
+        for general_name in san:
+            # OtherName tem type_id e value (DER-encoded)
+            if hasattr(general_name, "type_id") and hasattr(general_name, "value"):
+                if general_name.type_id.dotted_string == "2.16.76.1.3.3":
+                    # Value é DER-encoded — primeiro byte é a tag, depois length, depois bytes
+                    raw = general_name.value
+                    # Tenta decodificar como string ASCII (formato: 14 dígitos do CNPJ no fim)
+                    try:
+                        text = raw.decode("ascii", errors="ignore")
+                    except Exception:
+                        text = raw.hex()
+                    digits = re.findall(r"\d{14}", text)
+                    if digits:
+                        return digits[0]
+    except (x509.ExtensionNotFound, AttributeError, Exception):
+        pass
+
+    # Estratégia 2: parsing do CN — formato comum 'RAZAO SOCIAL:CNPJ' ou similar
+    if cn:
+        # Procura sequência de 14 dígitos no CN
+        digits = re.findall(r"\d{14}", cn)
+        if digits:
+            return digits[0]
+        # Procura CNPJ formatado 00.000.000/0000-00
+        formatted = re.findall(r"\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}", cn)
+        if formatted:
+            return re.sub(r"\D", "", formatted[0])
+
+    return None
 
 
 # ---------------------------------------------------------------------------

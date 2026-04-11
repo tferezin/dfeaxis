@@ -28,3 +28,15 @@ logs/
 .DS_Store
 Thumbs.db
 Supapass.rtf
+
+# Playwright
+frontend/test-results/
+frontend/playwright-report/
+
+# Supabase CLI temp
+supabase/.temp/
+
+# Stray local files
+/03
+Evidencias.docx
+backend/DESIGN.md

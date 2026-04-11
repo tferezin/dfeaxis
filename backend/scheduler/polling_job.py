@@ -32,27 +32,58 @@ def polling_job():
         logger.debug("Nenhum certificado ativo para polling")
         return
 
-    # Busca tenants com polling_mode='auto' e créditos > 0
+    # Cache tenants por id para não refazer query várias vezes por run
+    blocked_in_run: set[str] = set()
+
     for cert in result.data:
+        tenant_id = cert["tenant_id"]
+        if tenant_id in blocked_in_run:
+            continue
+
         tenant = sb.table("tenants").select(
-            "id, polling_mode, manifestacao_mode, credits, sefaz_ambiente"
-        ).eq("id", cert["tenant_id"]).single().execute()
+            "id, polling_mode, manifestacao_mode, credits, sefaz_ambiente, "
+            "subscription_status, docs_consumidos_trial, trial_cap, "
+            "trial_blocked_at, trial_blocked_reason"
+        ).eq("id", tenant_id).single().execute()
 
         if not tenant.data:
             continue
 
         tenant_data = tenant.data
+
+        # Skip tenants expirados/cancelados/bloqueados
+        status = tenant_data.get("subscription_status")
+        if status in ("expired", "cancelled"):
+            logger.info(f"Tenant {tenant_id} status={status}, pulando polling")
+            blocked_in_run.add(tenant_id)
+            continue
+        if tenant_data.get("trial_blocked_at"):
+            logger.info(
+                f"Tenant {tenant_id} trial bloqueado "
+                f"(reason={tenant_data.get('trial_blocked_reason')}), pulando polling"
+            )
+            blocked_in_run.add(tenant_id)
+            continue
+
         if tenant_data.get("polling_mode") != "auto":
             continue
 
         if tenant_data.get("credits", 0) <= 0:
             logger.info(
-                f"Tenant {cert['tenant_id']} sem créditos, pulando polling"
+                f"Tenant {tenant_id} sem créditos, pulando polling"
             )
             continue
 
         for tipo in TIPOS:
             _poll_single(cert, tipo, tenant_data)
+            # Se o trial foi bloqueado durante o processamento, aborta
+            # o restante dos tipos para este tenant neste run.
+            if tenant_id in blocked_in_run:
+                break
+            # Re-lê flag de bloqueio do cache local (atualizada por _poll_single)
+            if tenant_data.get("_trial_blocked_now"):
+                blocked_in_run.add(tenant_id)
+                break
 
 
 def _poll_single_detailed(cert: dict, tipo: str, tenant_data: dict) -> dict:
@@ -197,7 +228,10 @@ def _poll_single(cert: dict, tipo: str, tenant_data: dict) -> int:
     sb = get_supabase_client()
     tenant_id = cert["tenant_id"]
     cnpj = cert["cnpj"]
-    ult_nsu = cert.get(f"last_nsu_{tipo}", "000000000000000")
+    ambiente = tenant_data.get("sefaz_ambiente", "2")
+
+    # Cursor agora vem de nsu_state (por cert/tipo/ambiente)
+    ult_nsu = nsu_controller.get_cursor(cert["id"], tipo, ambiente)
 
     pfx_password = _get_pfx_password(cert["id"], tenant_id)
     if not pfx_password:
@@ -210,8 +244,6 @@ def _poll_single(cert: dict, tipo: str, tenant_data: dict) -> int:
         pfx_encrypted = bytes.fromhex(pfx_encrypted.replace("\\x", ""))
     if isinstance(pfx_iv, str):
         pfx_iv = bytes.fromhex(pfx_iv.replace("\\x", ""))
-
-    ambiente = tenant_data.get("sefaz_ambiente", "2")
 
     try:
         response = sefaz_client.consultar_distribuicao(
@@ -241,25 +273,85 @@ def _poll_single(cert: dict, tipo: str, tenant_data: dict) -> int:
         }).execute()
 
         if docs_found == 0:
+            # Nenhum doc: mesmo assim atualiza max_nsu/pendentes para visibilidade
+            if response.max_nsu:
+                nsu_controller.update_pending_count(
+                    cert["id"], tipo, ambiente, response.max_nsu
+                )
             return 0
 
-        # Debit credits atomically via RPC
+        # --- Trial cap enforcement ---------------------------------------
+        # Se tenant é trial, limita quantos docs podem ser persistidos nesta
+        # rodada ao remaining = trial_cap - docs_consumidos_trial.
+        is_trial = tenant_data.get("subscription_status") == "trial"
+        docs_to_save = list(response.documents)
+        # Ordena por NSU asc para garantir corte determinístico
+        try:
+            docs_to_save.sort(key=lambda d: int(d.nsu) if d.nsu else 0)
+        except Exception:
+            pass
+
+        if is_trial:
+            trial_cap = int(tenant_data.get("trial_cap") or 500)
+            consumed = int(tenant_data.get("docs_consumidos_trial") or 0)
+            remaining = max(trial_cap - consumed, 0)
+
+            if remaining == 0:
+                # Cap já atingido antes deste batch: não salva, não avança cursor,
+                # apenas registra pendentes e marca tenant como bloqueado no run.
+                logger.info(
+                    f"Tenant {tenant_id} trial cap atingido — {docs_found} docs "
+                    f"{tipo.upper()} não serão capturados (remaining=0)"
+                )
+                if response.max_nsu:
+                    nsu_controller.update_pending_count(
+                        cert["id"], tipo, ambiente, response.max_nsu
+                    )
+                tenant_data["_trial_blocked_now"] = True
+                return 0
+
+            if len(docs_to_save) > remaining:
+                logger.info(
+                    f"Tenant {tenant_id} trial cap: salvando apenas {remaining}/{len(docs_to_save)} "
+                    f"docs {tipo.upper()} (consumed={consumed}, cap={trial_cap})"
+                )
+                docs_to_save = docs_to_save[:remaining]
+
+        effective_count = len(docs_to_save)
+        if effective_count == 0:
+            return 0
+
+        # Cursor efetivo = maior NSU realmente salvo (para cortes parciais)
+        # Em batch completo, usamos response.ult_nsu retornado pela SEFAZ.
+        full_batch_saved = effective_count == len(response.documents)
+        if full_batch_saved:
+            effective_cursor = response.ult_nsu
+        else:
+            try:
+                effective_cursor = max(
+                    docs_to_save,
+                    key=lambda d: int(d.nsu) if d.nsu else 0,
+                ).nsu or response.ult_nsu
+            except Exception:
+                effective_cursor = response.ult_nsu
+
+        # Debit credits atomically via RPC (apenas pelos docs efetivamente salvos)
         try:
             result = sb.rpc("debit_credits", {
                 "p_tenant_id": tenant_id,
-                "p_amount": -docs_found,
-                "p_description": f"Polling {tipo.upper()} CNPJ {mask_cnpj(cnpj)}: {docs_found} docs",
+                "p_amount": -effective_count,
+                "p_description": f"Polling {tipo.upper()} CNPJ {mask_cnpj(cnpj)}: {effective_count} docs",
             }).execute()
         except Exception as credit_err:
             logger.warning(
-                f"Tenant {tenant_id} insufficient credits for {docs_found} docs: {credit_err}"
+                f"Tenant {tenant_id} insufficient credits for {effective_count} docs: {credit_err}"
             )
             return 0
 
         # Classifica e salva documentos
         # resNFe/resCTe = resumo (precisa manifestação para NF-e)
         # procNFe/procCTe/procMDFe = XML completo
-        for doc in response.documents[:docs_found]:
+        for doc in docs_to_save:
             is_resumo = doc.schema.startswith("res")
             is_nfe = tipo == "nfe"
 
@@ -290,21 +382,58 @@ def _poll_single(cert: dict, tipo: str, tenant_data: dict) -> int:
         # Se modo auto_ciencia e há resumos NF-e, envia Ciência automaticamente
         if tipo == "nfe" and tenant_data.get("manifestacao_mode") == "auto_ciencia":
             _auto_ciencia(
-                response.documents[:docs_found],
+                docs_to_save,
                 cert, tenant_id, pfx_encrypted, pfx_iv, pfx_password,
                 ambiente=ambiente,
             )
 
-        # Atualiza último NSU
-        nsu_controller.update_last_nsu(cert["id"], tipo, response.ult_nsu)
+        # Atualiza cursor no nsu_state (por ambiente). max_nsu vem do response
+        # e é o verdadeiro "topo" conhecido na SEFAZ — serve para calcular pendentes.
+        max_nsu_eff = response.max_nsu or effective_cursor
+        nsu_controller.update_cursor(
+            cert["id"], tipo, ambiente, effective_cursor, max_nsu_eff
+        )
+        # Mantém coluna legada sincronizada (deprecada, mas ainda lida por outros fluxos)
+        nsu_controller.update_last_nsu(cert["id"], tipo, effective_cursor)
+
+        # Incrementa contador de trial e bloqueia se atingir cap
+        if is_trial:
+            try:
+                rpc_res = sb.rpc("increment_trial_docs", {
+                    "p_tenant_id": tenant_id,
+                    "p_count": effective_count,
+                }).execute()
+                new_count = 0
+                if rpc_res.data is not None:
+                    # RPC pode retornar int ou [{"...": int}]
+                    if isinstance(rpc_res.data, int):
+                        new_count = rpc_res.data
+                    elif isinstance(rpc_res.data, list) and rpc_res.data:
+                        first = rpc_res.data[0]
+                        if isinstance(first, dict):
+                            new_count = int(next(iter(first.values()), 0) or 0)
+                        else:
+                            new_count = int(first or 0)
+                trial_cap = int(tenant_data.get("trial_cap") or 500)
+                tenant_data["docs_consumidos_trial"] = new_count
+                if new_count >= trial_cap:
+                    logger.info(
+                        f"Tenant {tenant_id} atingiu trial_cap={trial_cap} "
+                        f"(count={new_count}), bloqueando polling neste run"
+                    )
+                    tenant_data["_trial_blocked_now"] = True
+            except Exception as inc_err:
+                logger.warning(
+                    f"increment_trial_docs falhou para {tenant_id}: {inc_err}"
+                )
 
         # Detecta gaps
-        received_nsus = [d.nsu for d in response.documents]
+        received_nsus = [d.nsu for d in docs_to_save]
         gaps = nsu_controller.detect_gap(ult_nsu, received_nsus)
         if gaps:
             logger.warning(f"Gaps detectados para {mask_cnpj(cnpj)}/{tipo}: {len(gaps)} NSUs faltantes")
 
-        return docs_found
+        return effective_count
 
     except Exception as e:
         logger.error(f"Erro no polling {mask_cnpj(cnpj)}/{tipo}: {e}")
@@ -550,6 +679,34 @@ def start_scheduler() -> BackgroundScheduler:
         name="SEFAZ DF-e Polling",
         replace_existing=True,
     )
+
+    # Transactional trial emails — imported lazily so the polling scheduler
+    # still starts even if email deps are missing in a dev environment.
+    try:
+        from scheduler.email_jobs import check_trial_nudges, check_trial_expirations
+
+        scheduler.add_job(
+            check_trial_nudges,
+            "interval",
+            hours=6,
+            id="trial_email_nudges",
+            name="Trial nudge emails (D-5/D-2/D-1 + 80% cap)",
+            replace_existing=True,
+        )
+        scheduler.add_job(
+            check_trial_expirations,
+            "interval",
+            hours=1,
+            id="trial_email_expirations",
+            name="Trial expired emails",
+            replace_existing=True,
+        )
+        logger.info(
+            "Trial email jobs agendados: nudges a cada 6h, expirations a cada 1h"
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Não foi possível agendar trial email jobs: %s", exc)
+
     scheduler.start()
     logger.info("Scheduler iniciado: polling a cada 15 minutos")
     return scheduler

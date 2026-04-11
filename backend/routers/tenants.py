@@ -6,17 +6,21 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 
 from db.supabase import get_supabase_client
 from middleware.security import verify_jwt_token
+from models.schemas import TenantRegisterRequest
 
 router = APIRouter()
 
 
 @router.post("/tenants/register", status_code=201)
 async def register_tenant(
-    company_name: str,
-    email: str,
+    body: TenantRegisterRequest,
     auth: dict = Depends(verify_jwt_token),
 ):
-    """Registra tenant na primeira vez que faz login (onboarding)."""
+    """Registra tenant na primeira vez que faz login (onboarding).
+
+    CNPJ NÃO é pedido aqui — será extraído do .pfx no upload de certificado
+    e validado globalmente (1 CNPJ = 1 trial na vida).
+    """
     sb = get_supabase_client()
     user_id = auth["user_id"]
 
@@ -28,19 +32,23 @@ async def register_tenant(
     if existing.data:
         return {"tenant_id": existing.data[0]["id"], "status": "already_exists"}
 
-    trial_expires = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
+    trial_expires = (datetime.now(timezone.utc) + timedelta(days=10)).isoformat()
 
-    result = sb.table("tenants").insert({
+    insert_data = {
         "user_id": user_id,
-        "company_name": company_name,
-        "email": email,
+        "company_name": body.company_name,
+        "email": body.email,
         "plan": "starter",
         "credits": 100,  # créditos iniciais de teste
         "manifestacao_mode": "manual",
         "trial_expires_at": trial_expires,
         "trial_active": True,
         "subscription_status": "trial",
-    }).execute()
+    }
+    if body.phone:
+        insert_data["phone"] = body.phone
+
+    result = sb.table("tenants").insert(insert_data).execute()
 
     return {"tenant_id": result.data[0]["id"], "status": "created"}
 

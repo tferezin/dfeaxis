@@ -15,7 +15,11 @@ import { StatCard } from "@/components/dashboard/stat-card"
 import { FinancialCard } from "@/components/dashboard/financial-card"
 import { VolumeChart } from "@/components/dashboard/volume-chart"
 import { RecentDocuments } from "@/components/dashboard/recent-documents"
+import { TrialCounter } from "@/components/trial-counter"
+import { EnvToggle } from "@/components/env-toggle"
+import { PendentesPanel } from "@/components/pendentes-panel"
 import { useSettings } from "@/hooks/use-settings"
+import { useTrial } from "@/hooks/use-trial"
 import { getSupabase } from "@/lib/supabase"
 
 interface DashboardCounts {
@@ -37,6 +41,8 @@ interface ActivityEntry {
 export default function DashboardPage() {
   const { settings } = useSettings()
   const showMock = settings.showMockData
+  const { trialActive, subscriptionStatus } = useTrial()
+  const showTrialCounter = subscriptionStatus !== "active" && trialActive
 
   const [realCompanyName, setRealCompanyName] = useState("")
   const [realCounts, setRealCounts] = useState<DashboardCounts>({ nfe: 0, cte: 0, mdfe: 0, nfse: 0 })
@@ -194,6 +200,7 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <EnvToggle />
           <button className="inline-flex items-center gap-2 rounded-lg border bg-background px-2.5 py-1.5 text-xs font-medium shadow-sm transition-colors hover:bg-muted">
             <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
             <span>{showMock ? "Tech Solutions Ltda" : (realCompanyName || "Empresa")}</span>
@@ -206,6 +213,12 @@ export default function DashboardPage() {
           </button>
         </div>
       </div>
+
+      {/* Trial counter */}
+      {showTrialCounter && <TrialCounter />}
+
+      {/* Pendentes panel (quando aplicável) */}
+      <PendentesPanel />
 
       {/* Stat cards — all in one row */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
