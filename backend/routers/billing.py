@@ -35,6 +35,10 @@ class CheckoutRequest(BaseModel):
     price_id: str = Field(..., description="Stripe Price ID (price_...)")
     success_url: Optional[str] = None
     cancel_url: Optional[str] = None
+    billing_day: Optional[int] = Field(
+        default=5,
+        description="Dia do mês para cobrança recorrente (5, 10 ou 15)",
+    )
 
 
 class CheckoutResponse(BaseModel):
@@ -91,12 +95,23 @@ async def checkout(
     `checkout.session.completed` webhook which unblocks the trial.
     """
     tenant_id = auth["tenant_id"]
+    # Valida billing_day
+    billing_day = body.billing_day or 5
+    if billing_day not in (5, 10, 15):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "billing_day deve ser 5, 10 ou 15",
+                "error_code": "INVALID_BILLING_DAY",
+            },
+        )
     try:
         session = create_checkout_session(
             tenant_id=tenant_id,
             price_id=body.price_id,
             success_url=body.success_url,
             cancel_url=body.cancel_url,
+            billing_day=billing_day,
         )
     except RuntimeError as e:
         # Stripe not configured

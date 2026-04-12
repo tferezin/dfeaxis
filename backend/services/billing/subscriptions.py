@@ -89,6 +89,20 @@ def sync_subscription_to_db(stripe_subscription: dict) -> None:
                     sub.get("id"),
                 )
 
+        # Propaga billing_day do metadata se presente (cliente escolheu no checkout)
+        sub_metadata = sub.get("metadata") or {}
+        billing_day_raw = sub_metadata.get("billing_day")
+        if billing_day_raw:
+            try:
+                billing_day = int(billing_day_raw)
+                if billing_day in (5, 10, 15):
+                    update["billing_day"] = billing_day
+            except (TypeError, ValueError):
+                logger.warning(
+                    "Invalid billing_day in metadata: %r for subscription %s",
+                    billing_day_raw, sub.get("id"),
+                )
+
     sb = get_supabase_client()
     sb.table("tenants").update(update).eq("id", tenant_id).execute()
 
