@@ -5,7 +5,7 @@ import Link from "next/link"
 import {
   Settings, ShieldCheck, Play, FileText, CheckCircle2, ArrowRight,
   Code2, Copy, Check, Server, Key, FileCode, ChevronDown, ChevronUp,
-  Send, Workflow,
+  Send, Workflow, Search, History,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -74,6 +74,20 @@ const apiEndpoints = [
     description: "Manifestação em lote (até 50 chaves com mesmo tipo_evento)",
     params: "Body JSON: { chaves: [...], tipo_evento }",
     response: "Lista de resultados por chave",
+  },
+  {
+    method: "GET",
+    path: "/api/v1/manifestacao/pendentes",
+    description: "Listar NF-e pendentes de ciência (ainda não manifestadas)",
+    params: "cnpj (obrigatório)",
+    response: "Lista de documentos pendentes: [{ chave, nsu, manifestacao_status, fetched_at }]",
+  },
+  {
+    method: "GET",
+    path: "/api/v1/manifestacao/historico",
+    description: "Histórico de eventos de manifestação com filtros",
+    params: "cnpj, chave_acesso, tipo_evento, limit (máx 500) — todos opcionais",
+    response: '{ "total": N, "events": [{ chave_acesso, tipo_evento, cstat, xmotivo, protocolo, source, created_at }] }',
   },
   {
     method: "GET",
@@ -377,6 +391,89 @@ ENDIF.
 " Limite: 50 chaves por request.
 `
 
+const abapCodeConsultarPendentes = `*&---------------------------------------------------------------------*
+*& Lista NF-e pendentes de manifestação para um CNPJ
+*& Retorna apenas documentos que ainda não receberam Ciência
+*&---------------------------------------------------------------------*
+
+DATA: lo_http_client TYPE REF TO if_http_client,
+      lv_url         TYPE string,
+      lv_status      TYPE i,
+      lv_response    TYPE string.
+
+DATA(lv_cnpj) = '12345678000190'.
+lv_url = |https://api.dfeaxis.com.br/api/v1/manifestacao/pendentes?cnpj={ lv_cnpj }|.
+
+cl_http_client=>create_by_destination(
+  EXPORTING destination = gc_rfc_dest
+  IMPORTING client      = lo_http_client ).
+
+lo_http_client->request->set_method( 'GET' ).
+lo_http_client->request->set_header_field( name = 'X-API-Key' value = gc_api_key ).
+lo_http_client->request->set_header_field( name = 'Host' value = 'api.dfeaxis.com.br' ).
+lo_http_client->request->set_uri( lv_url ).
+
+lo_http_client->send( ).
+lo_http_client->receive( ).
+lo_http_client->response->get_status( IMPORTING code = lv_status ).
+lo_http_client->response->get_cdata( RECEIVING data = lv_response ).
+
+IF lv_status = 200.
+  " Parse JSON array: [{chave, nsu, manifestacao_status, fetched_at}, ...]
+  " Use /ui2/cl_json para converter
+  WRITE: / 'Documentos pendentes encontrados.'.
+  WRITE: / 'Resposta:', lv_response.
+ELSE.
+  WRITE: / 'Erro ao consultar pendentes:', lv_status.
+ENDIF.
+`
+
+const abapCodeConsultarHistorico = `*&---------------------------------------------------------------------*
+*& Consulta histórico de manifestações (todas ou filtradas)
+*& Filtros opcionais: cnpj, chave_acesso, tipo_evento, limit (máx 500)
+*&---------------------------------------------------------------------*
+
+DATA: lo_http_client TYPE REF TO if_http_client,
+      lv_url         TYPE string,
+      lv_status      TYPE i,
+      lv_response    TYPE string.
+
+" Exemplo 1: últimos 100 eventos de um CNPJ
+DATA(lv_cnpj) = '12345678000190'.
+lv_url = |https://api.dfeaxis.com.br/api/v1/manifestacao/historico?cnpj={ lv_cnpj }&limit=100|.
+
+" Exemplo 2: histórico de uma NF-e específica
+" lv_url = |https://api.dfeaxis.com.br/api/v1/manifestacao/historico?chave_acesso=35260...|.
+
+" Exemplo 3: apenas confirmações (210200)
+" lv_url = |https://api.dfeaxis.com.br/api/v1/manifestacao/historico?tipo_evento=210200|.
+
+cl_http_client=>create_by_destination(
+  EXPORTING destination = gc_rfc_dest
+  IMPORTING client      = lo_http_client ).
+
+lo_http_client->request->set_method( 'GET' ).
+lo_http_client->request->set_header_field( name = 'X-API-Key' value = gc_api_key ).
+lo_http_client->request->set_header_field( name = 'Host' value = 'api.dfeaxis.com.br' ).
+lo_http_client->request->set_uri( lv_url ).
+
+lo_http_client->send( ).
+lo_http_client->receive( ).
+lo_http_client->response->get_status( IMPORTING code = lv_status ).
+lo_http_client->response->get_cdata( RECEIVING data = lv_response ).
+
+IF lv_status = 200.
+  " Resposta: { "total": N, "events": [{ chave_acesso, tipo_evento, descricao,
+  "                                       cstat, xmotivo, protocolo, source,
+  "                                       latency_ms, created_at }, ...] }
+  " Source pode ser: auto_capture | dashboard | api
+  WRITE: / 'Histórico de manifestações:'.
+  WRITE: / lv_response.
+ELSE.
+  WRITE: / 'Erro ao consultar histórico:', lv_status.
+ENDIF.
+`
+
 function CopyButton({ text, label }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false)
   return (
@@ -550,7 +647,7 @@ export default function GettingStartedPage() {
       </div>
 
       {/* API DOCUMENTATION */}
-      <CollapsibleSection title="API REST — Endpoints" icon={Server} badge="5 endpoints" defaultOpen>
+      <CollapsibleSection title="API REST — Endpoints" icon={Server} badge="7 endpoints" defaultOpen>
         <div className="space-y-4">
           <div className="rounded-lg bg-muted/50 p-4 space-y-1">
             <p className="text-sm font-medium">Autenticação</p>
@@ -731,6 +828,47 @@ export default function GettingStartedPage() {
             {" "}com body <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">{"{ chaves: [...], tipo_evento: \"210200\" }"}</code>
             {" "}(limite de 50 chaves por request).
           </p>
+        </div>
+      </CollapsibleSection>
+
+      {/* ABAP — CONSULTAR PENDENTES */}
+      <CollapsibleSection title="SAP — Consultar Pendentes (GET /manifestacao/pendentes)" icon={Search} badge="ABAP">
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Lista as NF-e recebidas que ainda estão <strong>pendentes de Ciência</strong> para um CNPJ.
+            Útil para o SAP identificar quais documentos precisam ser manifestados antes de iniciar o processamento.
+          </p>
+          <div className="relative">
+            <div className="absolute top-2 right-2 z-10">
+              <CopyButton text={abapCodeConsultarPendentes} />
+            </div>
+            <pre className="text-xs font-mono bg-zinc-950 text-zinc-100 rounded-lg p-4 overflow-x-auto whitespace-pre max-h-[500px] overflow-y-auto">
+{abapCodeConsultarPendentes}
+            </pre>
+          </div>
+        </div>
+      </CollapsibleSection>
+
+      {/* ABAP — CONSULTAR HISTORICO */}
+      <CollapsibleSection title="SAP — Consultar Histórico (GET /manifestacao/historico)" icon={History} badge="ABAP">
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Consulta o histórico de eventos de manifestação já enviados. Suporta filtros opcionais por
+            {" "}<code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">cnpj</code>,
+            {" "}<code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">chave_acesso</code>,
+            {" "}<code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">tipo_evento</code> e
+            {" "}<code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">limit</code> (máx 500).
+            Cada evento indica a origem (<code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">source</code>):
+            {" "}auto_capture, dashboard ou api.
+          </p>
+          <div className="relative">
+            <div className="absolute top-2 right-2 z-10">
+              <CopyButton text={abapCodeConsultarHistorico} />
+            </div>
+            <pre className="text-xs font-mono bg-zinc-950 text-zinc-100 rounded-lg p-4 overflow-x-auto whitespace-pre max-h-[500px] overflow-y-auto">
+{abapCodeConsultarHistorico}
+            </pre>
+          </div>
         </div>
       </CollapsibleSection>
 

@@ -1,4 +1,11 @@
-"""Endpoints de créditos e integração MercadoPago."""
+"""Endpoints de créditos e integração MercadoPago.
+
+DEPRECATED — este router está em modo legacy.
+O modelo comercial atual usa Stripe (backend/services/billing/) com
+plano base pré-pago + excedente via InvoiceItem mensal.
+Manter este arquivo apenas para compatibilidade com tenants antigos que
+ainda têm saldo de créditos. Não expor nas novas telas do dashboard.
+"""
 
 import hashlib
 import hmac

@@ -83,6 +83,65 @@ async def listar_pendentes(
     return pendentes
 
 
+@router.get("/manifestacao/historico")
+async def historico_manifestacao(
+    cnpj: str | None = Query(None, min_length=14, max_length=14),
+    chave_acesso: str | None = Query(None, min_length=44, max_length=44),
+    tipo_evento: str | None = Query(None, pattern=r"^(210210|210200|210220|210240)$"),
+    limit: int = Query(100, ge=1, le=500),
+    auth: dict = Depends(verify_jwt_or_api_key),
+):
+    """Consulta histórico de manifestações.
+
+    Retorna até 500 eventos de manifestação do tenant autenticado, com filtros
+    opcionais por CNPJ, chave de acesso, tipo de evento. Ordenado do mais recente
+    para o mais antigo. Cada evento traz: chave, tipo, status SEFAZ, protocolo,
+    origem (auto_capture/dashboard/api), data e latência.
+
+    Uso típico: SAP consulta periodicamente para reconciliar status de manifestos.
+    """
+    sb = get_supabase_client()
+    tenant_id = auth["tenant_id"]
+
+    query = sb.table("manifestacao_events").select("*").eq("tenant_id", tenant_id)
+
+    if chave_acesso:
+        query = query.eq("chave_acesso", chave_acesso)
+    if tipo_evento:
+        query = query.eq("tipo_evento", tipo_evento)
+
+    query = query.order("created_at", desc=True).limit(limit)
+    result = query.execute()
+
+    events = []
+    for row in result.data or []:
+        descricao = EVENTO_DESCRICAO.get(row.get("tipo_evento", ""), "")
+        events.append({
+            "chave_acesso": row.get("chave_acesso"),
+            "tipo_evento": row.get("tipo_evento"),
+            "descricao": descricao,
+            "cstat": row.get("cstat"),
+            "xmotivo": row.get("xmotivo"),
+            "protocolo": row.get("protocolo"),
+            "source": row.get("source"),
+            "latency_ms": row.get("latency_ms"),
+            "created_at": row.get("created_at"),
+        })
+
+    # Se CNPJ foi informado, filtra (via join com documents — a tabela de eventos
+    # não tem coluna cnpj diretamente, usamos o document_id)
+    if cnpj and events:
+        chaves = [e["chave_acesso"] for e in events if e.get("chave_acesso")]
+        if chaves:
+            docs_res = sb.table("documents").select("chave_acesso").eq(
+                "tenant_id", tenant_id
+            ).eq("cnpj", cnpj).in_("chave_acesso", chaves).execute()
+            chaves_do_cnpj = {d["chave_acesso"] for d in (docs_res.data or [])}
+            events = [e for e in events if e.get("chave_acesso") in chaves_do_cnpj]
+
+    return {"total": len(events), "events": events}
+
+
 @router.post("/manifestacao", response_model=ManifestacaoResponse)
 async def enviar_manifestacao(
     body: ManifestacaoRequest,
