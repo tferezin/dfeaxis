@@ -370,7 +370,7 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
 .cmp-row strong{color:var(--tx);font-weight:600;text-align:right}
 
 @media(max-width:800px){
-  .feat-grid,.layers,.plans,.steps,.retro-grid,.frr,.trust-stats{grid-template-columns:1fr!important}
+  .feat-grid,.layers,.plans,.steps,.retro-grid,.frr,.trust-stats,.sec-grid-2{grid-template-columns:1fr!important}
   .stat{padding:0 20px;border-right:none;border-bottom:1px solid var(--bdr);padding-bottom:18px;margin-bottom:18px}
   .stat:last-child{border-bottom:none}
   #nav,footer,.sec,.cta-in,.dor-inner,.trust-inner{padding-left:20px;padding-right:20px}
@@ -584,7 +584,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 
     <!-- ENTERPRISE-GRADE SUB-SECTION -->
     <h3 style="font-family:var(--fd);font-size:clamp(20px,2.5vw,28px);font-weight:400;color:#fff;margin:56px 0 24px;letter-spacing:-.01em">Segurança enterprise por padrão</h3>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px">
+    <div class="sec-grid-2" style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px">
       <div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:24px 22px">
         <div style="font-size:13px;font-weight:700;color:var(--gr-m);margin-bottom:8px;letter-spacing:.04em">Row-Level Security</div>
         <p style="font-size:14px;color:rgba(255,255,255,.6);line-height:1.65;margin:0">Isolamento de dados no nível do PostgreSQL. Cada tenant separado por design do banco &mdash; não apenas na aplicação.</p>
