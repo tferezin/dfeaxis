@@ -315,7 +315,7 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
   .stat{padding:0 20px;border-right:none;border-bottom:1px solid var(--bdr);padding-bottom:18px;margin-bottom:18px}
   .stat:last-child{border-bottom:none}
   #nav,footer,.sec,.cta-in,.dor-inner,.trust-inner{padding-left:20px;padding-right:20px}
-  #nav{flex-wrap:wrap;height:auto;min-height:62px;padding-top:16px;padding-bottom:16px}
+  #nav{flex-wrap:wrap;height:auto;min-height:48px;padding-top:8px;padding-bottom:8px;background:var(--bg)}
   .hamburger{display:block}
   .nav-links,.nav-btns{display:none;width:100%;padding-top:16px}
   .nav-links.open,.nav-btns.open{display:flex}
@@ -323,6 +323,12 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
   .nav-links a{font-size:15px;padding:6px 0}
   .nav-btns{margin-left:0;gap:10px;padding-bottom:4px}
   .nav-btns button{flex:1}
+  #nav .logo img{height:36px!important}
+  .privacy-cards{grid-template-columns:1fr!important}
+  #sticky-bar{padding:8px 16px!important}
+  #sticky-bar>div>div:first-child{font-size:12px!important}
+  #sticky-bar>div>div:last-child{font-size:11px!important}
+  #sticky-bar>a{padding:7px 14px!important;font-size:12px!important}
   #hero{padding:130px 20px 80px}
 }
 @media(max-width:600px){
@@ -330,6 +336,7 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
   .cmp-wrap thead th:first-child{background:var(--bg)}
   .cmp-cat td:first-child{background:var(--bg)}
   .cmp-wrap{border-radius:10px}
+  .cmp-wrap thead th{top:48px}
 }
 </style>
 </head>
@@ -456,7 +463,7 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
     <p style="font-size:16px;font-weight:300;color:rgba(255,255,255,.55);max-width:520px;line-height:1.75;margin-bottom:52px">
       Diferente de repositórios genéricos que guardam seus documentos fiscais indefinidamente em servidores de terceiros, o DFeAxis opera com <strong style="color:#fff">zero-retention</strong>: o XML é capturado na SEFAZ, entregue ao seu ERP e descartado imediatamente após confirmação.
     </p>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px">
+    <div class="privacy-cards" style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px">
       <div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:28px 24px">
         <div style="width:48px;height:48px;border-radius:12px;background:rgba(25,117,80,.2);display:flex;align-items:center;justify-content:center;margin-bottom:16px">
           <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="rgba(25,117,80,.9)" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/></svg>
