@@ -58,10 +58,9 @@ DEFAULT_PLAN_CATALOG: list[dict] = [
         "features": [
             "1 CNPJ monitorado",
             "3.000 docs/mês inclusos",
-            "NF-e + CT-e + MDF-e",
-            "Polling automático 15 min",
+            "NF-e + CT-e + MDF-e + NFS-e",
+            "Manifestação manual ou automática",
             "API REST + SAP DRC",
-            "Suporte por e-mail",
         ],
     },
     {
@@ -70,16 +69,15 @@ DEFAULT_PLAN_CATALOG: list[dict] = [
         "description": "Para empresas em operação plena com volume relevante.",
         "monthly_amount_cents": 69000,  # R$ 690,00
         "yearly_amount_cents": 662400,  # R$ 552,00/mês × 12
-        "docs_included": 10000,
+        "docs_included": 8000,
         "overage_cents_per_doc": 9,
         "max_cnpjs": 5,
         "features": [
             "Até 5 CNPJs",
-            "10.000 docs/mês inclusos",
+            "8.000 docs/mês inclusos",
             "NF-e + CT-e + MDF-e + NFS-e",
-            "Manifestação automática",
-            "Webhooks",
-            "Atendimento prioritário",
+            "Manifestação manual ou automática",
+            "API REST + SAP DRC",
         ],
     },
     {
@@ -88,16 +86,16 @@ DEFAULT_PLAN_CATALOG: list[dict] = [
         "description": "Grandes grupos e holdings com alto volume.",
         "monthly_amount_cents": 149000,  # R$ 1.490,00
         "yearly_amount_cents": 1430400,  # R$ 1.192,00/mês × 12
-        "docs_included": 30000,
+        "docs_included": 20000,
         "overage_cents_per_doc": 7,
         "max_cnpjs": 50,
         "features": [
             "Até 50 CNPJs",
-            "30.000 docs/mês inclusos",
-            "Polling 5 min",
-            "Canal dedicado + gerente de conta",
-            "Monitoramento 24/7 com alerta automático",
-            "SLA contratual personalizado",
+            "20.000 docs/mês inclusos",
+            "Todos os tipos de documento",
+            "Manifestação manual ou automática",
+            "API REST + SAP DRC",
+            "Questionário de segurança incluso",
         ],
     },
 ]

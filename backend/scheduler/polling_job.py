@@ -397,6 +397,18 @@ def _poll_single(cert: dict, tipo: str, tenant_data: dict) -> int:
         # Mantém coluna legada sincronizada (deprecada, mas ainda lida por outros fluxos)
         nsu_controller.update_last_nsu(cert["id"], tipo, effective_cursor)
 
+        # Incrementa contador mensal para tenants ativos (cobra excedente no fim do mês)
+        if not is_trial and tenant_data.get("subscription_status") == "active":
+            try:
+                sb.rpc("increment_monthly_docs", {
+                    "p_tenant_id": tenant_id,
+                    "p_count": effective_count,
+                }).execute()
+            except Exception as inc_err:
+                logger.warning(
+                    f"increment_monthly_docs falhou para {tenant_id}: {inc_err}"
+                )
+
         # Incrementa contador de trial e bloqueia se atingir cap
         if is_trial:
             try:
@@ -709,6 +721,25 @@ def start_scheduler() -> BackgroundScheduler:
         )
     except Exception as exc:  # noqa: BLE001
         logger.warning("Não foi possível agendar trial email jobs: %s", exc)
+
+    # Billing: cálculo mensal de excedente + InvoiceItem no Stripe
+    # Roda dia 1 às 02:00 UTC. Usa cron ao invés de interval pra garantir a data.
+    try:
+        from scheduler.monthly_overage_job import process_monthly_overage
+
+        scheduler.add_job(
+            process_monthly_overage,
+            "cron",
+            day=1,
+            hour=2,
+            minute=0,
+            id="monthly_overage",
+            name="Billing: cobrança de excedente mensal",
+            replace_existing=True,
+        )
+        logger.info("monthly_overage_job agendado: dia 1 às 02:00 UTC")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Não foi possível agendar monthly_overage_job: %s", exc)
 
     # Manifestação: alerta de NF-e pendentes (1x/dia)
     try:
