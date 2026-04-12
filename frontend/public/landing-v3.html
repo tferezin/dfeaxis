@@ -7,20 +7,19 @@
 <meta name="description" content="Captura automática de NF-e, CT-e, MDF-e e NFS-e na SEFAZ. Integra com SAP DRC, TOTVS, Oracle ou qualquer ERP via API REST. Zero armazenamento. Trial grátis.">
 <meta name="keywords" content="NF-e automática SEFAZ, CT-e automático, MDF-e captura, NFS-e SEFAZ, documentos fiscais fornecedores, SAP DRC NF-e, TOTVS NF-e, Oracle ERP fiscal, API REST documentos fiscais, automação fiscal ERP">
 <meta name="robots" content="index, follow">
-<!-- TODO: trocar canonical para https://dfeaxis.com.br/ quando o domínio apontar para o Vercel -->
-<link rel="canonical" href="https://frontend-henna-five-35.vercel.app/landing-v3.html">
+<link rel="canonical" href="https://www.dfeaxis.com.br/">
 <meta property="og:title" content="DFeAxis — Captura automática de NF-e, CT-e e MDF-e | SAP DRC">
 <meta property="og:description" content="Captura automática de NF-e, CT-e, MDF-e e NFS-e na SEFAZ. Integra com SAP DRC, TOTVS, Oracle ou qualquer ERP via API REST. Zero armazenamento.">
-<meta property="og:image" content="https://frontend-henna-five-35.vercel.app/og-image.jpg">
+<meta property="og:image" content="https://www.dfeaxis.com.br/og-image.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:url" content="https://frontend-henna-five-35.vercel.app/landing-v3.html">
+<meta property="og:url" content="https://www.dfeaxis.com.br/">
 <meta property="og:type" content="website">
 <meta property="og:locale" content="pt_BR">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="DFeAxis — Captura automática de NF-e, CT-e e MDF-e | SAP DRC">
 <meta name="twitter:description" content="NF-e, CT-e, MDF-e e NFS-e capturados na SEFAZ e entregues ao seu ERP via API REST. Zero armazenamento.">
-<meta name="twitter:image" content="https://frontend-henna-five-35.vercel.app/og-image.jpg">
+<meta name="twitter:image" content="https://www.dfeaxis.com.br/og-image.jpg">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"SoftwareApplication","name":"DFeAxis","description":"SaaS para captura automática de NF-e, CT-e, MDF-e e NFS-e de fornecedores na SEFAZ e entrega ao seu ERP via API REST. Integra com SAP DRC, TOTVS, Oracle, Senior, Sankhya ou qualquer sistema. Zero armazenamento de XMLs.","applicationCategory":"BusinessApplication","operatingSystem":"Web","url":"https://dfeaxis.com.br","offers":{"@type":"Offer","availability":"https://schema.org/InStock","priceCurrency":"BRL","price":"290"}}
 </script>
@@ -30,7 +29,6 @@
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Precisa de SAP PI ou SAP Integration Suite?","acceptedAnswer":{"@type":"Answer","text":"Não. O DFeAxis se conecta ao SAP DRC via RFC Destination HTTP padrão (SM59). Sem SAP PI, sem CPI, sem cenário B2B, sem middleware adicional."}},{"@type":"Question","name":"Funciona com SAP DRC Cloud (Public Cloud)?","acceptedAnswer":{"@type":"Answer","text":"Sim. O DFeAxis expõe uma API REST pública acessível por qualquer ambiente SAP com acesso à internet via Communication Arrangement ou RFC Destination HTTP."}},{"@type":"Question","name":"Migramos do SAP GRC NFe para o DRC e perdemos a automação. O DFeAxis resolve?","acceptedAnswer":{"@type":"Answer","text":"Exatamente. O GRC fazia polling automático via SAP PI a cada 15-30 min. O DRC não tem esse mecanismo nativo. O DFeAxis foi criado especificamente para resolver essa lacuna."}},{"@type":"Question","name":"Meus XMLs ficam armazenados em servidores de terceiros?","acceptedAnswer":{"@type":"Answer","text":"Não. O DFeAxis opera com zero-retention por design. O XML é capturado na SEFAZ, entregue ao seu ERP e descartado imediatamente após a confirmação."}},{"@type":"Question","name":"O certificado digital A1 fica seguro?","acceptedAnswer":{"@type":"Answer","text":"Sim. O .pfx é cifrado com AES-256 com chave exclusiva derivada por tenant. Nunca é gravado em disco em texto claro. Isolamento total entre empresas."}},{"@type":"Question","name":"Posso testar por 10 dias sem cartão?","acceptedAnswer":{"@type":"Answer","text":"Sim. Nenhum cartão é solicitado no cadastro. Ao final dos 10 dias o sistema para automaticamente. O modelo é créditos pré-pagos."}},{"@type":"Question","name":"Funciona apenas com SAP ou integra com outros ERPs?","acceptedAnswer":{"@type":"Answer","text":"Sim. O DFeAxis expõe API REST padrão. Qualquer sistema que consuma REST pode integrar. SAP DRC é a integração principal, mas TOTVS, Oracle, Senior, Sankhya e sistemas próprios funcionam perfeitamente via API."}},{"@type":"Question","name":"Funciona com TOTVS / Oracle / outros ERPs?","acceptedAnswer":{"@type":"Answer","text":"Sim. O DFeAxis expõe API REST padrão. Qualquer sistema que consuma REST pode integrar. Para SAP DRC temos integração nativa via RFC Destination HTTP. Para TOTVS, Oracle, Senior, Sankhya e outros, basta consumir os endpoints REST."}},{"@type":"Question","name":"Preciso de middleware (SAP PI, CPI, MuleSoft) para integrar?","acceptedAnswer":{"@type":"Answer","text":"Não. O DFeAxis se conecta diretamente ao seu ERP via API REST. Sem SAP PI, sem CPI, sem MuleSoft, sem cenários B2B. Para SAP DRC, basta configurar uma RFC Destination HTTP na SM59."}},{"@type":"Question","name":"Vocês respondem questionário de segurança para procurement enterprise?","acceptedAnswer":{"@type":"Answer","text":"Sim. Temos um questionário de segurança pré-preenchido com 44 perguntas cobrindo infraestrutura, controle de acesso, criptografia, compliance LGPD, resposta a incidentes e continuidade de negócio. Disponível sob demanda para empresas nos planos Business e Enterprise."}}]}
 </script>
-<!-- TODO: substituir GTM-XXXXXXX pelo ID real do Google Tag Manager -->
 <!--
 <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-XXXXXXX');</script>
 -->
@@ -310,6 +308,19 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
 .cmp-no{color:var(--tx4, #bbb)}
 .cmp-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
 
+/* MOBILE TABS for comparison */
+.cmp-mobile{display:none}
+.cmp-tabs{display:flex;gap:0;border-radius:10px;overflow:hidden;border:1px solid var(--bdr);margin-bottom:16px}
+.cmp-tab{flex:1;padding:11px 8px;font-size:13px;font-weight:600;background:var(--sur);color:var(--tx2);border:none;cursor:pointer;transition:all .15s;font-family:var(--fs)}
+.cmp-tab.active{background:var(--gr);color:#fff}
+.cmp-panel{display:none}
+.cmp-panel.active{display:block}
+.cmp-group-title{font-family:var(--fd);font-size:12px;font-weight:600;color:var(--tx2);letter-spacing:.04em;padding:12px 0 6px;border-bottom:1px solid var(--bdr);margin-top:8px}
+.cmp-group-title:first-child{margin-top:0}
+.cmp-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(18,32,72,.05);font-size:13px}
+.cmp-row span{color:var(--tx2);font-weight:400}
+.cmp-row strong{color:var(--tx);font-weight:600;text-align:right}
+
 @media(max-width:800px){
   .feat-grid,.layers,.plans,.steps,.retro-grid,.frr,.trust-stats{grid-template-columns:1fr!important}
   .stat{padding:0 20px;border-right:none;border-bottom:1px solid var(--bdr);padding-bottom:18px;margin-bottom:18px}
@@ -331,19 +342,13 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
   #sticky-bar>a{padding:7px 14px!important;font-size:12px!important}
   #hero{padding:130px 20px 80px}
 }
-@media(max-width:600px){
-  .cmp-wrap{border-radius:10px;font-size:11px}
-  .cmp-wrap th,.cmp-wrap td{padding:8px 6px!important}
-  .cmp-wrap td:first-child,.cmp-wrap th:first-child{position:sticky;left:0;background:var(--sur);z-index:1;min-width:100px}
-  .cmp-wrap thead th:first-child{background:var(--bg)}
-  .cmp-wrap thead th{font-size:12px}
-  .cmp-cat td:first-child{background:var(--bg)}
-  .cmp-wrap thead th{top:48px}
+@media(max-width:600px) and (orientation:portrait){
+  .cmp-desktop{display:none!important}
+  .cmp-mobile{display:block!important}
 }
 </style>
 </head>
 <body>
-<!-- TODO: descomentar noscript quando GTM estiver configurado -->
 <!--<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-XXXXXXX" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>-->
 
 <nav id="nav">
@@ -681,10 +686,10 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
       <div class="plan-badge">Mais popular</div>
       <div class="plan-name">Business</div>
       <div class="plan-price"><span class="price-val" data-mensal="690" data-anual="552">R$ 690</span><span>/mês</span></div>
-      <div class="plan-desc">Médias empresas com múltiplos CNPJs e integração ERP.</div>
+      <div class="plan-desc">Médias empresas com até 8.000 documentos/mês.</div>
       <div class="plan-div"></div>
       <div class="plan-f"><div class="chk">&#10003;</div>Até 5 CNPJs</div>
-      <div class="plan-f"><div class="chk">&#10003;</div>10.000 docs inclusos</div>
+      <div class="plan-f"><div class="chk">&#10003;</div>8.000 docs inclusos</div>
       <div class="plan-f"><div class="chk">&#10003;</div>NF-e + CT-e + MDF-e + NFS-e</div>
       <div class="plan-f"><div class="chk">&#10003;</div>Excedente: R$ 0,09/doc</div>
       <button class="plan-btn" onclick="window.location.href='/signup'">Começar agora</button>
@@ -692,10 +697,10 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
     <div class="plan">
       <div class="plan-name">Enterprise</div>
       <div class="plan-price"><span class="price-val" data-mensal="1.490" data-anual="1.192">R$ 1.490</span><span>/mês</span></div>
-      <div class="plan-desc">Grandes grupos e holdings com alto volume.</div>
+      <div class="plan-desc">Grandes grupos com até 20.000 documentos/mês.</div>
       <div class="plan-div"></div>
       <div class="plan-f"><div class="chk">&#10003;</div>Até 50 CNPJs</div>
-      <div class="plan-f"><div class="chk">&#10003;</div>30.000 docs inclusos</div>
+      <div class="plan-f"><div class="chk">&#10003;</div>20.000 docs inclusos</div>
       <div class="plan-f"><div class="chk">&#10003;</div>SLA em contrato + DPA LGPD</div>
       <div class="plan-f"><div class="chk">&#10003;</div>Incidentes P1: resposta em 15 min</div>
       <div class="plan-f"><div class="chk">&#10003;</div>Questionário de segurança incluso</div>
@@ -710,42 +715,109 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
 <div id="compare" class="sec" style="padding-top:32px;padding-bottom:56px">
   <div class="sec-tag">Comparação</div>
   <h2 style="font-family:var(--fd);font-size:clamp(24px,3vw,38px);font-weight:300;line-height:1.18;letter-spacing:-.02em;margin-bottom:36px">Compare os planos em detalhe</h2>
+  <!-- DESKTOP TABLE (hidden on portrait ≤600px) -->
+  <div class="cmp-desktop">
   <div class="cmp-scroll">
   <div class="cmp-wrap">
   <table>
     <thead><tr><th>Feature</th><th>Starter</th><th>Business</th><th>Enterprise</th></tr></thead>
     <tbody>
-      <tr class="cmp-cat"><td colspan="4">Consultas e Monitoramento</td></tr>
-      <tr><td>Consultas NF-e</td><td>Ilimitadas</td><td>Ilimitadas</td><td>Ilimitadas</td></tr>
-      <tr><td>Consultas CT-e</td><td>1.000/mês</td><td>Ilimitadas</td><td>Ilimitadas</td></tr>
-      <tr><td>Consultas MDF-e</td><td>500/mês</td><td>Ilimitadas</td><td>Ilimitadas</td></tr>
-      <tr><td>Consultas NFS-e</td><td class="cmp-no">&mdash;</td><td>Ilimitadas</td><td>Ilimitadas</td></tr>
-      <tr><td>Polling automático</td><td>A cada 15 min</td><td>A cada 15 min</td><td>A cada 5 min</td></tr>
-      <tr><td>CNPJs monitorados</td><td>1</td><td>Até 5</td><td>Até 50</td></tr>
+      <tr class="cmp-cat"><td colspan="4">Volume e Tipos</td></tr>
+      <tr><td>Docs/mês inclusos</td><td>3.000</td><td>8.000</td><td>20.000</td></tr>
+      <tr><td>Tipos de documento</td><td>NF-e, CT-e, MDF-e, NFS-e</td><td>NF-e, CT-e, MDF-e, NFS-e</td><td>NF-e, CT-e, MDF-e, NFS-e</td></tr>
+      <tr><td>Excedente por doc</td><td>R$ 0,12</td><td>R$ 0,09</td><td>R$ 0,07</td></tr>
+      <tr><td>CNPJs (API Keys)</td><td>1</td><td>Até 5</td><td>Até 50</td></tr>
 
-      <tr class="cmp-cat"><td colspan="4">Manifestação e Eventos</td></tr>
-      <tr><td>Manifestação NF-e</td><td class="cmp-no">&mdash;</td><td>Ciência + Confirmação</td><td>Todos os eventos</td></tr>
-      <tr><td>Manifestação automática</td><td class="cmp-no">&mdash;</td><td class="cmp-no">&mdash;</td><td class="cmp-yes">&#10003;</td></tr>
-      <tr><td>Consulta retroativa</td><td>30 dias</td><td>60 dias</td><td>90 dias</td></tr>
+      <tr class="cmp-cat"><td colspan="4">Manifestação e Retroativa</td></tr>
+      <tr><td>Manifestação NF-e</td><td>Manual ou automática</td><td>Manual ou automática</td><td>Manual ou automática</td></tr>
+      <tr><td>Consulta retroativa</td><td>90 dias</td><td>90 dias</td><td>90 dias</td></tr>
 
       <tr class="cmp-cat"><td colspan="4">Integração e API</td></tr>
       <tr><td>API REST</td><td class="cmp-yes">&#10003;</td><td class="cmp-yes">&#10003;</td><td class="cmp-yes">&#10003;</td></tr>
       <tr><td>SAP DRC compatível</td><td class="cmp-yes">&#10003;</td><td class="cmp-yes">&#10003;</td><td class="cmp-yes">&#10003;</td></tr>
-      <tr><td>API Keys</td><td>2</td><td>5</td><td>Ilimitadas</td></tr>
-      <tr><td>Webhooks</td><td class="cmp-no">&mdash;</td><td class="cmp-yes">&#10003;</td><td class="cmp-yes">&#10003;</td></tr>
       <tr><td>Exportação XML</td><td class="cmp-yes">&#10003;</td><td class="cmp-yes">&#10003;</td><td class="cmp-yes">&#10003;</td></tr>
 
       <tr class="cmp-cat"><td colspan="4">Segurança e Compliance</td></tr>
       <tr><td>Criptografia AES-256</td><td class="cmp-yes">&#10003;</td><td class="cmp-yes">&#10003;</td><td class="cmp-yes">&#10003;</td></tr>
       <tr><td>Zero-retention</td><td class="cmp-yes">&#10003;</td><td class="cmp-yes">&#10003;</td><td class="cmp-yes">&#10003;</td></tr>
       <tr><td>LGPD compliance</td><td class="cmp-yes">&#10003;</td><td class="cmp-yes">&#10003;</td><td class="cmp-yes">&#10003;</td></tr>
-      <tr><td>Audit log</td><td>30 dias</td><td>60 dias</td><td>90 dias</td></tr>
-      <tr><td>Resposta a incidentes P1</td><td class="cmp-no">&mdash;</td><td>4h</td><td>15 min</td></tr>
-      <tr><td>Questionário segurança</td><td class="cmp-no">&mdash;</td><td class="cmp-no">&mdash;</td><td class="cmp-yes">&#10003;</td></tr>
-      <tr><td>Suporte</td><td>E-mail</td><td>E-mail prioritário</td><td>Dedicado</td></tr>
+      <tr><td>Audit log</td><td>90 dias</td><td>90 dias</td><td>90 dias</td></tr>
+      <tr><td>Escalação</td><td>Padrão</td><td>Prioritária</td><td>Dedicada</td></tr>
     </tbody>
   </table>
   </div>
+  </div>
+  </div>
+
+  <!-- MOBILE TABS (visible only on portrait ≤600px) -->
+  <div class="cmp-mobile">
+    <div class="cmp-tabs">
+      <button class="cmp-tab active" onclick="switchCmpTab(0)">Starter</button>
+      <button class="cmp-tab" onclick="switchCmpTab(1)">Business</button>
+      <button class="cmp-tab" onclick="switchCmpTab(2)">Enterprise</button>
+    </div>
+    <div class="cmp-panels">
+      <div class="cmp-panel active" data-plan="0">
+        <div class="cmp-group-title">Volume e Tipos</div>
+        <div class="cmp-row"><span>Docs/mês inclusos</span><strong>3.000</strong></div>
+        <div class="cmp-row"><span>Tipos de documento</span><strong>Todos</strong></div>
+        <div class="cmp-row"><span>Excedente por doc</span><strong>R$ 0,12</strong></div>
+        <div class="cmp-row"><span>CNPJs (API Keys)</span><strong>1</strong></div>
+        <div class="cmp-group-title">Manifestação e Retroativa</div>
+        <div class="cmp-row"><span>Manifestação NF-e</span><strong>Manual ou automática</strong></div>
+        <div class="cmp-row"><span>Consulta retroativa</span><strong>90 dias</strong></div>
+        <div class="cmp-group-title">Integração e API</div>
+        <div class="cmp-row"><span>API REST</span><strong class="cmp-yes">&#10003;</strong></div>
+        <div class="cmp-row"><span>SAP DRC compatível</span><strong class="cmp-yes">&#10003;</strong></div>
+        <div class="cmp-row"><span>Exportação XML</span><strong class="cmp-yes">&#10003;</strong></div>
+        <div class="cmp-group-title">Segurança e Compliance</div>
+        <div class="cmp-row"><span>Criptografia AES-256</span><strong class="cmp-yes">&#10003;</strong></div>
+        <div class="cmp-row"><span>Zero-retention</span><strong class="cmp-yes">&#10003;</strong></div>
+        <div class="cmp-row"><span>LGPD compliance</span><strong class="cmp-yes">&#10003;</strong></div>
+        <div class="cmp-row"><span>Audit log</span><strong>90 dias</strong></div>
+        <div class="cmp-row"><span>Escalação</span><strong>Padrão</strong></div>
+      </div>
+      <div class="cmp-panel" data-plan="1">
+        <div class="cmp-group-title">Volume e Tipos</div>
+        <div class="cmp-row"><span>Docs/mês inclusos</span><strong>8.000</strong></div>
+        <div class="cmp-row"><span>Tipos de documento</span><strong>Todos</strong></div>
+        <div class="cmp-row"><span>Excedente por doc</span><strong>R$ 0,09</strong></div>
+        <div class="cmp-row"><span>CNPJs (API Keys)</span><strong>Até 5</strong></div>
+        <div class="cmp-group-title">Manifestação e Retroativa</div>
+        <div class="cmp-row"><span>Manifestação NF-e</span><strong>Manual ou automática</strong></div>
+        <div class="cmp-row"><span>Consulta retroativa</span><strong>90 dias</strong></div>
+        <div class="cmp-group-title">Integração e API</div>
+        <div class="cmp-row"><span>API REST</span><strong class="cmp-yes">&#10003;</strong></div>
+        <div class="cmp-row"><span>SAP DRC compatível</span><strong class="cmp-yes">&#10003;</strong></div>
+        <div class="cmp-row"><span>Exportação XML</span><strong class="cmp-yes">&#10003;</strong></div>
+        <div class="cmp-group-title">Segurança e Compliance</div>
+        <div class="cmp-row"><span>Criptografia AES-256</span><strong class="cmp-yes">&#10003;</strong></div>
+        <div class="cmp-row"><span>Zero-retention</span><strong class="cmp-yes">&#10003;</strong></div>
+        <div class="cmp-row"><span>LGPD compliance</span><strong class="cmp-yes">&#10003;</strong></div>
+        <div class="cmp-row"><span>Audit log</span><strong>90 dias</strong></div>
+        <div class="cmp-row"><span>Escalação</span><strong>Prioritária</strong></div>
+      </div>
+      <div class="cmp-panel" data-plan="2">
+        <div class="cmp-group-title">Volume e Tipos</div>
+        <div class="cmp-row"><span>Docs/mês inclusos</span><strong>20.000</strong></div>
+        <div class="cmp-row"><span>Tipos de documento</span><strong>Todos</strong></div>
+        <div class="cmp-row"><span>Excedente por doc</span><strong>R$ 0,07</strong></div>
+        <div class="cmp-row"><span>CNPJs (API Keys)</span><strong>Até 50</strong></div>
+        <div class="cmp-group-title">Manifestação e Retroativa</div>
+        <div class="cmp-row"><span>Manifestação NF-e</span><strong>Manual ou automática</strong></div>
+        <div class="cmp-row"><span>Consulta retroativa</span><strong>90 dias</strong></div>
+        <div class="cmp-group-title">Integração e API</div>
+        <div class="cmp-row"><span>API REST</span><strong class="cmp-yes">&#10003;</strong></div>
+        <div class="cmp-row"><span>SAP DRC compatível</span><strong class="cmp-yes">&#10003;</strong></div>
+        <div class="cmp-row"><span>Exportação XML</span><strong class="cmp-yes">&#10003;</strong></div>
+        <div class="cmp-group-title">Segurança e Compliance</div>
+        <div class="cmp-row"><span>Criptografia AES-256</span><strong class="cmp-yes">&#10003;</strong></div>
+        <div class="cmp-row"><span>Zero-retention</span><strong class="cmp-yes">&#10003;</strong></div>
+        <div class="cmp-row"><span>LGPD compliance</span><strong class="cmp-yes">&#10003;</strong></div>
+        <div class="cmp-row"><span>Audit log</span><strong>90 dias</strong></div>
+        <div class="cmp-row"><span>Escalação</span><strong>Dedicada</strong></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -860,6 +932,12 @@ function togglePlanPeriod(){
     var v=planAnual?el.getAttribute('data-anual'):el.getAttribute('data-mensal');
     el.textContent='R$ '+v;
   });
+}
+
+/* ===== COMPARE TABS (mobile) ===== */
+function switchCmpTab(idx){
+  document.querySelectorAll('.cmp-tab').forEach(function(t,i){t.classList.toggle('active',i===idx)});
+  document.querySelectorAll('.cmp-panel').forEach(function(p,i){p.classList.toggle('active',i===idx)});
 }
 
 /* ===== MOBILE MENU ===== */
