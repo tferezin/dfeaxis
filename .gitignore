@@ -40,3 +40,7 @@ supabase/.temp/
 /03
 Evidencias.docx
 backend/DESIGN.md
+
+# Local secrets (stored in password manager, never committed)
+CERT_MASTER_SECRET*
+*.secret
