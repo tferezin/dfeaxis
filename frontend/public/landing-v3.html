@@ -614,8 +614,8 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <div class="steps">
       <div class="step"><div class="step-n">01</div><h3>Crie sua conta</h3><p>Cadastre e-mail, senha e CNPJ. Menos de 2 minutos.</p></div>
       <div class="step"><div class="step-n">02</div><h3>Upload do .pfx</h3><p>Carregue o certificado A1 e senha. Cifrado imediatamente em memória.</p></div>
-      <div class="step"><div class="step-n">03</div><h3>Polling automático</h3><p>A cada 15 min buscamos NF-e, CT-e e MDF-e novos na SEFAZ para o seu CNPJ.</p></div>
-      <div class="step"><div class="step-n">04</div><h3>Seu ERP recebe automaticamente</h3><p>RFC Destination no SAP DRC, webhook no TOTVS, ou polling via API REST — seu ERP consome <code style="font-family:var(--mn);font-size:.8em">/api/v1/documentos</code> sem intervenção.</p></div>
+      <div class="step"><div class="step-n">03</div><h3>Captura automática</h3><p>Scheduler roda a cada 15 min como backup e seu ERP também pode disparar sob demanda via API. Ciência enviada automaticamente.</p></div>
+      <div class="step"><div class="step-n">04</div><h3>Seu ERP recebe automaticamente</h3><p>RFC Destination no SAP DRC ou polling via API REST — seu ERP consome <code style="font-family:var(--mn);font-size:.8em">/api/v1/documentos</code> sem intervenção.</p></div>
     </div>
   </div>
 </div>
@@ -703,7 +703,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <span style="color:#86efac">"estimativa"</span>: <span style="color:#fde68a">"~45s"</span>
 }</pre>
         </div>
-        <div class="retro-note">Janela máxima: 90 dias (limite SEFAZ). Disponível nos planos Business e Enterprise.<br><br><em style="color:rgba(255,255,255,.25);font-size:11.5px">Escopo: documentos recebidos de fornecedores e transportadoras. Documentos emitidos pela sua empresa não são escopo desta solução &mdash; estes já transitam pelo SAP DRC na emissão.</em></div>
+        <div class="retro-note">Janela máxima: 90 dias (limite SEFAZ). Disponível em todos os planos.<br><br><em style="color:rgba(255,255,255,.25);font-size:11.5px">Escopo: documentos recebidos de fornecedores e transportadoras. Documentos emitidos pela sua empresa não são escopo desta solução &mdash; estes já transitam pelo SAP DRC na emissão.</em></div>
       </div>
     </div>
   </div>
@@ -730,7 +730,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       <div class="plan-div"></div>
       <div class="plan-f"><div class="chk">&#10003;</div>1 CNPJ</div>
       <div class="plan-f"><div class="chk">&#10003;</div>3.000 docs inclusos</div>
-      <div class="plan-f"><div class="chk">&#10003;</div>NF-e + CT-e + MDF-e</div>
+      <div class="plan-f"><div class="chk">&#10003;</div>NF-e + CT-e + MDF-e + NFS-e</div>
       <div class="plan-f"><div class="chk">&#10003;</div>Excedente: R$ 0,12/doc</div>
       <button class="plan-btn" onclick="if(window.fbq)fbq('track','Lead');if(window.gtag)gtag('event','click_cta',{'event_category':'signup'});window.location.href='/signup'">Começar agora</button>
     </div>
@@ -753,8 +753,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       <div class="plan-div"></div>
       <div class="plan-f"><div class="chk">&#10003;</div>Até 50 CNPJs</div>
       <div class="plan-f"><div class="chk">&#10003;</div>20.000 docs inclusos</div>
-      <div class="plan-f"><div class="chk">&#10003;</div>SLA em contrato + DPA LGPD</div>
-      <div class="plan-f"><div class="chk">&#10003;</div>Incidentes P1: resposta em 15 min</div>
+      <div class="plan-f"><div class="chk">&#10003;</div>NF-e + CT-e + MDF-e + NFS-e</div>
       <div class="plan-f"><div class="chk">&#10003;</div>Questionário de segurança incluso</div>
       <div class="plan-f"><div class="chk">&#10003;</div>Excedente: R$ 0,07/doc</div>
       <button class="plan-btn" onclick="if(window.fbq)fbq('track','Lead');if(window.gtag)gtag('event','click_cta',{'event_category':'signup'});window.location.href='/signup'">Começar agora</button>

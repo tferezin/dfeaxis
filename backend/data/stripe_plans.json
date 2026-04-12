@@ -11,10 +11,9 @@
     "features": [
       "1 CNPJ monitorado",
       "3.000 docs/mês inclusos",
-      "NF-e + CT-e + MDF-e",
-      "Polling automático 15 min",
-      "API REST + SAP DRC",
-      "Suporte por e-mail"
+      "NF-e + CT-e + MDF-e + NFS-e",
+      "Manifestação manual ou automática",
+      "API REST + SAP DRC"
     ],
     "stripe_product_id": "prod_UJmKtC3sNlftdF",
     "price_id_monthly": "price_1TL8mFRt1dC9HqXtio9ptFI5",
@@ -26,16 +25,15 @@
     "description": "Para empresas em operação plena com volume relevante.",
     "monthly_amount_cents": 69000,
     "yearly_amount_cents": 662400,
-    "docs_included": 10000,
+    "docs_included": 8000,
     "overage_cents_per_doc": 9,
     "max_cnpjs": 5,
     "features": [
       "Até 5 CNPJs",
-      "10.000 docs/mês inclusos",
+      "8.000 docs/mês inclusos",
       "NF-e + CT-e + MDF-e + NFS-e",
-      "Manifestação automática",
-      "Webhooks",
-      "Atendimento prioritário"
+      "Manifestação manual ou automática",
+      "API REST + SAP DRC"
     ],
     "stripe_product_id": "prod_UJmKspZe6WePhT",
     "price_id_monthly": "price_1TL8mGRt1dC9HqXt2rVwjqmb",
@@ -47,16 +45,16 @@
     "description": "Grandes grupos e holdings com alto volume.",
     "monthly_amount_cents": 149000,
     "yearly_amount_cents": 1430400,
-    "docs_included": 30000,
+    "docs_included": 20000,
     "overage_cents_per_doc": 7,
     "max_cnpjs": 50,
     "features": [
       "Até 50 CNPJs",
-      "30.000 docs/mês inclusos",
-      "Polling 5 min",
-      "Canal dedicado + gerente de conta",
-      "Monitoramento 24/7 com alerta automático",
-      "SLA contratual personalizado"
+      "20.000 docs/mês inclusos",
+      "NF-e + CT-e + MDF-e + NFS-e",
+      "Manifestação manual ou automática",
+      "API REST + SAP DRC",
+      "Questionário de segurança incluso"
     ],
     "stripe_product_id": "prod_UJmKhElT5mCf9j",
     "price_id_monthly": "price_1TL8mIRt1dC9HqXtqn3SkQcI",

@@ -9,13 +9,16 @@ Empresas que migraram do SAP GRC NFe para o SAP DRC perderam a automação de ca
 ## Principais funcionalidades
 - Captura automática de NF-e, CT-e, MDF-e e NFS-e na SEFAZ via certificado A1
 - Entrega de NF-e e CT-e ao SAP DRC via RFC Destination HTTP (SM59)
-- MDF-e e NFS-e disponíveis via API REST para qualquer ERP
-- Polling automático a cada 15 minutos com circuit breaker contra erro 656
-- Controle de NSU sem gaps
-- Manifestação do destinatário (ciência automática ou manual)
-- Zero-retention: XML descartado após confirmação de entrega
-- Certificado A1 cifrado com AES-256 por tenant
-- Isolamento multi-tenant com Row Level Security
+- NFS-e disponível via API REST (consumida pelo Ambiente Nacional)
+- Scheduler interno roda a cada 15 minutos como backup; SAP/ERP também pode disparar captura on-demand via API REST
+- Circuit breaker contra erro 656 + controle de NSU sem gaps
+- Ciência da Operação (210210) enviada automaticamente durante a captura — obrigatório pela SEFAZ para liberar o XML completo
+- Manifestação definitiva (confirmação, desconhecimento, operação não realizada) manual via dashboard OU automática via SAP API após MIRO
+- Deadline de manifestação 180 dias com alertas por e-mail em D-10 e D-5
+- Consulta retroativa 90 dias (limite SEFAZ) disponível em todos os planos
+- Zero-retention: XML descartado após confirmação de entrega; metadata de auditoria persiste
+- Certificado A1 cifrado com AES-256-GCM por tenant
+- Isolamento multi-tenant com Row Level Security (PostgreSQL)
 
 ## Público-alvo
 - Empresas com SAP que migraram do GRC para o DRC
@@ -31,10 +34,13 @@ Empresas que migraram do SAP GRC NFe para o SAP DRC perderam a automação de ca
 - API REST compatível com qualquer ERP (TOTVS, Oracle, Senior, Sankhya)
 
 ## Planos
-- Starter: R$ 290/mês — 1 CNPJ, 3.000 docs inclusos
-- Business: R$ 690/mês — até 5 CNPJs, 10.000 docs inclusos
-- Enterprise: R$ 1.490/mês — até 50 CNPJs, 30.000 docs inclusos
-- Trial: 10 dias grátis, sem cartão de crédito
+Todos os planos incluem todas as funcionalidades (captura automática, manifestação manual/automática, retroativa 90 dias, todos os tipos de documento). A diferença entre planos é apenas volume incluído e número de CNPJs.
+
+- Starter: R$ 290/mês — 1 CNPJ, 3.000 docs inclusos, excedente R$ 0,12/doc
+- Business: R$ 690/mês — até 5 CNPJs, 8.000 docs inclusos, excedente R$ 0,09/doc
+- Enterprise: R$ 1.490/mês — até 50 CNPJs, 20.000 docs inclusos, excedente R$ 0,07/doc
+- Trial: 10 dias OU 500 documentos (o que vier primeiro), sem cartão de crédito
+- Anual: 20% de desconto no plano base
 
 ## Tecnologia
 - Backend: FastAPI (Python) no Railway
