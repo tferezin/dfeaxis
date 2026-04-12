@@ -1,10 +1,10 @@
 # DFeAxis
 
 ## O que é
-DFeAxis é um SaaS B2B que automatiza a captura de documentos fiscais eletrônicos recebidos de fornecedores na SEFAZ e entrega direto ao SAP DRC via RFC Destination HTTP. Opera com zero-retention — o XML é descartado após confirmação de entrega ao SAP.
+DFeAxis é um SaaS B2B brasileiro que automatiza a captura de documentos fiscais eletrônicos (NF-e, CT-e, MDF-e, NFS-e) recebidos de fornecedores na SEFAZ e entrega direto ao ERP do cliente via API REST. Oferece integração nativa com SAP DRC (via RFC Destination HTTP) e compatibilidade total com TOTVS, Oracle, Senior, Sankhya e sistemas próprios. Opera com zero-retention — o XML é descartado após confirmação de entrega.
 
 ## Problema que resolve
-Empresas que migraram do SAP GRC NFe para o SAP DRC perderam a automação de captura de documentos de entrada. O DRC não tem mecanismo nativo de polling na SEFAZ. O DFeAxis preenche essa lacuna sem SAP PI, sem CPI e sem ABAP customizado.
+Times fiscais em todo tipo de empresa ainda baixam XMLs manualmente do portal da SEFAZ, correndo risco de perder créditos fiscais por não manifestar dentro do prazo de 180 dias. O DFeAxis automatiza o processo de ponta a ponta. Um caso específico de grande demanda: empresas que migraram do SAP GRC NFe para o SAP DRC perderam a automação de captura de documentos de entrada (o DRC não tem mecanismo nativo de polling na SEFAZ), e o DFeAxis preenche essa lacuna sem SAP PI, sem CPI e sem ABAP customizado.
 
 ## Principais funcionalidades
 - Captura automática de NF-e, CT-e, MDF-e e NFS-e na SEFAZ via certificado A1
@@ -21,17 +21,19 @@ Empresas que migraram do SAP GRC NFe para o SAP DRC perderam a automação de ca
 - Isolamento multi-tenant com Row Level Security (PostgreSQL)
 
 ## Público-alvo
-- Empresas com SAP que migraram do GRC para o DRC
-- Consultorias SAP especializadas em DRC e compliance fiscal
-- Equipes fiscais e de controladoria de médio e grande porte
-- Desenvolvedores SAP ABAP integrando documentos de entrada
+- Equipes fiscais e de controladoria de médio e grande porte com qualquer ERP
+- Empresas usando TOTVS, Oracle, Senior, Sankhya ou sistemas próprios que precisam automatizar recebimento fiscal
+- Empresas com SAP que migraram do GRC para o DRC e perderam a automação de captura
+- Consultorias especializadas em ERP e compliance fiscal
+- Desenvolvedores ABAP, Java, .NET, Node ou Python integrando documentos de entrada
 
 ## Diferenciais vs concorrentes
-- Especializado em SAP DRC (não é repositório genérico de XMLs)
+- Integração nativa com SAP DRC via RFC Destination HTTP (diferencial técnico único no mercado)
+- Multi-ERP real: API REST padrão funciona com TOTVS, Oracle, Senior, Sankhya, sistemas próprios
 - Zero armazenamento por design (LGPD compliance)
-- Sem necessidade de SAP PI ou SAP Integration Suite
-- Código ABAP modelo para integração fornecido
-- API REST compatível com qualquer ERP (TOTVS, Oracle, Senior, Sankhya)
+- Sem necessidade de middleware (SAP PI, CPI, MuleSoft) para nenhum ERP
+- Código ABAP modelo para SAP + exemplos REST para outras linguagens
+- Manifestação do destinatário com alerta de prazo SEFAZ (180 dias)
 
 ## Planos
 Todos os planos incluem todas as funcionalidades (captura automática, manifestação manual/automática, retroativa 90 dias, todos os tipos de documento). A diferença entre planos é apenas volume incluído e número de CNPJs.

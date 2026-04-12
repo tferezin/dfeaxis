@@ -124,7 +124,7 @@ export default function SignupPage() {
             Captura automática de documentos fiscais recebidos
           </p>
           <p className="text-xs text-muted-foreground mt-2 max-w-[300px] mx-auto leading-relaxed">
-            Seus fornecedores emitem. A SEFAZ guarda. O DFeAxis entrega no SAP.
+            Seus fornecedores emitem. A SEFAZ guarda. O DFeAxis entrega no seu ERP.
           </p>
         </div>
 

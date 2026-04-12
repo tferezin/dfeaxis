@@ -538,6 +538,15 @@ export default function GettingStartedPage() {
         </p>
       </div>
 
+      {/* AVISO MULTI-ERP */}
+      <Card className="border-amber-500/30 bg-amber-50 dark:bg-amber-950/20">
+        <CardContent className="pt-4 pb-4">
+          <p className="text-sm text-amber-900 dark:text-amber-100">
+            <strong>Exemplos abaixo são em ABAP para SAP DRC.</strong> A API DFeAxis é REST padrão — funciona nativamente com qualquer ERP (TOTVS, Oracle, Senior, Sankhya) ou sistema próprio. Use os exemplos ABAP como referência de fluxo e adapte para sua linguagem (Java, .NET, Node, Python, ABAP, etc.).
+          </p>
+        </CardContent>
+      </Card>
+
       {/* FLUXO COMPLETO */}
       <Card className="border-primary/30 bg-primary/5">
         <CardHeader>
@@ -545,7 +554,7 @@ export default function GettingStartedPage() {
             <div className="size-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
               <Workflow className="size-5 text-primary" />
             </div>
-            <span>Fluxo completo — do SEFAZ ao SAP</span>
+            <span>Fluxo completo — da SEFAZ ao seu ERP</span>
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-0">
@@ -553,7 +562,7 @@ export default function GettingStartedPage() {
             <li className="flex gap-3">
               <span className="shrink-0 size-6 rounded-full bg-primary/15 text-primary font-bold text-xs flex items-center justify-center">1</span>
               <div>
-                <strong>Captura automática</strong> — scheduler interno roda a cada 15 minutos como backup. O SAP/ERP
+                <strong>Captura automática</strong> — scheduler interno roda a cada 15 minutos como backup. Seu ERP
                 também pode disparar captura sob demanda via <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">POST /api/v1/polling/trigger</code>.
                 Durante a captura, a Ciência da Operação é enviada automaticamente à SEFAZ (obrigatório para liberar o XML completo).
               </div>
@@ -562,7 +571,7 @@ export default function GettingStartedPage() {
               <span className="shrink-0 size-6 rounded-full bg-primary/15 text-primary font-bold text-xs flex items-center justify-center">2</span>
               <div>
                 <strong>Cliente busca via API</strong> — o ERP chama <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">GET /api/v1/documentos</code>
-                {" "}quando quiser (tipicamente em job agendado no SAP).
+                {" "}quando quiser (tipicamente em job agendado).
               </div>
             </li>
             <li className="flex gap-3">

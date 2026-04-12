@@ -14,7 +14,7 @@ export const metadata: Metadata = {
     default: "DFeAxis",
     template: "%s | DFeAxis",
   },
-  description: "Captura automatica de documentos fiscais recebidos da SEFAZ para SAP DRC",
+  description: "Captura automática de documentos fiscais da SEFAZ. API REST para SAP DRC, TOTVS, Oracle e qualquer ERP. Trial grátis.",
 }
 
 const GTM_ID = process.env.NEXT_PUBLIC_GTM_ID || "GTM-PLACEHOLDER"
