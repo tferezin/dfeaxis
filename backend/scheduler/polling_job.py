@@ -2,7 +2,7 @@
 
 import base64
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -574,9 +574,11 @@ def _auto_ciencia(
             )
 
             if result.success:
+                now = datetime.now(timezone.utc)
                 sb.table("documents").update({
                     "manifestacao_status": "ciencia",
-                    "manifestacao_at": datetime.now(timezone.utc).isoformat(),
+                    "manifestacao_at": now.isoformat(),
+                    "manifestacao_deadline": (now + timedelta(days=180)).isoformat(),
                 }).eq("tenant_id", tenant_id).eq(
                     "chave_acesso", doc.chave
                 ).execute()
@@ -707,6 +709,22 @@ def start_scheduler() -> BackgroundScheduler:
         )
     except Exception as exc:  # noqa: BLE001
         logger.warning("Não foi possível agendar trial email jobs: %s", exc)
+
+    # Manifestação: alerta de NF-e pendentes (1x/dia)
+    try:
+        from scheduler.manifestacao_alert_job import check_manifestacao_expiring
+
+        scheduler.add_job(
+            check_manifestacao_expiring,
+            "interval",
+            hours=24,
+            id="manifestacao_alerts",
+            name="Alerta NF-e pendentes de manifestação (D-10/D-5)",
+            replace_existing=True,
+        )
+        logger.info("manifestacao_alert_job agendado: 1x/dia")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Não foi possível agendar manifestacao_alert_job: %s", exc)
 
     # LGPD: cleanup de .pfx após 30 dias de inatividade (1x/dia)
     try:

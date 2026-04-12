@@ -140,6 +140,23 @@ class EmailService:
         subject = "Você está perto do limite do trial DFeAxis"
         return self._send(to_email, subject, html, email_type="trial_cap_warning")
 
+    def send_manifestacao_expiring(
+        self,
+        to_email: str,
+        name: str,
+        total_docs: int,
+        min_days_remaining: int,
+    ) -> bool:
+        """Alert: NF-e with ciência but no definitive manifestation, deadline approaching."""
+        html = self._render(
+            "manifestacao_expiring.html",
+            name=name,
+            total_docs=total_docs,
+            min_days_remaining=min_days_remaining,
+        )
+        subject = f"DFeAxis: {total_docs} NF-e pendente(s) de manifestação — vence em {min_days_remaining} dia(s)"
+        return self._send(to_email, subject, html, email_type="manifestacao_expiring")
+
     def send_trial_expired(
         self,
         to_email: str,

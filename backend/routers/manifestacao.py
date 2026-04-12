@@ -1,7 +1,7 @@
 """Endpoints de Manifestação do Destinatário (NF-e)."""
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -134,11 +134,19 @@ async def enviar_manifestacao(
 
     if result.success:
         # Atualiza status do documento
+        now = datetime.now(timezone.utc)
         new_status = status_map[body.tipo_evento]
-        sb.table("documents").update({
+        update_data: dict = {
             "manifestacao_status": new_status,
-            "manifestacao_at": datetime.now(timezone.utc).isoformat(),
-        }).eq("id", doc_id).execute()
+            "manifestacao_at": now.isoformat(),
+        }
+        # Se é ciência, seta o deadline de 180 dias para manifesto definitivo
+        if body.tipo_evento == "210210":
+            update_data["manifestacao_deadline"] = (now + timedelta(days=180)).isoformat()
+        # Se é manifesto definitivo, limpa o deadline (já foi cumprido)
+        elif body.tipo_evento in ("210200", "210220", "210240"):
+            update_data["manifestacao_deadline"] = None
+        sb.table("documents").update(update_data).eq("id", doc_id).execute()
 
     # Registra evento de auditoria
     sb.table("manifestacao_events").insert({
