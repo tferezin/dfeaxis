@@ -21,6 +21,7 @@ import { PendentesPanel } from "@/components/pendentes-panel"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { useSettings } from "@/hooks/use-settings"
 import { useTrial } from "@/hooks/use-trial"
+import { useMonthlyUsage } from "@/hooks/use-monthly-usage"
 import { getSupabase } from "@/lib/supabase"
 import { listPlans, type Plan } from "@/lib/billing"
 
@@ -43,15 +44,12 @@ interface ActivityEntry {
 export default function DashboardPage() {
   const { settings } = useSettings()
   const showMock = settings.showMockData
-  const {
-    trialActive,
-    subscriptionStatus,
-    docsConsumidosMes,
-    docsIncludedMes,
-    stripePriceId,
-  } = useTrial()
+  const { trialActive, subscriptionStatus } = useTrial()
   const showTrialCounter = subscriptionStatus !== "active" && trialActive
   const showUsageCard = subscriptionStatus === "active"
+
+  // Monthly usage only loads when subscription is active (decoupled from trial state)
+  const { docsConsumidosMes, docsIncludedMes, stripePriceId } = useMonthlyUsage(showUsageCard)
 
   // Plans (used to resolve overage rate for the current subscription).
   const [plansList, setPlansList] = useState<Plan[]>([])
@@ -204,6 +202,12 @@ export default function DashboardPage() {
     if (!settings.showMockData) loadRealData()
   }, [settings.showMockData, loadRealData])
 
+  // Current month/year label, e.g. "abr 2026"
+  const now = new Date()
+  const mesAtual = now.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "")
+  const anoAtual = now.getFullYear()
+  const periodoAtual = `${mesAtual.charAt(0).toUpperCase()}${mesAtual.slice(1)} ${anoAtual}`
+
   const nfeValue = showMock ? "1.247" : realCounts.nfe.toLocaleString("pt-BR")
   const cteValue = showMock ? "384" : realCounts.cte.toLocaleString("pt-BR")
   const mdfeValue = showMock ? "56" : realCounts.mdfe.toLocaleString("pt-BR")
@@ -240,7 +244,7 @@ export default function DashboardPage() {
           </button>
           <button className="inline-flex items-center gap-2 rounded-lg border bg-background px-2.5 py-1.5 text-xs font-medium shadow-sm transition-colors hover:bg-muted">
             <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
-            <span>Mar 2026</span>
+            <span>{periodoAtual}</span>
             <ChevronDown className="h-3 w-3 text-muted-foreground" />
           </button>
         </div>
@@ -356,7 +360,7 @@ export default function DashboardPage() {
               icon={<FileText className="h-4 w-4 text-blue-600" />}
               totalLabel="Total Geral"
               totalValue={showMock ? "R$ 2.847.320,45" : fmt(allTotal)}
-              period="Mar 2026"
+              period={periodoAtual}
               items={showMock ? [
                 { label: "Autorizadas", value: "R$ 2.847.320,45", amount: 2847320, color: "text-emerald-600", bgColor: "bg-emerald-500" },
                 { label: "Canceladas", value: "R$ 63.250,00", amount: 63250, color: "text-gray-500", bgColor: "bg-gray-400" },

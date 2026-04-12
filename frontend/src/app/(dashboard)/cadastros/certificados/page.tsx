@@ -13,7 +13,7 @@ import {
   Plus, Trash2, RefreshCw, ShieldCheck, Upload, Inbox, Loader2, Check, AlertTriangle,
 } from "lucide-react"
 
-const API_BASE_URL = "https://dfeaxis-production.up.railway.app"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://dfeaxis-production.up.railway.app"
 
 interface Certificate {
   id: string

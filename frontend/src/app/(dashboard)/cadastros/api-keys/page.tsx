@@ -11,7 +11,7 @@ import {
   Plus, Copy, Trash2, Check, Key, Server, Shield, AlertTriangle, Loader2,
 } from "lucide-react"
 
-const API_BASE_URL = "https://dfeaxis-production.up.railway.app"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://dfeaxis-production.up.railway.app"
 
 function formatCnpj(cnpj: string) {
   if (cnpj.length !== 14) return cnpj

@@ -65,10 +65,10 @@ test.describe("Manifestação — ciência individual", () => {
 
     // Navigate directly to NF-e history (showMockData defaults to false)
     await page.goto("/historico/nfe")
-    await page.waitForLoadState("networkidle")
+    await page.waitForLoadState("domcontentloaded")
 
     // Wait for data to load — look for the "Dar Ciência" button on pending docs
-    const darCienciaBtn = page.getByRole("button", { name: /dar ci[eê]ncia/i }).first()
+    const darCienciaBtn = page.getByRole("button", { name: /(dar|reenviar) ci[eê]ncia/i }).first()
     await expect(darCienciaBtn).toBeVisible({ timeout: 15_000 })
 
     // Click opens confirmation dialog
@@ -133,7 +133,7 @@ test.describe("Manifestação — ciência em lote", () => {
 
     await loginViaUI(page, user)
     await page.goto("/historico/nfe")
-    await page.waitForLoadState("networkidle")
+    await page.waitForLoadState("domcontentloaded")
 
     // Wait for checkboxes to appear (one per pending document row + header)
     const rowCheckboxes = page.locator('tbody input[type="checkbox"]')
@@ -197,10 +197,10 @@ test.describe("Manifestação — erro SEFAZ", () => {
 
     await loginViaUI(page, user)
     await page.goto("/historico/nfe")
-    await page.waitForLoadState("networkidle")
+    await page.waitForLoadState("domcontentloaded")
 
     // Click Dar Ciência
-    const darCienciaBtn = page.getByRole("button", { name: /dar ci[eê]ncia/i }).first()
+    const darCienciaBtn = page.getByRole("button", { name: /(dar|reenviar) ci[eê]ncia/i }).first()
     await expect(darCienciaBtn).toBeVisible({ timeout: 15_000 })
     await darCienciaBtn.click()
 

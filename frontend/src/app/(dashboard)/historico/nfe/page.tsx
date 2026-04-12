@@ -191,7 +191,7 @@ function ActionCell({ row, onManifest }: { row: { chave: string; status: NfeStat
           onClick={() => onManifest?.(row.chave, "210210", "Ciência da Operação")}
         >
           <CheckCircle2 className="size-3.5" />
-          Dar Ciência
+          Reenviar Ciência
         </Button>
       )
     case "Ciencia":
@@ -254,8 +254,11 @@ export default function HistoricoNfePage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [statusFilter, setStatusFilter] = useState("Todos")
   const [searchChave, setSearchChave] = useState("")
-  const [dateFrom, setDateFrom] = useState("2026-03-01")
-  const [dateTo, setDateTo] = useState("2026-03-17")
+  const [dateFrom, setDateFrom] = useState(() => {
+    const now = new Date()
+    return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0]
+  })
+  const [dateTo, setDateTo] = useState(() => new Date().toISOString().split("T")[0])
   const itemsPerPage = 10
 
   const [confirmDialog, setConfirmDialog] = useState<{
