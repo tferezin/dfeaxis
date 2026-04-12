@@ -68,7 +68,7 @@ button,input,select{font-family:var(--fs)}
 /* NAV */
 #nav{position:fixed;top:0;left:0;right:0;z-index:200;height:62px;padding:0 52px;
   display:flex;align-items:center;gap:36px;
-  background:rgba(237,240,246,.92);backdrop-filter:blur(18px);
+  background:var(--bg);backdrop-filter:blur(18px);
   border-bottom:1px solid var(--bdr)}
 .logo{font-family:var(--fd);font-size:19px;font-weight:400;letter-spacing:-.01em}
 .logo b{color:var(--gr-m);font-weight:400}
@@ -332,10 +332,12 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
   #hero{padding:130px 20px 80px}
 }
 @media(max-width:600px){
-  .cmp-wrap td:first-child,.cmp-wrap th:first-child{position:sticky;left:0;background:var(--sur);z-index:1;min-width:150px}
+  .cmp-wrap{border-radius:10px;font-size:11px}
+  .cmp-wrap th,.cmp-wrap td{padding:8px 6px!important}
+  .cmp-wrap td:first-child,.cmp-wrap th:first-child{position:sticky;left:0;background:var(--sur);z-index:1;min-width:100px}
   .cmp-wrap thead th:first-child{background:var(--bg)}
+  .cmp-wrap thead th{font-size:12px}
   .cmp-cat td:first-child{background:var(--bg)}
-  .cmp-wrap{border-radius:10px}
   .cmp-wrap thead th{top:48px}
 }
 </style>
