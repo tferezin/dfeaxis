@@ -21,10 +21,10 @@
 <meta name="twitter:description" content="NF-e, CT-e, MDF-e e NFS-e capturados na SEFAZ e entregues ao seu ERP via API REST. Zero armazenamento.">
 <meta name="twitter:image" content="https://www.dfeaxis.com.br/og-image.jpg">
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"SoftwareApplication","name":"DFeAxis","description":"SaaS para captura automática de NF-e, CT-e, MDF-e e NFS-e de fornecedores na SEFAZ e entrega ao seu ERP via API REST. Integra com SAP DRC, TOTVS, Oracle, Senior, Sankhya ou qualquer sistema. Zero armazenamento de XMLs.","applicationCategory":"BusinessApplication","operatingSystem":"Web","url":"https://dfeaxis.com.br","offers":{"@type":"Offer","availability":"https://schema.org/InStock","priceCurrency":"BRL","price":"290"}}
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"DFeAxis","description":"SaaS para captura automática de NF-e, CT-e, MDF-e e NFS-e de fornecedores na SEFAZ e entrega ao seu ERP via API REST. Integra com SAP DRC, TOTVS, Oracle, Senior, Sankhya ou qualquer sistema. Zero armazenamento de XMLs.","applicationCategory":"BusinessApplication","operatingSystem":"Web","url":"https://www.dfeaxis.com.br/","offers":[{"@type":"Offer","name":"Starter","price":"290","priceCurrency":"BRL","availability":"https://schema.org/InStock"},{"@type":"Offer","name":"Business","price":"690","priceCurrency":"BRL","availability":"https://schema.org/InStock"},{"@type":"Offer","name":"Enterprise","price":"1490","priceCurrency":"BRL","availability":"https://schema.org/InStock"}]}
 </script>
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"Organization","name":"DFeAxis","url":"https://dfeaxis.com.br","logo":"https://dfeaxis.com.br/logo-dfeaxis.png","description":"Plataforma SaaS de captura automática de documentos fiscais (NF-e, CT-e, MDF-e) na SEFAZ com entrega direta ao SAP DRC e outros ERPs via API REST.","foundingDate":"2026","contactPoint":{"@type":"ContactPoint","email":"contato@dfeaxis.com.br","contactType":"sales","availableLanguage":"Portuguese"},"sameAs":[]}
+{"@context":"https://schema.org","@type":"Organization","name":"DFeAxis","url":"https://www.dfeaxis.com.br/","logo":"https://www.dfeaxis.com.br/logo-dfeaxis.png","description":"Plataforma SaaS de captura automática de documentos fiscais (NF-e, CT-e, MDF-e) na SEFAZ com entrega direta ao SAP DRC e outros ERPs via API REST.","foundingDate":"2026","contactPoint":{"@type":"ContactPoint","email":"contato@dfeaxis.com.br","contactType":"sales","availableLanguage":"Portuguese"},"sameAs":[]}
 </script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Precisa de SAP PI ou SAP Integration Suite?","acceptedAnswer":{"@type":"Answer","text":"Não. O DFeAxis se conecta ao SAP DRC via RFC Destination HTTP padrão (SM59). Sem SAP PI, sem CPI, sem cenário B2B, sem middleware adicional."}},{"@type":"Question","name":"Funciona com SAP DRC Cloud (Public Cloud)?","acceptedAnswer":{"@type":"Answer","text":"Sim. O DFeAxis expõe uma API REST pública acessível por qualquer ambiente SAP com acesso à internet via Communication Arrangement ou RFC Destination HTTP."}},{"@type":"Question","name":"Migramos do SAP GRC NFe para o DRC e perdemos a automação. O DFeAxis resolve?","acceptedAnswer":{"@type":"Answer","text":"Exatamente. O GRC fazia polling automático via SAP PI a cada 15-30 min. O DRC não tem esse mecanismo nativo. O DFeAxis foi criado especificamente para resolver essa lacuna."}},{"@type":"Question","name":"Meus XMLs ficam armazenados em servidores de terceiros?","acceptedAnswer":{"@type":"Answer","text":"Não. O DFeAxis opera com zero-retention por design. O XML é capturado na SEFAZ, entregue ao seu ERP e descartado imediatamente após a confirmação."}},{"@type":"Question","name":"O certificado digital A1 fica seguro?","acceptedAnswer":{"@type":"Answer","text":"Sim. O .pfx é cifrado com AES-256 com chave exclusiva derivada por tenant. Nunca é gravado em disco em texto claro. Isolamento total entre empresas."}},{"@type":"Question","name":"Posso testar por 10 dias sem cartão?","acceptedAnswer":{"@type":"Answer","text":"Sim. Nenhum cartão é solicitado no cadastro. Ao final dos 10 dias o sistema para automaticamente. O modelo é créditos pré-pagos."}},{"@type":"Question","name":"Funciona apenas com SAP ou integra com outros ERPs?","acceptedAnswer":{"@type":"Answer","text":"Sim. O DFeAxis expõe API REST padrão. Qualquer sistema que consuma REST pode integrar. SAP DRC é a integração principal, mas TOTVS, Oracle, Senior, Sankhya e sistemas próprios funcionam perfeitamente via API."}},{"@type":"Question","name":"Funciona com TOTVS / Oracle / outros ERPs?","acceptedAnswer":{"@type":"Answer","text":"Sim. O DFeAxis expõe API REST padrão. Qualquer sistema que consuma REST pode integrar. Para SAP DRC temos integração nativa via RFC Destination HTTP. Para TOTVS, Oracle, Senior, Sankhya e outros, basta consumir os endpoints REST."}},{"@type":"Question","name":"Preciso de middleware (SAP PI, CPI, MuleSoft) para integrar?","acceptedAnswer":{"@type":"Answer","text":"Não. O DFeAxis se conecta diretamente ao seu ERP via API REST. Sem SAP PI, sem CPI, sem MuleSoft, sem cenários B2B. Para SAP DRC, basta configurar uma RFC Destination HTTP na SM59."}},{"@type":"Question","name":"Vocês respondem questionário de segurança para procurement enterprise?","acceptedAnswer":{"@type":"Answer","text":"Sim. Temos um questionário de segurança pré-preenchido com 44 perguntas cobrindo infraestrutura, controle de acesso, criptografia, compliance LGPD, resposta a incidentes e continuidade de negócio. Disponível sob demanda para empresas nos planos Business e Enterprise."}}]}
@@ -52,6 +52,34 @@ fbq('track', 'PageView');
 <noscript><img height="1" width="1" style="display:none"
 src="https://www.facebook.com/tr?id=PIXEL_PLACEHOLDER&ev=PageView&noscript=1"/></noscript>
 <!-- End Meta Pixel -->
+<!-- Google Ads (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=AW-PLACEHOLDER"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'AW-PLACEHOLDER');
+</script>
+<!-- End Google Ads -->
+<!-- LinkedIn Insight Tag (B2B) -->
+<script type="text/javascript">
+_linkedin_partner_id = "LINKEDIN_PLACEHOLDER";
+window._linkedin_data_partner_ids = window._linkedin_data_partner_ids || [];
+window._linkedin_data_partner_ids.push(_linkedin_partner_id);
+</script><script type="text/javascript">
+(function(l) {
+if (!l){window.lintrk = function(a,b){window.lintrk.q.push([a,b])};
+window.lintrk.q=[]}
+var s = document.getElementsByTagName("script")[0];
+var b = document.createElement("script");
+b.type = "text/javascript";b.async = true;
+b.src = "https://snap.licdn.com/li.lms-analytics/insight.min.js";
+s.parentNode.insertBefore(b, s);})(window.lintrk);
+</script>
+<noscript>
+<img height="1" width="1" style="display:none;" alt="" src="https://px.ads.linkedin.com/collect/?pid=LINKEDIN_PLACEHOLDER&fmt=gif" />
+</noscript>
+<!-- End LinkedIn Insight Tag -->
 <link rel="icon" href="/favicon.ico?v=3" type="image/x-icon">
 <link rel="shortcut icon" href="/favicon.ico?v=3">
 <link rel="apple-touch-icon" href="/apple-icon.png">
