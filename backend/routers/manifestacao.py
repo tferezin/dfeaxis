@@ -148,7 +148,10 @@ async def enviar_manifestacao(
             update_data["manifestacao_deadline"] = None
         sb.table("documents").update(update_data).eq("id", doc_id).execute()
 
-    # Registra evento de auditoria
+    # Determina origem do evento (dashboard via JWT, ou api via API key)
+    source = "dashboard" if auth.get("user_id") else "api"
+
+    # Registra evento de auditoria com source + identificador
     sb.table("manifestacao_events").insert({
         "tenant_id": tenant_id,
         "document_id": doc_id,
@@ -158,6 +161,9 @@ async def enviar_manifestacao(
         "xmotivo": result.xmotivo,
         "protocolo": result.protocolo,
         "latency_ms": result.latency_ms,
+        "source": source,
+        "user_id": auth.get("user_id"),
+        "api_key_id": auth.get("api_key_id"),
     }).execute()
 
     return ManifestacaoResponse(

@@ -611,6 +611,7 @@ def _auto_ciencia(
                 "xmotivo": result.xmotivo,
                 "protocolo": result.protocolo,
                 "latency_ms": result.latency_ms,
+                "source": "auto_capture",
             }).execute()
 
             logger.info(

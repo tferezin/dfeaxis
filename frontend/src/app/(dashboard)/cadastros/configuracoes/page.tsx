@@ -214,7 +214,7 @@ export default function ConfiguracoesPage() {
           </CardContent>
         </Card>
 
-        {/* Manifestação do Destinatário */}
+        {/* Manifestação do Destinatário — informativo */}
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
@@ -222,29 +222,22 @@ export default function ConfiguracoesPage() {
               <CardTitle className="text-base">Manifestação do Destinatário</CardTitle>
             </div>
             <CardDescription>
-              Define como o DFeAxis trata NF-e com resumo (sem XML completo).
+              Como o DFeAxis trata os eventos de manifestação de NF-e.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3 pt-0">
-            <SettingsSelect
-              label="Manifestação"
-              options={[
-                {
-                  value: "auto_ciencia",
-                  label: "Automática",
-                  description:
-                    "Envia Ciência da Operação automaticamente ao detectar resumo de NF-e.",
-                },
-                {
-                  value: "manual",
-                  label: "Manual",
-                  description:
-                    "Você decide quais notas manifestar pelo painel ou via API.",
-                },
-              ]}
-              value={settings.manifestacaoMode}
-              onChange={(v) => updateSettings({ manifestacaoMode: v as "auto_ciencia" | "manual" })}
-            />
+          <CardContent className="space-y-3 pt-0 text-sm text-muted-foreground">
+            <div className="flex gap-2">
+              <span className="font-medium text-foreground shrink-0">Ciência (210210):</span>
+              <span>Enviada <strong>automaticamente</strong> durante cada captura. É obrigatória pela SEFAZ para liberar o XML completo.</span>
+            </div>
+            <div className="flex gap-2">
+              <span className="font-medium text-foreground shrink-0">Manifesto definitivo:</span>
+              <span>Confirmar, Desconhecer ou Operação não Realizada. Pode ser feito <strong>manualmente pelo painel</strong> ou <strong>automaticamente via API</strong> (SAP após MIRO).</span>
+            </div>
+            <div className="flex gap-2">
+              <span className="font-medium text-foreground shrink-0">Prazo SEFAZ:</span>
+              <span>180 dias após a ciência. Você receberá alertas por e-mail quando algum documento estiver próximo do vencimento.</span>
+            </div>
           </CardContent>
         </Card>
 
