@@ -29,9 +29,29 @@
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Precisa de SAP PI ou SAP Integration Suite?","acceptedAnswer":{"@type":"Answer","text":"Não. O DFeAxis se conecta ao SAP DRC via RFC Destination HTTP padrão (SM59). Sem SAP PI, sem CPI, sem cenário B2B, sem middleware adicional."}},{"@type":"Question","name":"Funciona com SAP DRC Cloud (Public Cloud)?","acceptedAnswer":{"@type":"Answer","text":"Sim. O DFeAxis expõe uma API REST pública acessível por qualquer ambiente SAP com acesso à internet via Communication Arrangement ou RFC Destination HTTP."}},{"@type":"Question","name":"Migramos do SAP GRC NFe para o DRC e perdemos a automação. O DFeAxis resolve?","acceptedAnswer":{"@type":"Answer","text":"Exatamente. O GRC fazia polling automático via SAP PI a cada 15-30 min. O DRC não tem esse mecanismo nativo. O DFeAxis foi criado especificamente para resolver essa lacuna."}},{"@type":"Question","name":"Meus XMLs ficam armazenados em servidores de terceiros?","acceptedAnswer":{"@type":"Answer","text":"Não. O DFeAxis opera com zero-retention por design. O XML é capturado na SEFAZ, entregue ao seu ERP e descartado imediatamente após a confirmação."}},{"@type":"Question","name":"O certificado digital A1 fica seguro?","acceptedAnswer":{"@type":"Answer","text":"Sim. O .pfx é cifrado com AES-256 com chave exclusiva derivada por tenant. Nunca é gravado em disco em texto claro. Isolamento total entre empresas."}},{"@type":"Question","name":"Posso testar por 10 dias sem cartão?","acceptedAnswer":{"@type":"Answer","text":"Sim. Nenhum cartão é solicitado no cadastro. Ao final dos 10 dias o sistema para automaticamente. O modelo é créditos pré-pagos."}},{"@type":"Question","name":"Funciona apenas com SAP ou integra com outros ERPs?","acceptedAnswer":{"@type":"Answer","text":"Sim. O DFeAxis expõe API REST padrão. Qualquer sistema que consuma REST pode integrar. SAP DRC é a integração principal, mas TOTVS, Oracle, Senior, Sankhya e sistemas próprios funcionam perfeitamente via API."}},{"@type":"Question","name":"Funciona com TOTVS / Oracle / outros ERPs?","acceptedAnswer":{"@type":"Answer","text":"Sim. O DFeAxis expõe API REST padrão. Qualquer sistema que consuma REST pode integrar. Para SAP DRC temos integração nativa via RFC Destination HTTP. Para TOTVS, Oracle, Senior, Sankhya e outros, basta consumir os endpoints REST."}},{"@type":"Question","name":"Preciso de middleware (SAP PI, CPI, MuleSoft) para integrar?","acceptedAnswer":{"@type":"Answer","text":"Não. O DFeAxis se conecta diretamente ao seu ERP via API REST. Sem SAP PI, sem CPI, sem MuleSoft, sem cenários B2B. Para SAP DRC, basta configurar uma RFC Destination HTTP na SM59."}},{"@type":"Question","name":"Vocês respondem questionário de segurança para procurement enterprise?","acceptedAnswer":{"@type":"Answer","text":"Sim. Temos um questionário de segurança pré-preenchido com 44 perguntas cobrindo infraestrutura, controle de acesso, criptografia, compliance LGPD, resposta a incidentes e continuidade de negócio. Disponível sob demanda para empresas nos planos Business e Enterprise."}}]}
 </script>
-<!--
-<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-XXXXXXX');</script>
--->
+<!-- Google Tag Manager -->
+<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-PLACEHOLDER');</script>
+<!-- End Google Tag Manager -->
+<!-- Meta Pixel -->
+<script>
+!function(f,b,e,v,n,t,s)
+{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];
+s.parentNode.insertBefore(t,s)}(window, document,'script',
+'https://connect.facebook.net/en_US/fbevents.js');
+fbq('init', 'PIXEL_PLACEHOLDER');
+fbq('track', 'PageView');
+</script>
+<noscript><img height="1" width="1" style="display:none"
+src="https://www.facebook.com/tr?id=PIXEL_PLACEHOLDER&ev=PageView&noscript=1"/></noscript>
+<!-- End Meta Pixel -->
 <link rel="icon" href="/favicon.ico?v=3" type="image/x-icon">
 <link rel="shortcut icon" href="/favicon.ico?v=3">
 <link rel="apple-touch-icon" href="/apple-icon.png">
@@ -349,6 +369,10 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
 </style>
 </head>
 <body>
+<!-- Google Tag Manager (noscript) -->
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-PLACEHOLDER"
+height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+<!-- End Google Tag Manager (noscript) -->
 <!--<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-XXXXXXX" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>-->
 
 <nav id="nav">
@@ -365,7 +389,7 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
   </div>
   <div class="nav-btns" id="navBtns">
     <button class="btn-out" onclick="openAuth('login')">Entrar</button>
-    <button class="btn-fill" onclick="window.location.href='/signup'">Começar grátis</button>
+    <button class="btn-fill" onclick="if(window.fbq)fbq('track','Lead');if(window.gtag)gtag('event','click_cta',{'event_category':'signup'});window.location.href='/signup'">Começar grátis</button>
   </div>
 </nav>
 
@@ -378,7 +402,7 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
     <h1>Documentos fiscais dos<br>seus fornecedores.<br>Capturados,<br><strong style="color:var(--gr-m)">Automaticamente.</strong></h1>
     <p class="hero-p">Capturamos NF-e, CT-e, MDF-e e NFS-e na SEFAZ e entregamos via API REST ao seu ERP. Sem middleware. Sem armazenamento.</p>
     <div class="hero-ctas">
-      <button class="cta-p" onclick="window.location.href='/signup'">Criar conta — 10 dias grátis</button>
+      <button class="cta-p" onclick="if(window.fbq)fbq('track','Lead');if(window.gtag)gtag('event','click_cta',{'event_category':'signup'});window.location.href='/signup'">Criar conta — 10 dias grátis</button>
       <button class="cta-s" onclick="document.getElementById('features').scrollIntoView({behavior:'smooth'})">Ver como funciona</button>
     </div>
     <a href="mailto:contato@dfeaxis.com.br" class="hero-tertiary">Prefere uma demonstração? Fale com um especialista <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg></a>
@@ -680,7 +704,7 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
       <div class="plan-f"><div class="chk">&#10003;</div>3.000 docs inclusos</div>
       <div class="plan-f"><div class="chk">&#10003;</div>NF-e + CT-e + MDF-e</div>
       <div class="plan-f"><div class="chk">&#10003;</div>Excedente: R$ 0,12/doc</div>
-      <button class="plan-btn" onclick="window.location.href='/signup'">Começar agora</button>
+      <button class="plan-btn" onclick="if(window.fbq)fbq('track','Lead');if(window.gtag)gtag('event','click_cta',{'event_category':'signup'});window.location.href='/signup'">Começar agora</button>
     </div>
     <div class="plan fp">
       <div class="plan-badge">Mais popular</div>
@@ -692,7 +716,7 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
       <div class="plan-f"><div class="chk">&#10003;</div>8.000 docs inclusos</div>
       <div class="plan-f"><div class="chk">&#10003;</div>NF-e + CT-e + MDF-e + NFS-e</div>
       <div class="plan-f"><div class="chk">&#10003;</div>Excedente: R$ 0,09/doc</div>
-      <button class="plan-btn" onclick="window.location.href='/signup'">Começar agora</button>
+      <button class="plan-btn" onclick="if(window.fbq)fbq('track','Lead');if(window.gtag)gtag('event','click_cta',{'event_category':'signup'});window.location.href='/signup'">Começar agora</button>
     </div>
     <div class="plan">
       <div class="plan-name">Enterprise</div>
@@ -705,7 +729,7 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
       <div class="plan-f"><div class="chk">&#10003;</div>Incidentes P1: resposta em 15 min</div>
       <div class="plan-f"><div class="chk">&#10003;</div>Questionário de segurança incluso</div>
       <div class="plan-f"><div class="chk">&#10003;</div>Excedente: R$ 0,07/doc</div>
-      <button class="plan-btn" onclick="window.location.href='/signup'">Começar agora</button>
+      <button class="plan-btn" onclick="if(window.fbq)fbq('track','Lead');if(window.gtag)gtag('event','click_cta',{'event_category':'signup'});window.location.href='/signup'">Começar agora</button>
     </div>
   </div>
   <p class="price-note">Precisa de mais de 50 CNPJs? <a href="mailto:contato@dfeaxis.com.br" style="color:var(--gr-m);font-weight:600">Fale conosco</a>. Trial 10 dias grátis, sem cartão.</p>
@@ -742,7 +766,6 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
       <tr><td>Zero-retention</td><td class="cmp-yes">&#10003;</td><td class="cmp-yes">&#10003;</td><td class="cmp-yes">&#10003;</td></tr>
       <tr><td>LGPD compliance</td><td class="cmp-yes">&#10003;</td><td class="cmp-yes">&#10003;</td><td class="cmp-yes">&#10003;</td></tr>
       <tr><td>Audit log</td><td>90 dias</td><td>90 dias</td><td>90 dias</td></tr>
-      <tr><td>Escalação</td><td>Padrão</td><td>Prioritária</td><td>Dedicada</td></tr>
     </tbody>
   </table>
   </div>
@@ -775,7 +798,6 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
         <div class="cmp-row"><span>Zero-retention</span><strong class="cmp-yes">&#10003;</strong></div>
         <div class="cmp-row"><span>LGPD compliance</span><strong class="cmp-yes">&#10003;</strong></div>
         <div class="cmp-row"><span>Audit log</span><strong>90 dias</strong></div>
-        <div class="cmp-row"><span>Escalação</span><strong>Padrão</strong></div>
       </div>
       <div class="cmp-panel" data-plan="1">
         <div class="cmp-group-title">Volume e Tipos</div>
@@ -795,7 +817,6 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
         <div class="cmp-row"><span>Zero-retention</span><strong class="cmp-yes">&#10003;</strong></div>
         <div class="cmp-row"><span>LGPD compliance</span><strong class="cmp-yes">&#10003;</strong></div>
         <div class="cmp-row"><span>Audit log</span><strong>90 dias</strong></div>
-        <div class="cmp-row"><span>Escalação</span><strong>Prioritária</strong></div>
       </div>
       <div class="cmp-panel" data-plan="2">
         <div class="cmp-group-title">Volume e Tipos</div>
@@ -815,7 +836,6 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
         <div class="cmp-row"><span>Zero-retention</span><strong class="cmp-yes">&#10003;</strong></div>
         <div class="cmp-row"><span>LGPD compliance</span><strong class="cmp-yes">&#10003;</strong></div>
         <div class="cmp-row"><span>Audit log</span><strong>90 dias</strong></div>
-        <div class="cmp-row"><span>Escalação</span><strong>Dedicada</strong></div>
       </div>
     </div>
   </div>
@@ -859,7 +879,7 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
 <div id="cta-band">
   <div class="cta-in">
     <h2>Pronto para receber seus<br><em>documentos fiscais automaticamente?</em></h2>
-    <button class="cta-p" onclick="window.location.href='/signup'">Criar conta e testar agora</button>
+    <button class="cta-p" onclick="if(window.fbq)fbq('track','Lead');if(window.gtag)gtag('event','click_cta',{'event_category':'signup'});window.location.href='/signup'">Criar conta e testar agora</button>
   </div>
 </div>
 

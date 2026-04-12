@@ -14,6 +14,10 @@ interface TrialStatus {
   docsConsumidos: number
   trialCap: number
   trialBlockedReason: TrialBlockedReason
+  docsConsumidosMes: number
+  docsIncludedMes: number
+  billingDay: number
+  stripePriceId: string | null
   loading: boolean
 }
 
@@ -26,6 +30,10 @@ export function useTrial(): TrialStatus {
     docsConsumidos: 0,
     trialCap: 500,
     trialBlockedReason: null,
+    docsConsumidosMes: 0,
+    docsIncludedMes: 0,
+    billingDay: 5,
+    stripePriceId: null,
     loading: true,
   })
 
@@ -42,7 +50,7 @@ export function useTrial(): TrialStatus {
         const { data, error } = await sb
           .from("tenants")
           .select(
-            "trial_active, trial_expires_at, subscription_status, docs_consumidos_trial, trial_cap, trial_blocked_reason"
+            "trial_active, trial_expires_at, subscription_status, docs_consumidos_trial, trial_cap, trial_blocked_reason, docs_consumidos_mes, docs_included_mes, billing_day, stripe_price_id"
           )
           .eq("user_id", user.id)
           .single()
@@ -67,6 +75,10 @@ export function useTrial(): TrialStatus {
           docsConsumidos: data.docs_consumidos_trial ?? 0,
           trialCap: data.trial_cap ?? 500,
           trialBlockedReason: (data.trial_blocked_reason ?? null) as TrialBlockedReason,
+          docsConsumidosMes: data.docs_consumidos_mes ?? 0,
+          docsIncludedMes: data.docs_included_mes ?? 0,
+          billingDay: data.billing_day ?? 5,
+          stripePriceId: data.stripe_price_id ?? null,
           loading: false,
         })
       } catch {

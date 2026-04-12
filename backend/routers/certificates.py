@@ -97,6 +97,37 @@ async def upload_certificate(
 
     sb = get_supabase_client()
 
+    # --- Plan enforcement: limite de CNPJs do plano ---
+    tenant_plan_row = sb.table("tenants").select(
+        "plan, max_cnpjs"
+    ).eq("id", tenant_id).single().execute()
+    tenant_plan_data = tenant_plan_row.data or {}
+    max_cnpjs = tenant_plan_data.get("max_cnpjs") or 1
+
+    # Verifica se já existe certificado para este mesmo CNPJ (update, não novo)
+    replacing_existing = sb.table("certificates").select("id").eq(
+        "tenant_id", tenant_id
+    ).eq("cnpj", cnpj).execute()
+
+    if not replacing_existing.data:
+        # Só aplica o limite se for um insert novo (não substituição)
+        active_certs = sb.table("certificates").select(
+            "id", count="exact"
+        ).eq("tenant_id", tenant_id).eq("is_active", True).execute()
+        active_count = active_certs.count or 0
+
+        if active_count >= max_cnpjs:
+            raise HTTPException(
+                status_code=402,
+                detail={
+                    "message": (
+                        f"Limite de CNPJs do plano atingido ({max_cnpjs}). "
+                        "Faça upgrade."
+                    ),
+                    "error_code": "CNPJ_LIMIT_REACHED",
+                },
+            )
+
     # --- Anti-abuse: 1 CNPJ = 1 trial na vida ---
     # Verifica se algum OUTRO tenant já usou este CNPJ
     cnpj_taken = sb.table("tenants").select("id").eq(
@@ -118,10 +149,8 @@ async def upload_certificate(
     ).single().execute()
     current_tenant_cnpj = (tenant_row.data or {}).get("cnpj")
 
-    # Verifica se CNPJ ja existe para este tenant
-    existing = sb.table("certificates").select("id").eq(
-        "tenant_id", tenant_id
-    ).eq("cnpj", cnpj).execute()
+    # Verifica se CNPJ ja existe para este tenant (reusa query anterior)
+    existing = replacing_existing
 
     cert_data = {
         "pfx_encrypted": pfx_hex,

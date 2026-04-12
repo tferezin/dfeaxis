@@ -28,13 +28,18 @@ export async function listPlans(): Promise<Plan[]> {
   return apiFetch<Plan[]>("/billing/plans")
 }
 
-/** Creates a checkout session and returns the redirect URL. */
+/** Creates a checkout session and returns the redirect URL.
+ *  Optional `billingDay` (5 | 10 | 15) is forwarded as Checkout metadata so the
+ *  backend can align the subscription anchor to the chosen day. */
 export async function createCheckoutSession(
-  priceId: string
+  priceId: string,
+  billingDay?: number
 ): Promise<{ session_id: string; url: string }> {
+  const body: Record<string, unknown> = { price_id: priceId }
+  if (billingDay !== undefined) body.billing_day = billingDay
   return apiFetch<{ session_id: string; url: string }>("/billing/checkout", {
     method: "POST",
-    body: JSON.stringify({ price_id: priceId }),
+    body: JSON.stringify(body),
   })
 }
 

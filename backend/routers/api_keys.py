@@ -37,13 +37,28 @@ async def create_api_key(
 
     sb = get_supabase_client()
 
-    # Limita a 5 keys por tenant
-    existing = sb.table("api_keys").select("id").eq(
-        "tenant_id", tenant_id
-    ).eq("is_active", True).execute()
+    # API keys têm relação 1:1 com CNPJs ativos
+    active_certs = sb.table("certificates").select(
+        "id", count="exact"
+    ).eq("tenant_id", tenant_id).eq("is_active", True).execute()
+    active_certs_count = active_certs.count or 0
 
-    if len(existing.data) >= 5:
-        raise HTTPException(status_code=400, detail="Limite de 5 API keys atingido")
+    active_keys = sb.table("api_keys").select(
+        "id", count="exact"
+    ).eq("tenant_id", tenant_id).eq("is_active", True).execute()
+    active_keys_count = active_keys.count or 0
+
+    if active_keys_count >= active_certs_count:
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "message": (
+                    "Número de API keys não pode exceder o número de CNPJs "
+                    "ativos. Cadastre um novo certificado primeiro."
+                ),
+                "error_code": "API_KEY_LIMIT_REACHED",
+            },
+        )
 
     sb.table("api_keys").insert({
         "tenant_id": tenant_id,

@@ -5,6 +5,7 @@ import Link from "next/link"
 import {
   Settings, ShieldCheck, Play, FileText, CheckCircle2, ArrowRight,
   Code2, Copy, Check, Server, Key, FileCode, ChevronDown, ChevronUp,
+  Send, Workflow,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -59,6 +60,20 @@ const apiEndpoints = [
     description: "Confirma recebimento — XML é removido do banco",
     params: "chave (chave de acesso de 44 dígitos na URL)",
     response: '{ "status": "discarded" }',
+  },
+  {
+    method: "POST",
+    path: "/api/v1/manifestacao",
+    description: "Envia evento de manifestação (ciencia, confirmar, desconhecer, nao realizada)",
+    params: "Body JSON: { chave_acesso, tipo_evento } — tipo_evento: 210210 | 210200 | 210220 | 210240",
+    response: '{ "status": "accepted", "protocolo": "..." }',
+  },
+  {
+    method: "POST",
+    path: "/api/v1/manifestacao/batch",
+    description: "Manifestação em lote (até 50 chaves com mesmo tipo_evento)",
+    params: "Body JSON: { chaves: [...], tipo_evento }",
+    response: "Lista de resultados por chave",
   },
   {
     method: "GET",
@@ -281,6 +296,87 @@ const rfcConfig = `*------------------------------------------------------------
 *    gerada no painel DFeAxis (menu Cadastros > API Keys)
 *----------------------------------------------------------------------*`
 
+const abapCodeConfirmar = `*&---------------------------------------------------------------------*
+*& Confirma recebimento do documento (XML é descartado no servidor)
+*&---------------------------------------------------------------------*
+
+DATA: lo_http_client TYPE REF TO if_http_client,
+      lv_url         TYPE string,
+      lv_status      TYPE i,
+      lv_response    TYPE string.
+
+" Exemplo: confirmar NF-e com chave específica
+DATA(lv_chave) = '35260312345678000190550010012345671234567890'.
+lv_url = |https://api.dfeaxis.com.br/api/v1/documentos/{ lv_chave }/confirmar|.
+
+cl_http_client=>create_by_destination(
+  EXPORTING destination = gc_rfc_dest
+  IMPORTING client      = lo_http_client ).
+
+lo_http_client->request->set_method( 'POST' ).
+lo_http_client->request->set_header_field( name = 'X-API-Key' value = gc_api_key ).
+lo_http_client->request->set_header_field( name = 'Content-Type' value = 'application/json' ).
+lo_http_client->request->set_header_field( name = 'Host' value = 'api.dfeaxis.com.br' ).
+lo_http_client->request->set_uri( lv_url ).
+
+lo_http_client->send( ).
+lo_http_client->receive( ).
+lo_http_client->response->get_status( IMPORTING code = lv_status ).
+
+IF lv_status = 200.
+  WRITE: / 'Documento confirmado como recebido. XML descartado no servidor.'.
+ELSE.
+  WRITE: / 'Erro ao confirmar:', lv_response.
+ENDIF.
+`
+
+const abapCodeManifestar = `*&---------------------------------------------------------------------*
+*& Envia manifestação de NF-e (210200 = Confirmação da Operação)
+*& Eventos: 210210=Ciência, 210200=Confirmar, 210220=Desconhecer, 210240=Não Realizada
+*&---------------------------------------------------------------------*
+
+DATA: lo_http_client TYPE REF TO if_http_client,
+      lv_url         TYPE string,
+      lv_body        TYPE string,
+      lv_status      TYPE i,
+      lv_response    TYPE string.
+
+" Após a MIRO ter sido feita com sucesso, enviar Confirmação
+DATA(lv_chave) = '35260312345678000190550010012345671234567890'.
+DATA(lv_tipo_evento) = '210200'. " Confirmação da Operação
+
+lv_url = 'https://api.dfeaxis.com.br/api/v1/manifestacao'.
+
+" Monta o JSON do request
+lv_body = |\\{"chave_acesso":"{ lv_chave }","tipo_evento":"{ lv_tipo_evento }"\\}|.
+
+cl_http_client=>create_by_destination(
+  EXPORTING destination = gc_rfc_dest
+  IMPORTING client      = lo_http_client ).
+
+lo_http_client->request->set_method( 'POST' ).
+lo_http_client->request->set_header_field( name = 'X-API-Key' value = gc_api_key ).
+lo_http_client->request->set_header_field( name = 'Content-Type' value = 'application/json' ).
+lo_http_client->request->set_header_field( name = 'Host' value = 'api.dfeaxis.com.br' ).
+lo_http_client->request->set_uri( lv_url ).
+lo_http_client->request->set_cdata( lv_body ).
+
+lo_http_client->send( ).
+lo_http_client->receive( ).
+lo_http_client->response->get_status( IMPORTING code = lv_status ).
+lo_http_client->response->get_cdata( RECEIVING data = lv_response ).
+
+IF lv_status = 200.
+  WRITE: / 'Manifestação enviada com sucesso. Resposta:', lv_response.
+ELSE.
+  WRITE: / 'Erro na manifestação. Status:', lv_status, 'Resposta:', lv_response.
+ENDIF.
+
+" Para manifestação em lote, use:
+" POST /manifestacao/batch com body { chaves: [...], tipo_evento: "210200" }
+" Limite: 50 chaves por request.
+`
+
 function CopyButton({ text, label }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false)
   return (
@@ -338,9 +434,73 @@ export default function GettingStartedPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Primeiros Passos</h1>
         </div>
         <p className="text-sm text-muted-foreground mt-1">
-          Siga os passos abaixo para configurar e testar a captura de documentos fiscais recebidos.
+          O DFeAxis captura documentos fiscais da SEFAZ <strong>automaticamente</strong> a cada 15 minutos.
+          O seu ERP (SAP, TOTVS, etc) apenas consome a nossa API REST quando precisa — buscando documentos,
+          confirmando recebimento e enviando eventos de manifestação. Siga os passos abaixo para configurar
+          e validar o fluxo.
         </p>
       </div>
+
+      {/* FLUXO COMPLETO */}
+      <Card className="border-primary/30 bg-primary/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-3 text-base">
+            <div className="size-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+              <Workflow className="size-5 text-primary" />
+            </div>
+            <span>Fluxo completo — do SEFAZ ao SAP</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <ol className="space-y-3 text-sm">
+            <li className="flex gap-3">
+              <span className="shrink-0 size-6 rounded-full bg-primary/15 text-primary font-bold text-xs flex items-center justify-center">1</span>
+              <div>
+                <strong>Captura automática</strong> — o DFeAxis consulta a SEFAZ a cada 15 minutos via scheduler.
+                O tenant não precisa fazer nada; os documentos recebidos ficam disponíveis no painel e na API.
+              </div>
+            </li>
+            <li className="flex gap-3">
+              <span className="shrink-0 size-6 rounded-full bg-primary/15 text-primary font-bold text-xs flex items-center justify-center">2</span>
+              <div>
+                <strong>Cliente busca via API</strong> — o ERP chama <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">GET /api/v1/documentos</code>
+                {" "}quando quiser (tipicamente em job agendado no SAP).
+              </div>
+            </li>
+            <li className="flex gap-3">
+              <span className="shrink-0 size-6 rounded-full bg-primary/15 text-primary font-bold text-xs flex items-center justify-center">3</span>
+              <div>
+                <strong>Cliente processa o XML</strong> — decodifica o base64 e grava no ERP
+                (MIRO, DRC, tabela Z, etc), conforme a regra de negócio.
+              </div>
+            </li>
+            <li className="flex gap-3">
+              <span className="shrink-0 size-6 rounded-full bg-primary/15 text-primary font-bold text-xs flex items-center justify-center">4</span>
+              <div>
+                <strong>Cliente confirma recebimento</strong> — chama <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">POST /api/v1/documentos/{"{chave}"}/confirmar</code>.
+                O XML é descartado do DFeAxis e o documento sai da listagem pendente.
+              </div>
+            </li>
+            <li className="flex gap-3">
+              <span className="shrink-0 size-6 rounded-full bg-primary/15 text-primary font-bold text-xs flex items-center justify-center">5</span>
+              <div>
+                <strong>Manifestação definitiva</strong> — após a MIRO no SAP, o cliente envia
+                {" "}<code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">POST /api/v1/manifestacao</code>
+                {" "}com <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">tipo_evento=210200</code> (Confirmação da Operação).
+                Outros eventos: 210210 (Ciência), 210220 (Desconhecer), 210240 (Não Realizada).
+              </div>
+            </li>
+          </ol>
+          <div className="mt-4 rounded-lg bg-background/60 border p-3">
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              <strong>Ciência automática:</strong> se o tenant estiver com <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">manifestacao_mode=auto_ciencia</code>,
+              o DFeAxis já envia o evento 210210 durante a captura. Nesse caso, o cliente só precisa se preocupar
+              com a <strong>manifestação definitiva</strong> (confirmar, desconhecer ou não realizada) — que é sempre explícita,
+              feita manualmente pelo dashboard ou via API pelo ERP após a MIRO.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* STEPS */}
       <div className="grid gap-4">
@@ -390,7 +550,7 @@ export default function GettingStartedPage() {
       </div>
 
       {/* API DOCUMENTATION */}
-      <CollapsibleSection title="API REST — Endpoints" icon={Server} badge="3 endpoints" defaultOpen>
+      <CollapsibleSection title="API REST — Endpoints" icon={Server} badge="5 endpoints" defaultOpen>
         <div className="space-y-4">
           <div className="rounded-lg bg-muted/50 p-4 space-y-1">
             <p className="text-sm font-medium">Autenticação</p>
@@ -520,6 +680,57 @@ export default function GettingStartedPage() {
 {abapCode}
             </pre>
           </div>
+        </div>
+      </CollapsibleSection>
+
+      {/* ABAP — CONFIRMAR RECEBIMENTO */}
+      <CollapsibleSection title="SAP — Confirmar Recebimento (POST /documentos/{chave}/confirmar)" icon={CheckCircle2} badge="ABAP">
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Após o XML ser processado no ERP (MIRO, DRC ou tabela Z), o cliente deve confirmar o recebimento.
+            Isso faz com que o XML seja <strong>descartado do servidor DFeAxis</strong> e o documento saia da listagem pendente.
+          </p>
+          <div className="relative">
+            <div className="absolute top-2 right-2 z-10">
+              <CopyButton text={abapCodeConfirmar} />
+            </div>
+            <pre className="text-xs font-mono bg-zinc-950 text-zinc-100 rounded-lg p-4 overflow-x-auto whitespace-pre max-h-[500px] overflow-y-auto">
+{abapCodeConfirmar}
+            </pre>
+          </div>
+        </div>
+      </CollapsibleSection>
+
+      {/* ABAP — MANIFESTACAO */}
+      <CollapsibleSection title="SAP — Manifestação Definitiva (POST /manifestacao)" icon={Send} badge="ABAP">
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Envia o evento de manifestação definitiva para a SEFAZ. Tipicamente chamado pelo SAP
+            <strong> após a MIRO</strong> ter sido feita com sucesso, usando <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">tipo_evento=210200</code>
+            {" "}(Confirmação da Operação).
+          </p>
+          <div className="rounded-lg bg-blue-50 border border-blue-200 p-4">
+            <p className="text-sm text-blue-900 font-medium mb-1">Tipos de evento suportados</p>
+            <ul className="text-xs text-blue-800 space-y-0.5">
+              <li><code className="bg-white/60 px-1 py-0.5 rounded font-mono">210210</code> — Ciência da Operação (pode ser automática via modo auto_ciencia)</li>
+              <li><code className="bg-white/60 px-1 py-0.5 rounded font-mono">210200</code> — Confirmação da Operação (após MIRO)</li>
+              <li><code className="bg-white/60 px-1 py-0.5 rounded font-mono">210220</code> — Desconhecimento da Operação</li>
+              <li><code className="bg-white/60 px-1 py-0.5 rounded font-mono">210240</code> — Operação não Realizada</li>
+            </ul>
+          </div>
+          <div className="relative">
+            <div className="absolute top-2 right-2 z-10">
+              <CopyButton text={abapCodeManifestar} />
+            </div>
+            <pre className="text-xs font-mono bg-zinc-950 text-zinc-100 rounded-lg p-4 overflow-x-auto whitespace-pre max-h-[500px] overflow-y-auto">
+{abapCodeManifestar}
+            </pre>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Para manifestação em lote, use <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">POST /api/v1/manifestacao/batch</code>
+            {" "}com body <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">{"{ chaves: [...], tipo_evento: \"210200\" }"}</code>
+            {" "}(limite de 50 chaves por request).
+          </p>
         </div>
       </CollapsibleSection>
 

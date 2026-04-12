@@ -18,9 +18,11 @@ import { RecentDocuments } from "@/components/dashboard/recent-documents"
 import { TrialCounter } from "@/components/trial-counter"
 import { EnvToggle } from "@/components/env-toggle"
 import { PendentesPanel } from "@/components/pendentes-panel"
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { useSettings } from "@/hooks/use-settings"
 import { useTrial } from "@/hooks/use-trial"
 import { getSupabase } from "@/lib/supabase"
+import { listPlans, type Plan } from "@/lib/billing"
 
 interface DashboardCounts {
   nfe: number
@@ -41,8 +43,38 @@ interface ActivityEntry {
 export default function DashboardPage() {
   const { settings } = useSettings()
   const showMock = settings.showMockData
-  const { trialActive, subscriptionStatus } = useTrial()
+  const {
+    trialActive,
+    subscriptionStatus,
+    docsConsumidosMes,
+    docsIncludedMes,
+    stripePriceId,
+  } = useTrial()
   const showTrialCounter = subscriptionStatus !== "active" && trialActive
+  const showUsageCard = subscriptionStatus === "active"
+
+  // Plans (used to resolve overage rate for the current subscription).
+  const [plansList, setPlansList] = useState<Plan[]>([])
+  useEffect(() => {
+    if (!showUsageCard) return
+    listPlans()
+      .then(setPlansList)
+      .catch(() => setPlansList([]))
+  }, [showUsageCard])
+
+  const currentPlan = plansList.find(
+    (p) => p.price_id_monthly === stripePriceId || p.price_id_yearly === stripePriceId
+  )
+  const overageCentsPerDoc = currentPlan?.overage_cents_per_doc ?? 0
+  const usagePct = docsIncludedMes > 0
+    ? Math.min(100, Math.round((docsConsumidosMes / docsIncludedMes) * 100))
+    : 0
+  const overageDocs = Math.max(0, docsConsumidosMes - docsIncludedMes)
+  const overageCents = overageDocs * overageCentsPerDoc
+  const overageBRL = (overageCents / 100).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
 
   const [realCompanyName, setRealCompanyName] = useState("")
   const [realCounts, setRealCounts] = useState<DashboardCounts>({ nfe: 0, cte: 0, mdfe: 0, nfse: 0 })
@@ -274,6 +306,44 @@ export default function DashboardPage() {
           </>
         )}
       </div>
+
+      {/* Uso do mês — apenas para assinaturas ativas */}
+      {showUsageCard && (
+        <Card size="sm">
+          <CardHeader>
+            <CardTitle>Uso do mês</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+              <div
+                className={`h-full rounded-full transition-all ${
+                  overageDocs > 0
+                    ? "bg-amber-500"
+                    : usagePct >= 90
+                      ? "bg-amber-400"
+                      : "bg-emerald-500"
+                }`}
+                style={{ width: `${Math.max(usagePct, overageDocs > 0 ? 100 : usagePct)}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">
+                {docsConsumidosMes.toLocaleString("pt-BR")} de{" "}
+                {docsIncludedMes.toLocaleString("pt-BR")} documentos capturados
+              </span>
+              {overageDocs > 0 ? (
+                <span className="font-semibold text-amber-600">
+                  Excedente previsto: R$ {overageBRL}
+                </span>
+              ) : (
+                <span className="font-semibold text-emerald-600">
+                  Dentro do limite
+                </span>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Financial + Chart side by side */}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
