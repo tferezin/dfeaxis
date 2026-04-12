@@ -40,6 +40,8 @@ async def register_tenant(
         "email": body.email,
         "plan": "starter",
         "credits": 100,  # créditos iniciais de teste
+        "max_cnpjs": 1,
+        "docs_included_mes": 3000,
         "manifestacao_mode": "manual",
         "trial_expires_at": trial_expires,
         "trial_active": True,

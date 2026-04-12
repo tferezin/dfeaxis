@@ -18,9 +18,12 @@ import { RecentDocuments } from "@/components/dashboard/recent-documents"
 import { TrialCounter } from "@/components/trial-counter"
 import { EnvToggle } from "@/components/env-toggle"
 import { PendentesPanel } from "@/components/pendentes-panel"
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { useSettings } from "@/hooks/use-settings"
 import { useTrial } from "@/hooks/use-trial"
+import { useMonthlyUsage } from "@/hooks/use-monthly-usage"
 import { getSupabase } from "@/lib/supabase"
+import { listPlans, type Plan } from "@/lib/billing"
 
 interface DashboardCounts {
   nfe: number
@@ -43,6 +46,33 @@ export default function DashboardPage() {
   const showMock = settings.showMockData
   const { trialActive, subscriptionStatus } = useTrial()
   const showTrialCounter = subscriptionStatus !== "active" && trialActive
+  const showUsageCard = subscriptionStatus === "active"
+
+  // Monthly usage only loads when subscription is active (decoupled from trial state)
+  const { docsConsumidosMes, docsIncludedMes, stripePriceId } = useMonthlyUsage(showUsageCard)
+
+  // Plans (used to resolve overage rate for the current subscription).
+  const [plansList, setPlansList] = useState<Plan[]>([])
+  useEffect(() => {
+    if (!showUsageCard) return
+    listPlans()
+      .then(setPlansList)
+      .catch(() => setPlansList([]))
+  }, [showUsageCard])
+
+  const currentPlan = plansList.find(
+    (p) => p.price_id_monthly === stripePriceId || p.price_id_yearly === stripePriceId
+  )
+  const overageCentsPerDoc = currentPlan?.overage_cents_per_doc ?? 0
+  const usagePct = docsIncludedMes > 0
+    ? Math.min(100, Math.round((docsConsumidosMes / docsIncludedMes) * 100))
+    : 0
+  const overageDocs = Math.max(0, docsConsumidosMes - docsIncludedMes)
+  const overageCents = overageDocs * overageCentsPerDoc
+  const overageBRL = (overageCents / 100).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
 
   const [realCompanyName, setRealCompanyName] = useState("")
   const [realCounts, setRealCounts] = useState<DashboardCounts>({ nfe: 0, cte: 0, mdfe: 0, nfse: 0 })
@@ -172,6 +202,12 @@ export default function DashboardPage() {
     if (!settings.showMockData) loadRealData()
   }, [settings.showMockData, loadRealData])
 
+  // Current month/year label, e.g. "abr 2026"
+  const now = new Date()
+  const mesAtual = now.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "")
+  const anoAtual = now.getFullYear()
+  const periodoAtual = `${mesAtual.charAt(0).toUpperCase()}${mesAtual.slice(1)} ${anoAtual}`
+
   const nfeValue = showMock ? "1.247" : realCounts.nfe.toLocaleString("pt-BR")
   const cteValue = showMock ? "384" : realCounts.cte.toLocaleString("pt-BR")
   const mdfeValue = showMock ? "56" : realCounts.mdfe.toLocaleString("pt-BR")
@@ -208,7 +244,7 @@ export default function DashboardPage() {
           </button>
           <button className="inline-flex items-center gap-2 rounded-lg border bg-background px-2.5 py-1.5 text-xs font-medium shadow-sm transition-colors hover:bg-muted">
             <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
-            <span>Mar 2026</span>
+            <span>{periodoAtual}</span>
             <ChevronDown className="h-3 w-3 text-muted-foreground" />
           </button>
         </div>
@@ -275,6 +311,44 @@ export default function DashboardPage() {
         )}
       </div>
 
+      {/* Uso do mês — apenas para assinaturas ativas */}
+      {showUsageCard && (
+        <Card size="sm">
+          <CardHeader>
+            <CardTitle>Uso do mês</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+              <div
+                className={`h-full rounded-full transition-all ${
+                  overageDocs > 0
+                    ? "bg-amber-500"
+                    : usagePct >= 90
+                      ? "bg-amber-400"
+                      : "bg-emerald-500"
+                }`}
+                style={{ width: `${Math.max(usagePct, overageDocs > 0 ? 100 : usagePct)}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">
+                {docsConsumidosMes.toLocaleString("pt-BR")} de{" "}
+                {docsIncludedMes.toLocaleString("pt-BR")} documentos capturados
+              </span>
+              {overageDocs > 0 ? (
+                <span className="font-semibold text-amber-600">
+                  Excedente previsto: R$ {overageBRL}
+                </span>
+              ) : (
+                <span className="font-semibold text-emerald-600">
+                  Dentro do limite
+                </span>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Financial + Chart side by side */}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         {(() => {
@@ -286,7 +360,7 @@ export default function DashboardPage() {
               icon={<FileText className="h-4 w-4 text-blue-600" />}
               totalLabel="Total Geral"
               totalValue={showMock ? "R$ 2.847.320,45" : fmt(allTotal)}
-              period="Mar 2026"
+              period={periodoAtual}
               items={showMock ? [
                 { label: "Autorizadas", value: "R$ 2.847.320,45", amount: 2847320, color: "text-emerald-600", bgColor: "bg-emerald-500" },
                 { label: "Canceladas", value: "R$ 63.250,00", amount: 63250, color: "text-gray-500", bgColor: "bg-gray-400" },

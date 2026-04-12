@@ -31,10 +31,36 @@ import { loginViaUI, expectOnDashboard } from "./helpers/auth"
  * Test card: 4242 4242 4242 4242 / 12/30 / 123 / 12345 (US ZIP) or 01310-100 (BR CEP).
  */
 
+const BACKEND_URL =
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/v1\/?$/, "") ||
+  "http://localhost:8000"
+
+async function isBackendReachable(): Promise<boolean> {
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/v1/billing/plans`, {
+      signal: AbortSignal.timeout(3000),
+    })
+    if (!res.ok) return false
+    const data = (await res.json()) as Array<{ price_id_monthly?: string }>
+    // Must have at least 1 plan with a real price_id configured
+    return Array.isArray(data) && data.some((p) => !!p.price_id_monthly)
+  } catch {
+    return false
+  }
+}
+
 test.describe.serial("Stripe checkout — real end-to-end with test card", () => {
   let user: TestUser
+  let backendReady = false
 
   test.beforeAll(async () => {
+    backendReady = await isBackendReachable()
+    if (!backendReady) {
+      console.warn(
+        `[skip] backend ${BACKEND_URL} unreachable or plans not seeded — billing tests will be skipped`
+      )
+      return
+    }
     user = await createTestUser({
       status: "trial",
       daysRemaining: 5,
@@ -42,6 +68,13 @@ test.describe.serial("Stripe checkout — real end-to-end with test card", () =>
       blockedReason: "cap",
     })
     console.log(`[fixture] tenant=${user.tenantId} email=${user.email}`)
+  })
+
+  test.beforeEach(() => {
+    test.skip(
+      !backendReady,
+      `Backend ${BACKEND_URL} not available or plans not seeded. Run seed_stripe_products.py first.`
+    )
   })
 
   test.afterAll(async () => {
@@ -59,7 +92,7 @@ test.describe.serial("Stripe checkout — real end-to-end with test card", () =>
   }) => {
     await loginViaUI(page, user)
     await page.goto("/financeiro/creditos")
-    await page.waitForLoadState("networkidle")
+    await page.waitForLoadState("domcontentloaded")
 
     // Pricing table should render with at least one "Assinar agora"
     await expect(
@@ -81,7 +114,7 @@ test.describe.serial("Stripe checkout — real end-to-end with test card", () =>
 
     await loginViaUI(page, user)
     await page.goto("/financeiro/creditos")
-    await page.waitForLoadState("networkidle")
+    await page.waitForLoadState("domcontentloaded")
 
     // Find the Starter plan card and click its "Assinar agora" button
     const starterCard = page.locator("div.rounded-2xl").filter({
@@ -166,7 +199,7 @@ test.describe.serial("Stripe checkout — real end-to-end with test card", () =>
     // Reload the dashboard and confirm the trial overlay is gone
     // -----------------------------------------------------------------------
     await page.goto("/dashboard")
-    await page.waitForLoadState("networkidle")
+    await page.waitForLoadState("domcontentloaded")
 
     // Trial blocked overlay should NOT be present
     const blockedOverlay = page.locator(

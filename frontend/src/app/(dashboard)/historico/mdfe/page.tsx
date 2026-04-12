@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -77,8 +78,11 @@ export default function HistoricoMdfePage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [statusFilter, setStatusFilter] = useState("Todos")
   const [searchChave, setSearchChave] = useState("")
-  const [dateFrom, setDateFrom] = useState("2026-03-01")
-  const [dateTo, setDateTo] = useState("2026-03-16")
+  const [dateFrom, setDateFrom] = useState(() => {
+    const now = new Date()
+    return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0]
+  })
+  const [dateTo, setDateTo] = useState(() => new Date().toISOString().split("T")[0])
   const itemsPerPage = 10
 
   const [realData, setRealData] = useState<any[]>([])
@@ -251,10 +255,10 @@ export default function HistoricoMdfePage() {
                       <TableCell className="text-xs">{row.fetchedAt}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="icon-xs" title="Visualizar XML">
+                          <Button variant="ghost" size="icon-xs" title="Visualizar XML" onClick={() => toast.info("Visualização de XML em breve")}>
                             <Eye className="size-3.5" />
                           </Button>
-                          <Button variant="ghost" size="icon-xs" title="Download">
+                          <Button variant="ghost" size="icon-xs" title="Download" onClick={() => toast.info("Download do XML em breve")}>
                             <Download className="size-3.5" />
                           </Button>
                         </div>
@@ -411,7 +415,7 @@ export default function HistoricoMdfePage() {
           />
         </div>
 
-        <Button variant="default" className="gap-1.5">
+        <Button variant="default" className="gap-1.5" onClick={(e) => e.preventDefault()}>
           <Filter className="size-3.5" />
           Filtrar
         </Button>
@@ -452,10 +456,10 @@ export default function HistoricoMdfePage() {
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon-xs" title="Visualizar XML">
+                    <Button variant="ghost" size="icon-xs" title="Visualizar XML" onClick={() => toast.info("Visualização de XML em breve")}>
                       <Eye className="size-3.5" />
                     </Button>
-                    <Button variant="ghost" size="icon-xs" title="Download">
+                    <Button variant="ghost" size="icon-xs" title="Download" onClick={() => toast.info("Download do XML em breve")}>
                       <Download className="size-3.5" />
                     </Button>
                   </div>

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Save, Clock, Globe, Bell, AlertTriangle, Eye } from "lucide-react"
+import { Save, Clock, Globe, Bell, AlertTriangle, Eye, FileCheck } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -211,6 +211,33 @@ export default function ConfiguracoesPage() {
                 </p>
               </div>
             </label>
+          </CardContent>
+        </Card>
+
+        {/* Manifestação do Destinatário — informativo */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <FileCheck className="size-5 text-primary" />
+              <CardTitle className="text-base">Manifestação do Destinatário</CardTitle>
+            </div>
+            <CardDescription>
+              Como o DFeAxis trata os eventos de manifestação de NF-e.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 pt-0 text-sm text-muted-foreground">
+            <div className="flex gap-2">
+              <span className="font-medium text-foreground shrink-0">Ciência (210210):</span>
+              <span>Enviada <strong>automaticamente</strong> durante cada captura. É obrigatória pela SEFAZ para liberar o XML completo.</span>
+            </div>
+            <div className="flex gap-2">
+              <span className="font-medium text-foreground shrink-0">Manifesto definitivo:</span>
+              <span>Confirmar, Desconhecer ou Operação não Realizada. Pode ser feito <strong>manualmente pelo painel</strong> ou <strong>automaticamente via API</strong> (SAP após MIRO).</span>
+            </div>
+            <div className="flex gap-2">
+              <span className="font-medium text-foreground shrink-0">Prazo SEFAZ:</span>
+              <span>180 dias após a ciência. Você receberá alertas por e-mail quando algum documento estiver próximo do vencimento.</span>
+            </div>
           </CardContent>
         </Card>
 

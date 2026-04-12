@@ -48,14 +48,29 @@ export interface TestUser {
   certId?: string
 }
 
-/** Generates a unique 14-digit valid-looking CNPJ for tests. */
+/** Generates a unique 14-digit valid CNPJ with correct mod-11 check digits. */
 function generateTestCnpj(): string {
-  // Use a fixed prefix + random suffix; mod-11 is not validated by REST,
-  // only by the upload endpoint. For tenant.cnpj we just need uniqueness.
-  const random = Math.floor(Math.random() * 100_000_000)
+  // Generate 8 random base digits + fixed branch "0001"
+  const base = Math.floor(Math.random() * 100_000_000)
     .toString()
     .padStart(8, "0")
-  return `99${random}0001`.slice(0, 14)
+  const digits = (base + "0001").split("").map(Number) // 12 digits
+
+  // First check digit (position 13)
+  const w1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+  let sum = digits.reduce((s, d, i) => s + d * w1[i], 0)
+  let rem = sum % 11
+  const d1 = rem < 2 ? 0 : 11 - rem
+  digits.push(d1)
+
+  // Second check digit (position 14)
+  const w2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+  sum = digits.reduce((s, d, i) => s + d * w2[i], 0)
+  rem = sum % 11
+  const d2 = rem < 2 ? 0 : 11 - rem
+  digits.push(d2)
+
+  return digits.join("")
 }
 
 /**
@@ -269,6 +284,57 @@ export async function getTenant(
 ): Promise<Record<string, unknown>> {
   const res = await fetch(
     `${REST}/tenants?id=eq.${tenantId}&select=*`,
+    { headers: HEADERS }
+  )
+  const rows = (await res.json()) as Record<string, unknown>[]
+  return rows[0]
+}
+
+/** Seeds a document row for manifestation tests. Returns the document ID. */
+export async function seedDocument(
+  tenantId: string,
+  cnpj: string,
+  overrides: Record<string, unknown> = {}
+): Promise<string> {
+  const payload = {
+    tenant_id: tenantId,
+    cnpj,
+    tipo: "NFE",
+    chave_acesso:
+      overrides.chave_acesso ||
+      `3526${cnpj}55001${Math.floor(Math.random() * 1e9)
+        .toString()
+        .padStart(9, "0")}1${Math.floor(Math.random() * 1e9)
+        .toString()
+        .padStart(9, "0")}`.slice(0, 44),
+    nsu: overrides.nsu || "000000000000001",
+    xml_content: overrides.xml_content || null,
+    status: overrides.status || "pending_manifestacao",
+    is_resumo: overrides.is_resumo ?? true,
+    manifestacao_status: overrides.manifestacao_status || "pendente",
+    fetched_at: overrides.fetched_at || new Date().toISOString(),
+    ...overrides,
+  }
+
+  const res = await fetch(`${REST}/documents`, {
+    method: "POST",
+    headers: HEADERS,
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`seedDocument failed: ${res.status} ${text}`)
+  }
+  const data = await res.json()
+  return data[0].id
+}
+
+/** Reads a document by ID (for assertions on manifestacao_status). */
+export async function getDocument(
+  docId: string
+): Promise<Record<string, unknown>> {
+  const res = await fetch(
+    `${REST}/documents?id=eq.${docId}&select=*`,
     { headers: HEADERS }
   )
   const rows = (await res.json()) as Record<string, unknown>[]

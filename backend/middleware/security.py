@@ -381,3 +381,23 @@ async def verify_jwt_with_trial(request: Request) -> dict:
     auth = await verify_jwt_token(request)
     await verify_trial_active(request, auth)
     return auth
+
+
+async def verify_jwt_or_api_key(request: Request) -> dict:
+    """Dual auth: accepts either JWT Bearer token or X-API-Key header.
+
+    Checks Authorization header first; falls back to X-API-Key.
+    Raises 401 if neither is provided.
+    """
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        return await verify_jwt_with_trial(request)
+
+    api_key_val = request.headers.get("X-API-Key")
+    if api_key_val:
+        return await verify_api_key(request, api_key_val)
+
+    raise HTTPException(
+        status_code=401,
+        detail={"message": "Authentication required. Provide Authorization Bearer token or X-API-Key header.", "error_code": "AUTH_MISSING"},
+    )

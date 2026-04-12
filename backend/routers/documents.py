@@ -3,6 +3,7 @@
 import base64
 import threading
 import uuid
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -123,7 +124,7 @@ async def confirmar_documento(
     result = sb.table("documents").update({
         "status": "delivered",
         "xml_content": None,
-        "delivered_at": "now()",
+        "delivered_at": datetime.now(timezone.utc).isoformat(),
     }).eq(
         "chave_acesso", chave
     ).eq(

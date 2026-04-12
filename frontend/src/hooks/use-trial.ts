@@ -39,6 +39,9 @@ export function useTrial(): TrialStatus {
           return
         }
 
+        // Essential columns only — exist since migration 007.
+        // Monthly-usage fields live in useMonthlyUsage() to avoid coupling
+        // trial state to migrations that may not be applied in all envs.
         const { data, error } = await sb
           .from("tenants")
           .select(

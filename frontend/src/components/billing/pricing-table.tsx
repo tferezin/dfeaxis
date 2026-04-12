@@ -44,7 +44,16 @@ export function PricingTable({ popular = "business", onError }: PricingTableProp
     }
     setCheckoutLoading(plan.key)
     try {
-      const session = await createCheckoutSession(priceId)
+      // Billing day pode ter sido escolhido no overlay de trial expirado.
+      let billingDay: number | undefined
+      if (typeof window !== "undefined") {
+        const stored = window.sessionStorage.getItem("dfeaxis:billing_day")
+        if (stored) {
+          const parsed = parseInt(stored, 10)
+          if ([5, 10, 15].includes(parsed)) billingDay = parsed
+        }
+      }
+      const session = await createCheckoutSession(priceId, billingDay)
       window.location.href = session.url
     } catch (e) {
       console.error("Checkout failed", e)

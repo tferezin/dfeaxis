@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from db.supabase import get_supabase_client
+from services.billing.plans import get_plan_by_price_id
 
 logger = logging.getLogger("dfeaxis.billing.subscriptions")
 
@@ -72,6 +73,35 @@ def sync_subscription_to_db(stripe_subscription: dict) -> None:
         update["trial_blocked_at"] = None
         update["trial_blocked_reason"] = None
         update["pfx_inactive_since"] = None  # cancel pfx countdown
+
+        # Apply plan limits from the subscribed price
+        if price_id:
+            lookup = get_plan_by_price_id(price_id)
+            if lookup:
+                plan = lookup.plan
+                update["plan"] = plan.key
+                update["max_cnpjs"] = plan.max_cnpjs
+                update["docs_included_mes"] = plan.docs_included
+            else:
+                logger.warning(
+                    "No plan matched price_id=%s for subscription %s",
+                    price_id,
+                    sub.get("id"),
+                )
+
+        # Propaga billing_day do metadata se presente (cliente escolheu no checkout)
+        sub_metadata = sub.get("metadata") or {}
+        billing_day_raw = sub_metadata.get("billing_day")
+        if billing_day_raw:
+            try:
+                billing_day = int(billing_day_raw)
+                if billing_day in (5, 10, 15):
+                    update["billing_day"] = billing_day
+            except (TypeError, ValueError):
+                logger.warning(
+                    "Invalid billing_day in metadata: %r for subscription %s",
+                    billing_day_raw, sub.get("id"),
+                )
 
     sb = get_supabase_client()
     sb.table("tenants").update(update).eq("id", tenant_id).execute()
