@@ -2,6 +2,7 @@
 
 import base64
 import logging
+from datetime import datetime, timezone
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -575,7 +576,7 @@ def _auto_ciencia(
             if result.success:
                 sb.table("documents").update({
                     "manifestacao_status": "ciencia",
-                    "manifestacao_at": "now()",
+                    "manifestacao_at": datetime.now(timezone.utc).isoformat(),
                 }).eq("tenant_id", tenant_id).eq(
                     "chave_acesso", doc.chave
                 ).execute()
