@@ -5,8 +5,24 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useSettings } from "@/hooks/use-settings"
+import { useManifestacao } from "@/hooks/use-manifestacao"
 import { getSupabase } from "@/lib/supabase"
 import { cn } from "@/lib/utils"
+import { toast } from "sonner"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu"
 import {
   Select,
   SelectContent,
@@ -31,6 +47,9 @@ import {
   CheckCircle2,
   Download,
   Inbox,
+  MoreHorizontal,
+  ThumbsUp,
+  ThumbsDown,
 } from "lucide-react"
 
 type NfeStatus = "Pendente" | "Ciencia" | "Disponivel" | "Entregue" | "Cancelada"
@@ -161,21 +180,42 @@ function StatusBadge({ status }: { status: NfeStatus }) {
   )
 }
 
-function ActionCell({ row }: { row: NfeRow }) {
+function ActionCell({ row, onManifest }: { row: { chave: string; status: NfeStatus; entregueEm?: string }; onManifest?: (chave: string, tipo: string, descricao: string) => void }) {
   switch (row.status) {
     case "Pendente":
       return (
-        <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs">
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 gap-1.5 text-xs"
+          onClick={() => onManifest?.(row.chave, "210210", "Ciência da Operação")}
+        >
           <CheckCircle2 className="size-3.5" />
           Dar Ciência
         </Button>
       )
     case "Ciencia":
       return (
-        <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs text-muted-foreground" disabled>
-          <Loader2 className="size-3.5 animate-spin" />
-          Aguardando XML...
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" />
+            }
+          >
+            <MoreHorizontal className="size-3.5" />
+            Manifestar
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => onManifest?.(row.chave, "210200", "Confirmação da Operação")}>
+              <ThumbsUp className="size-3.5" />
+              Confirmar Operação
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onManifest?.(row.chave, "210220", "Desconhecimento da Operação")}>
+              <ThumbsDown className="size-3.5" />
+              Desconhecer Operação
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       )
     case "Disponivel":
       return (
@@ -209,6 +249,7 @@ type TabKey = "pendentes" | "completo"
 
 export default function HistoricoNfePage() {
   const { settings } = useSettings()
+  const { enviarManifestacao, enviarBatch, loading: manifLoading } = useManifestacao()
   const [activeTab, setActiveTab] = useState<TabKey>("pendentes")
   const [currentPage, setCurrentPage] = useState(1)
   const [statusFilter, setStatusFilter] = useState("Todos")
@@ -216,6 +257,13 @@ export default function HistoricoNfePage() {
   const [dateFrom, setDateFrom] = useState("2026-03-01")
   const [dateTo, setDateTo] = useState("2026-03-17")
   const itemsPerPage = 10
+
+  const [confirmDialog, setConfirmDialog] = useState<{
+    chave: string
+    tipo: string
+    descricao: string
+  } | null>(null)
+  const [selectedChaves, setSelectedChaves] = useState<Set<string>>(new Set())
 
   const [realData, setRealData] = useState<any[]>([])
   const [realLoading, setRealLoading] = useState(false)
@@ -246,6 +294,50 @@ export default function HistoricoNfePage() {
       loadRealData()
     }
   }, [settings.showMockData, loadRealData])
+
+  const handleOpenConfirmDialog = useCallback((chave: string, tipo: string, descricao: string) => {
+    setConfirmDialog({ chave, tipo, descricao })
+  }, [])
+
+  const handleConfirmManifestacao = useCallback(async () => {
+    if (!confirmDialog) return
+    try {
+      const result = await enviarManifestacao(confirmDialog.chave, confirmDialog.tipo)
+      if (result.success) {
+        toast.success(`${confirmDialog.descricao} enviada com sucesso`)
+      } else {
+        toast.error(`Erro: ${result.xmotivo}`)
+      }
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao manifestar")
+    }
+    setConfirmDialog(null)
+    loadRealData()
+  }, [confirmDialog, enviarManifestacao, loadRealData])
+
+  const handleBatchCiencia = useCallback(async () => {
+    if (selectedChaves.size === 0) return
+    try {
+      const result = await enviarBatch(Array.from(selectedChaves), "210210")
+      toast.success(`Ciência enviada: ${result.sucesso} sucesso, ${result.erro} erro(s)`)
+      setSelectedChaves(new Set())
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao enviar ciência em lote")
+    }
+    loadRealData()
+  }, [selectedChaves, enviarBatch, loadRealData])
+
+  const toggleChave = useCallback((chave: string) => {
+    setSelectedChaves((prev) => {
+      const next = new Set(prev)
+      if (next.has(chave)) {
+        next.delete(chave)
+      } else {
+        next.add(chave)
+      }
+      return next
+    })
+  }, [])
 
   if (!settings.showMockData) {
     const statusMap: Record<string, NfeStatus> = {
@@ -337,21 +429,68 @@ export default function HistoricoNfePage() {
           </div>
         ) : (
           <>
+            {/* Batch action bar */}
+            {selectedChaves.size > 0 && (
+              <div className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2.5">
+                <span className="text-sm font-medium">{selectedChaves.size} selecionada(s)</span>
+                <Button size="sm" className="h-7 gap-1.5 text-xs" disabled={manifLoading} onClick={handleBatchCiencia}>
+                  <CheckCircle2 className="size-3.5" />
+                  {manifLoading ? "Enviando..." : `Dar Ciência em Lote (${selectedChaves.size})`}
+                </Button>
+                <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setSelectedChaves(new Set())}>
+                  Limpar seleção
+                </Button>
+              </div>
+            )}
+
             <div className="rounded-lg border">
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">
+                      <input
+                        type="checkbox"
+                        className="size-4 rounded border-gray-300"
+                        checked={
+                          paginatedReal.filter((r) => r.status === "Pendente").length > 0 &&
+                          paginatedReal.filter((r) => r.status === "Pendente").every((r) => selectedChaves.has(r.chave))
+                        }
+                        onChange={(e) => {
+                          const pendentes = paginatedReal.filter((r) => r.status === "Pendente")
+                          setSelectedChaves((prev) => {
+                            const next = new Set(prev)
+                            if (e.target.checked) {
+                              pendentes.forEach((r) => next.add(r.chave))
+                            } else {
+                              pendentes.forEach((r) => next.delete(r.chave))
+                            }
+                            return next
+                          })
+                        }}
+                      />
+                    </TableHead>
                     <TableHead>Chave de Acesso</TableHead>
                     <TableHead>CNPJ</TableHead>
                     <TableHead>NSU</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Manifestação</TableHead>
                     <TableHead>Capturado em</TableHead>
+                    <TableHead>Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {paginatedReal.map((row) => (
                     <TableRow key={row.id}>
+                      <TableCell>
+                        {row.status === "Pendente" ? (
+                          <input
+                            type="checkbox"
+                            className="size-4 rounded border-gray-300"
+                            checked={selectedChaves.has(row.chave)}
+                            onChange={() => toggleChave(row.chave)}
+                          />
+                        ) : null}
+                      </TableCell>
                       <TableCell className="max-w-[220px] truncate font-mono text-xs">
                         {row.chave}
                       </TableCell>
@@ -362,11 +501,14 @@ export default function HistoricoNfePage() {
                       </TableCell>
                       <TableCell className="text-xs">{row.manifestacao || "--"}</TableCell>
                       <TableCell className="text-xs">{row.fetchedAt}</TableCell>
+                      <TableCell>
+                        <ActionCell row={row} onManifest={handleOpenConfirmDialog} />
+                      </TableCell>
                     </TableRow>
                   ))}
                   {paginatedReal.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                      <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
                         Nenhuma NF-e encontrada com os filtros aplicados.
                       </TableCell>
                     </TableRow>
@@ -425,6 +567,30 @@ export default function HistoricoNfePage() {
             </div>
           </>
         )}
+
+        {/* Confirmation Dialog */}
+        <Dialog open={!!confirmDialog} onOpenChange={(open) => { if (!open) setConfirmDialog(null) }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Confirmar Manifestação</DialogTitle>
+              <DialogDescription>
+                Deseja enviar <strong>{confirmDialog?.descricao}</strong> para a NF-e?
+              </DialogDescription>
+            </DialogHeader>
+            <p className="text-xs text-muted-foreground font-mono break-all">
+              {confirmDialog?.chave}
+            </p>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setConfirmDialog(null)}>Cancelar</Button>
+              <Button
+                disabled={manifLoading}
+                onClick={handleConfirmManifestacao}
+              >
+                {manifLoading ? "Enviando..." : "Confirmar"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     )
   }
@@ -589,11 +755,47 @@ export default function HistoricoNfePage() {
         </Button>
       </div>
 
+      {/* Batch action bar */}
+      {selectedChaves.size > 0 && (
+        <div className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2.5">
+          <span className="text-sm font-medium">{selectedChaves.size} selecionada(s)</span>
+          <Button size="sm" className="h-7 gap-1.5 text-xs" disabled={manifLoading} onClick={handleBatchCiencia}>
+            <CheckCircle2 className="size-3.5" />
+            {manifLoading ? "Enviando..." : `Dar Ciência em Lote (${selectedChaves.size})`}
+          </Button>
+          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setSelectedChaves(new Set())}>
+            Limpar seleção
+          </Button>
+        </div>
+      )}
+
       {/* Table */}
       <div className="rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-10">
+                <input
+                  type="checkbox"
+                  className="size-4 rounded border-gray-300"
+                  checked={
+                    paginatedData.filter((r) => r.status === "Pendente").length > 0 &&
+                    paginatedData.filter((r) => r.status === "Pendente").every((r) => selectedChaves.has(r.chave))
+                  }
+                  onChange={(e) => {
+                    const pendentes = paginatedData.filter((r) => r.status === "Pendente")
+                    setSelectedChaves((prev) => {
+                      const next = new Set(prev)
+                      if (e.target.checked) {
+                        pendentes.forEach((r) => next.add(r.chave))
+                      } else {
+                        pendentes.forEach((r) => next.delete(r.chave))
+                      }
+                      return next
+                    })
+                  }}
+                />
+              </TableHead>
               <TableHead>Emitente (Fornecedor)</TableHead>
               <TableHead>CNPJ Emitente</TableHead>
               <TableHead>Emissão</TableHead>
@@ -607,6 +809,16 @@ export default function HistoricoNfePage() {
           <TableBody>
             {paginatedData.map((row) => (
               <TableRow key={row.id}>
+                <TableCell>
+                  {row.status === "Pendente" ? (
+                    <input
+                      type="checkbox"
+                      className="size-4 rounded border-gray-300"
+                      checked={selectedChaves.has(row.chave)}
+                      onChange={() => toggleChave(row.chave)}
+                    />
+                  ) : null}
+                </TableCell>
                 <TableCell className="max-w-[200px] truncate font-medium">
                   {row.emitente}
                 </TableCell>
@@ -623,13 +835,13 @@ export default function HistoricoNfePage() {
                   <StatusBadge status={row.status} />
                 </TableCell>
                 <TableCell>
-                  <ActionCell row={row} />
+                  <ActionCell row={row} onManifest={handleOpenConfirmDialog} />
                 </TableCell>
               </TableRow>
             ))}
             {paginatedData.length === 0 && (
               <TableRow>
-                <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
                   Nenhuma NF-e encontrada com os filtros aplicados.
                 </TableCell>
               </TableRow>
@@ -686,6 +898,30 @@ export default function HistoricoNfePage() {
           </Button>
         </div>
       </div>
+
+      {/* Confirmation Dialog */}
+      <Dialog open={!!confirmDialog} onOpenChange={(open) => { if (!open) setConfirmDialog(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar Manifestação</DialogTitle>
+            <DialogDescription>
+              Deseja enviar <strong>{confirmDialog?.descricao}</strong> para a NF-e?
+            </DialogDescription>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground font-mono break-all">
+            {confirmDialog?.chave}
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDialog(null)}>Cancelar</Button>
+            <Button
+              disabled={manifLoading}
+              onClick={handleConfirmManifestacao}
+            >
+              {manifLoading ? "Enviando..." : "Confirmar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

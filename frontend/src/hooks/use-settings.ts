@@ -6,6 +6,7 @@ interface TenantSettings {
   operationMode: "auto" | "manual"
   sefazAmbiente: "1" | "2"
   capturaInterval: string
+  manifestacaoMode: "auto_ciencia" | "manual"
   notifyEmail: string
   notifyCertExpiry: boolean
   notifyNoCredits: boolean
@@ -18,6 +19,7 @@ const defaultSettings: TenantSettings = {
   operationMode: "manual",
   sefazAmbiente: "2",
   capturaInterval: "15",
+  manifestacaoMode: "manual",
   notifyEmail: "",
   notifyCertExpiry: true,
   notifyNoCredits: true,

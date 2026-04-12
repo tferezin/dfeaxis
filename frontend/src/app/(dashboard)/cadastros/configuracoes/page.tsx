@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Save, Clock, Globe, Bell, AlertTriangle, Eye } from "lucide-react"
+import { Save, Clock, Globe, Bell, AlertTriangle, Eye, FileCheck } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -211,6 +211,40 @@ export default function ConfiguracoesPage() {
                 </p>
               </div>
             </label>
+          </CardContent>
+        </Card>
+
+        {/* Manifestação do Destinatário */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <FileCheck className="size-5 text-primary" />
+              <CardTitle className="text-base">Manifestação do Destinatário</CardTitle>
+            </div>
+            <CardDescription>
+              Define como o DFeAxis trata NF-e com resumo (sem XML completo).
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 pt-0">
+            <SettingsSelect
+              label="Manifestação"
+              options={[
+                {
+                  value: "auto_ciencia",
+                  label: "Automática",
+                  description:
+                    "Envia Ciência da Operação automaticamente ao detectar resumo de NF-e.",
+                },
+                {
+                  value: "manual",
+                  label: "Manual",
+                  description:
+                    "Você decide quais notas manifestar pelo painel ou via API.",
+                },
+              ]}
+              value={settings.manifestacaoMode}
+              onChange={(v) => updateSettings({ manifestacaoMode: v as "auto_ciencia" | "manual" })}
+            />
           </CardContent>
         </Card>
 

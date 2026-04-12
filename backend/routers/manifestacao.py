@@ -1,12 +1,13 @@
 """Endpoints de Manifestação do Destinatário (NF-e)."""
 
 import logging
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from db.supabase import get_supabase_client
 from middleware.lgpd import mask_cnpj
-from middleware.security import verify_api_key, verify_jwt_token, verify_jwt_with_trial
+from middleware.security import verify_api_key, verify_jwt_or_api_key, verify_jwt_token, verify_jwt_with_trial
 from models.schemas import (
     DocumentoPendenteOut,
     ManifestacaoBatchRequest,
@@ -85,7 +86,7 @@ async def listar_pendentes(
 @router.post("/manifestacao", response_model=ManifestacaoResponse)
 async def enviar_manifestacao(
     body: ManifestacaoRequest,
-    auth: dict = Depends(verify_api_key),
+    auth: dict = Depends(verify_jwt_or_api_key),
 ):
     """Envia evento de manifestação para uma NF-e.
 
@@ -136,7 +137,7 @@ async def enviar_manifestacao(
         new_status = status_map[body.tipo_evento]
         sb.table("documents").update({
             "manifestacao_status": new_status,
-            "manifestacao_at": "now()",
+            "manifestacao_at": datetime.now(timezone.utc).isoformat(),
         }).eq("id", doc_id).execute()
 
     # Registra evento de auditoria
@@ -165,7 +166,7 @@ async def enviar_manifestacao(
 @router.post("/manifestacao/batch", response_model=ManifestacaoBatchResponse)
 async def enviar_manifestacao_batch(
     body: ManifestacaoBatchRequest,
-    auth: dict = Depends(verify_api_key),
+    auth: dict = Depends(verify_jwt_or_api_key),
 ):
     """Envia manifestação em lote para múltiplas NF-e (max 50 por request)."""
     resultados = []
