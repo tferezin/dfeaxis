@@ -7,6 +7,7 @@ import { AppFooter } from "@/components/app-footer"
 import { Separator } from "@/components/ui/separator"
 import { TrialBanner } from "@/components/trial-banner"
 import { TrialExpiredOverlay } from "@/components/trial-expired-overlay"
+import { ChatWidget } from "@/components/chat-widget"
 import { ReadOnlyProvider, useReadOnly } from "@/contexts/read-only-context"
 import { useSettings } from "@/hooks/use-settings"
 
@@ -62,6 +63,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           {showOverlay && <TrialExpiredOverlay />}
         </div>
         <AppFooter />
+        <ChatWidget context="dashboard" currentPage={pathname || undefined} />
       </main>
     </SidebarProvider>
   )
