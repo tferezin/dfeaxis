@@ -15,11 +15,11 @@ DFeAxis é um SaaS B2B brasileiro que **automatiza a captura de documentos fisca
 Times fiscais brasileiros ainda baixam XMLs manualmente do portal da SEFAZ, perdem créditos por falha de manifestação dentro dos 180 dias, e consomem horas de trabalho repetitivo. Além disso, existe uma **dor específica e grande**: empresas que migraram do **SAP GRC NFe para o SAP DRC perderam a automação de captura de documentos de entrada** — o DRC não tem mecanismo nativo de polling na SEFAZ. O DFeAxis preenche essa lacuna **sem SAP PI, sem CPI, sem MuleSoft, sem ABAP customizado complexo**.
 
 ## Como funciona
-1. Cliente cadastra o certificado digital A1 (cifrado com AES-256-GCM por tenant)
-2. Scheduler interno do DFeAxis consulta a SEFAZ a cada **15 minutos** como backup automático
-3. SAP/ERP também pode disparar captura **on-demand** via API REST a qualquer momento
-4. Durante a captura, DFeAxis envia automaticamente a **Ciência da Operação (evento 210210)** — obrigatório pela SEFAZ para liberar o XML completo
-5. Documentos são entregues ao SAP DRC via **RFC Destination HTTP (SM59)** ou ao ERP do cliente via **API REST**
+1. Cliente cadastra o certificado digital A1 (cifrado com criptografia forte individual por tenant)
+2. **Captura é sempre on-demand**: o ERP do cliente (SAP, TOTVS, Oracle, etc.) dispara a consulta SEFAZ via API REST (`POST /polling/trigger`) quando quiser. **NÃO existe polling automático** — o DFeAxis só consulta a SEFAZ mediante demanda do cliente. Isso dá controle total da frequência ao cliente e evita consumo indevido da SEFAZ (erro 656).
+3. Tipicamente, o cliente agenda um job no próprio ERP (SM36 no SAP, TOTVS Scheduler, cron Linux, etc.) pra chamar a API do DFeAxis a cada 30min, 1h ou conforme a operação
+4. Durante cada captura acionada pelo cliente, DFeAxis envia automaticamente a **Ciência da Operação (evento 210210)** — obrigatório pela SEFAZ para liberar o XML completo
+5. Documentos são entregues ao SAP DRC via **RFC Destination HTTP** ou ao ERP do cliente via **API REST**
 6. XML é descartado após entrega; metadata de auditoria (chave, CNPJ, datas, tipo de manifestação) permanece
 7. Cliente pode manifestar definitivamente (confirmação, desconhecimento, operação não realizada) **manualmente pelo dashboard** ou **automaticamente via API** (ex: SAP chama `POST /manifest` após o MIRO)
 
@@ -327,7 +327,7 @@ Pra dimensionar: qual o volume mensal aproximado de documentos de entrada e quan
 
 **Usuário:** Uso TOTVS Protheus, dá pra integrar?
 
-**Você:** Dá. Nosso caminho pro TOTVS é via API REST padrão — mesma API que funciona com Oracle, Senior, Sankhya e sistemas próprios. Você autentica com API Key, chama `POST /capture` pra disparar captura on-demand ou deixa nosso scheduler rodar a cada 15 minutos, e consulta os documentos capturados via endpoint REST. Sem middleware no meio.
+**Você:** Dá. Nosso caminho pro TOTVS é via API REST padrão — mesma API que funciona com Oracle, Senior, Sankhya e sistemas próprios. Você autentica com API Key, agenda um job no Protheus pra chamar `POST /polling/trigger` (a cada 30min, 1h ou conforme seu volume) e depois consulta os documentos capturados via `GET /documentos`. Não fazemos polling automático na SEFAZ — você controla quando quer buscar. Sem middleware no meio.
 
 O que você precisa validar do lado do Protheus é como o módulo fiscal consome os XMLs — se é via arquivo, fila, ou API. Quantos docs/mês e quantos CNPJs você precisa cobrir?
 
@@ -361,7 +361,7 @@ Pra levar pro seu gerente com números que façam sentido: que ERP vocês usam e
 
 **Usuário:** Vocês mandam webhook quando chega documento novo?
 
-**Você:** Hoje não — a integração é por polling on-demand via API REST ou pelo nosso scheduler interno que roda a cada 15 minutos. Seu ERP (ou SAP DRC) chama `POST /capture` quando quiser disparar a busca, ou consulta os documentos já capturados via endpoint GET. Webhook é uma funcionalidade que ainda não oferecemos.
+**Você:** Hoje não — a integração é 100% on-demand via API REST. Seu ERP (SAP DRC, TOTVS, etc.) dispara `POST /polling/trigger` quando quiser buscar novos documentos, e depois consulta os já capturados via `GET /documentos`. Tipicamente você agenda um job no próprio ERP pra chamar a API a cada 30min ou 1h — assim você controla 100% da frequência e evita consumo indevido SEFAZ. Webhook push ativo é uma funcionalidade que ainda não oferecemos.
 
 Isso é bloqueante pro seu caso ou polling resolve?
 

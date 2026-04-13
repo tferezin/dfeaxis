@@ -685,16 +685,23 @@ def run_retroactive_job(
 
 
 def start_scheduler() -> BackgroundScheduler:
-    """Inicia o scheduler APScheduler."""
+    """Inicia o scheduler APScheduler.
+
+    IMPORTANTE (decisão 2026-04-12): o polling automático SEFAZ foi
+    REMOVIDO do scheduler. A plataforma NUNCA consulta a SEFAZ sozinha.
+    Toda captura agora é on-demand, acionada pelo ERP do cliente via
+    POST /api/v1/polling/trigger. A função `polling_job()` acima
+    continua existindo porque é usada pelo endpoint manual/trigger
+    como biblioteca, mas não é mais registrada como job recorrente.
+
+    Razões da decisão:
+    - Evita consumo de recursos internos pra tenants inativos
+    - Distribui carga SEFAZ naturalmente ao longo do dia
+    - Cliente controla 100% da frequência (melhor pra ele)
+    - Reduz risco de erro 656 (consumo indevido SEFAZ)
+    - Simplifica arquitetura (sem lógica de "polling_mode auto vs manual")
+    """
     scheduler = BackgroundScheduler()
-    scheduler.add_job(
-        polling_job,
-        "interval",
-        minutes=15,
-        id="sefaz_polling",
-        name="SEFAZ DF-e Polling",
-        replace_existing=True,
-    )
 
     # Transactional trial emails — imported lazily so the polling scheduler
     # still starts even if email deps are missing in a dev environment.
@@ -775,7 +782,7 @@ def start_scheduler() -> BackgroundScheduler:
         logger.warning("Não foi possível agendar pfx_cleanup_job: %s", exc)
 
     scheduler.start()
-    logger.info("Scheduler iniciado: polling a cada 15 minutos")
+    logger.info("Scheduler iniciado: SEM polling automático SEFAZ. Jobs ativos: trial_emails, monthly_overage, manifestacao_alerts, pfx_cleanup.")
     return scheduler
 
 

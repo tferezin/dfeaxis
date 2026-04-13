@@ -10,7 +10,7 @@ Times fiscais em todo tipo de empresa ainda baixam XMLs manualmente do portal da
 - Captura automática de NF-e, CT-e, MDF-e e NFS-e na SEFAZ via certificado A1
 - Entrega de NF-e e CT-e ao SAP DRC via RFC Destination HTTP (SM59)
 - NFS-e disponível via API REST (consumida pelo Ambiente Nacional)
-- Scheduler interno roda a cada 15 minutos como backup; SAP/ERP também pode disparar captura on-demand via API REST
+- Captura é SEMPRE on-demand: o ERP do cliente dispara a consulta SEFAZ via API REST quando quiser (POST /polling/trigger). Não existe polling automático — o DFeAxis só consulta a SEFAZ quando há demanda explícita do cliente. Isso evita consumo indevido da SEFAZ e coloca o cliente no controle da frequência.
 - Circuit breaker contra erro 656 + controle de NSU sem gaps
 - Ciência da Operação (210210) enviada automaticamente durante a captura — obrigatório pela SEFAZ para liberar o XML completo
 - Manifestação definitiva (confirmação, desconhecimento, operação não realizada) manual via dashboard OU automática via SAP API após MIRO

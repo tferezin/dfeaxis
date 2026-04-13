@@ -269,31 +269,19 @@ export function AppSidebar() {
           </SidebarGroup>
         ))}
 
-        {/* Captura Manual — sempre visível, habilitado só quando modo manual */}
+        {/* Captura — sempre sob demanda */}
         <SidebarGroup>
           <SidebarGroupLabel>Execução</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                {settings.operationMode === "manual" ? (
-                  <SidebarMenuButton
-                    isActive={pathname === "/execucao/captura"}
-                    render={<Link href="/execucao/captura" />}
-                  >
-                    <Play className="size-4" />
-                    <span>Captura Manual</span>
-                  </SidebarMenuButton>
-                ) : (
-                  <SidebarMenuButton
-                    className="opacity-40 pointer-events-none"
-                  >
-                    <Play className="size-4" />
-                    <span>Captura Manual</span>
-                    <Badge variant="secondary" className="ml-auto text-[10px] px-1.5 py-0">
-                      Auto
-                    </Badge>
-                  </SidebarMenuButton>
-                )}
+                <SidebarMenuButton
+                  isActive={pathname === "/execucao/captura"}
+                  render={<Link href="/execucao/captura" />}
+                >
+                  <Play className="size-4" />
+                  <span>Captura Manual</span>
+                </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>

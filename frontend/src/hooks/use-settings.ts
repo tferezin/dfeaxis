@@ -3,9 +3,7 @@
 import { useCallback, useSyncExternalStore } from "react"
 
 interface TenantSettings {
-  operationMode: "auto" | "manual"
   sefazAmbiente: "1" | "2"
-  capturaInterval: string
   notifyEmail: string
   notifyCertExpiry: boolean
   notifyNoCredits: boolean
@@ -15,9 +13,7 @@ interface TenantSettings {
 const STORAGE_KEY = "dfeaxis_settings"
 
 const defaultSettings: TenantSettings = {
-  operationMode: "manual",
   sefazAmbiente: "2",
-  capturaInterval: "15",
   notifyEmail: "",
   notifyCertExpiry: true,
   notifyNoCredits: true,

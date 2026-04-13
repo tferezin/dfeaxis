@@ -70,7 +70,7 @@ DFeAxis é SaaS B2B que automatiza captura de documentos fiscais eletrônicos (N
 - **Zero-retention**: XML é descartado após confirmação de entrega. Metadata de auditoria persiste.
 - **Ciência da Operação (210210)** enviada automaticamente durante a captura — obrigatório pela SEFAZ para liberar XML completo.
 - **Manifestação definitiva** (confirmação, desconhecimento, operação não realizada) manual pelo dashboard OU automática via API pós-MIRO.
-- Scheduler interno a cada 15 min como backup + captura on-demand via API.
+- Captura é **100% on-demand**: cliente dispara via `POST /api/v1/polling/trigger` quando quiser. **Não existe polling automático** — a plataforma só consulta a SEFAZ mediante demanda explícita do cliente. Tipicamente o cliente agenda um job no próprio ERP (SM36 no SAP, cron no Linux, TOTVS Scheduler) pra chamar a API a cada 30min, 1h ou conforme a operação.
 - Circuit breaker contra erro 656 + controle de NSU sem gaps.
 - Certificado A1 cifrado com criptografia forte (AES-256) individual por tenant, isolamento total multi-tenant no banco relacional.
 - Retroativo 90 dias (limite SEFAZ) em todos os planos.
@@ -109,7 +109,10 @@ POST /api/v1/documentos/retroativo
 
 POST /api/v1/polling/trigger
      Body: { cnpj, tipo }
-     → Força captura imediata (além do scheduler de 15min).
+     → Dispara captura imediata da SEFAZ. Este é o ÚNICO jeito
+       de fazer captura: a plataforma NUNCA consulta a SEFAZ
+       automaticamente. Todo polling é on-demand, iniciado pelo
+       cliente.
 ```
 
 ### Manifestação

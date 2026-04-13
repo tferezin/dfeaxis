@@ -85,62 +85,35 @@ export default function ConfiguracoesPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        {/* Modo de Operação (unifica captura + manifestação) */}
+        {/* Modelo operacional (informativo — captura é sempre on-demand) */}
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
               <Clock className="size-5 text-primary" />
-              <CardTitle className="text-base">Modo de Operação</CardTitle>
+              <CardTitle className="text-base">Modelo de Captura</CardTitle>
             </div>
             <CardDescription>
-              Define como o DFeAxis captura documentos e responde à SEFAZ.
+              Como o DFeAxis consulta a SEFAZ e entrega documentos.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3 pt-0">
-            <SettingsSelect
-              label="Modo"
-              options={[
-                {
-                  value: "auto",
-                  label: "Automático",
-                  description:
-                    "Captura documentos a cada 15 min e envia Ciência da Operação automaticamente. Recomendado para produção.",
-                },
-                {
-                  value: "manual",
-                  label: "Manual",
-                  description:
-                    "Você dispara a captura quando desejar e decide quais notas aceitar. Ideal para testes.",
-                },
-              ]}
-              value={settings.operationMode}
-              onChange={(v) => updateSettings({ operationMode: v as "auto" | "manual" })}
-            />
-
-            {settings.operationMode === "auto" && (
-              <div className="space-y-1.5">
-                <Label className="text-sm font-medium">Intervalo de captura</Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="number"
-                    min="15"
-                    max="60"
-                    value={settings.capturaInterval}
-                    onChange={(e) => updateSettings({ capturaInterval: e.target.value })}
-                    className="w-20"
-                  />
-                  <span className="text-sm text-muted-foreground">minutos (mín. 15)</span>
-                </div>
-              </div>
-            )}
-
-            {settings.operationMode === "manual" && (
-              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
-                <p className="text-xs text-blue-800">
-                  Use o menu <strong>Captura Manual</strong> na barra lateral para disparar a captura por CNPJ ou para todos de uma vez.
-                </p>
-              </div>
-            )}
+          <CardContent className="space-y-3 pt-0 text-sm text-muted-foreground">
+            <div className="flex gap-2">
+              <span className="font-medium text-foreground shrink-0">On-demand:</span>
+              <span>Toda captura é iniciada pelo seu ERP via <code className="text-[11px] bg-muted px-1 py-0.5 rounded">POST /api/v1/polling/trigger</code>. Você controla a frequência — não fazemos polling automático na SEFAZ.</span>
+            </div>
+            <div className="flex gap-2">
+              <span className="font-medium text-foreground shrink-0">Ciência automática:</span>
+              <span>Durante cada captura acionada pelo cliente, o DFeAxis envia a Ciência da Operação (evento 210210) automaticamente. É obrigatório pela SEFAZ pra liberar o XML completo.</span>
+            </div>
+            <div className="flex gap-2">
+              <span className="font-medium text-foreground shrink-0">Frequência recomendada:</span>
+              <span>Agende um job no seu SAP/TOTVS/ERP pra chamar a captura a cada 30 min, 1h, ou conforme o volume da sua operação. Evita consumo indevido SEFAZ e otimiza custo.</span>
+            </div>
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 mt-3">
+              <p className="text-xs text-blue-800">
+                Pra testar manualmente a captura agora, use <strong>Captura Manual</strong> no menu lateral. Em produção, deixe seu ERP disparar via API.
+              </p>
+            </div>
           </CardContent>
         </Card>
 

@@ -531,10 +531,11 @@ export default function GettingStartedPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Primeiros Passos</h1>
         </div>
         <p className="text-sm text-muted-foreground mt-1">
-          O DFeAxis captura documentos fiscais da SEFAZ <strong>automaticamente</strong>: um scheduler roda a cada 15 minutos
-          como backup, e o seu ERP (SAP, TOTVS, etc) também pode disparar captura sob demanda via API REST. Em seguida,
-          o ERP consome a API para buscar documentos, confirmar recebimento e enviar eventos de manifestação definitiva.
-          Siga os passos abaixo para configurar e validar o fluxo.
+          O DFeAxis captura documentos fiscais da SEFAZ <strong>sob demanda</strong>: seu ERP (SAP, TOTVS, Oracle ou
+          qualquer outro) dispara a consulta via API REST quando quiser. Não fazemos polling automático — toda
+          consulta à SEFAZ é iniciada por você, o que te dá controle total da frequência e evita consumo indevido.
+          Durante cada captura, o DFeAxis envia ciência automática (obrigatório pela SEFAZ) e entrega os documentos
+          prontos pro seu ERP processar. Siga os passos abaixo para configurar e validar o fluxo.
         </p>
       </div>
 
@@ -562,9 +563,10 @@ export default function GettingStartedPage() {
             <li className="flex gap-3">
               <span className="shrink-0 size-6 rounded-full bg-primary/15 text-primary font-bold text-xs flex items-center justify-center">1</span>
               <div>
-                <strong>Captura automática</strong> — scheduler interno roda a cada 15 minutos como backup. Seu ERP
-                também pode disparar captura sob demanda via <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">POST /api/v1/polling/trigger</code>.
-                Durante a captura, a Ciência da Operação é enviada automaticamente à SEFAZ (obrigatório para liberar o XML completo).
+                <strong>Captura sob demanda</strong> — seu ERP dispara a consulta SEFAZ via <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">POST /api/v1/polling/trigger</code> quando
+                quiser (tipicamente em job agendado no SAP/TOTVS a cada 30min, 1h ou conforme sua operação). Não há polling
+                automático pela plataforma — você controla a frequência. Durante a captura, a Ciência da Operação é enviada
+                automaticamente à SEFAZ (obrigatório para liberar o XML completo).
               </div>
             </li>
             <li className="flex gap-3">
