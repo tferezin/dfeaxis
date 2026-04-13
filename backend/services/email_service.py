@@ -170,6 +170,52 @@ class EmailService:
         subject = "Seu trial DFeAxis encerrou — assine para continuar"
         return self._send(to_email, subject, html, email_type="trial_expired")
 
+    def send_chat_escalation(
+        self,
+        to_email: str,
+        context: str,
+        conversation_id: str,
+        contact_name: str,
+        contact_email: str,
+        reason: str,
+        messages: list,
+        tenant_company_name: str = "",
+        tenant_plan: str = "",
+        created_at_friendly: str = "",
+    ) -> bool:
+        """Notifica o time de suporte quando uma conversa de bot é escalada.
+
+        Args:
+            to_email: endereço do time (ex: ferezaeai@gmail.com ou contato@dfeaxis.com.br)
+            context: 'landing' ou 'dashboard'
+            conversation_id: UUID da conversa
+            contact_name: nome do usuário (coletado no formulário ou tenant)
+            contact_email: email do usuário
+            reason: texto explicando por que escalou (do usuário ou automático)
+            messages: lista de dicts {role, content, created_at_short}
+            tenant_company_name: se dashboard, nome da empresa
+            tenant_plan: se dashboard, plano atual
+            created_at_friendly: timestamp legível
+        """
+        context_label = "Bot Landing (prospect)" if context == "landing" else "Bot Dashboard (cliente)"
+        user_type = "prospect" if context == "landing" else "cliente"
+
+        html = self._render(
+            "chat_escalation.html",
+            context_label=context_label,
+            user_type=user_type,
+            conversation_id=conversation_id,
+            contact_name=contact_name or "(não informado)",
+            contact_email=contact_email or "",
+            reason=reason or "(não informado)",
+            messages=messages or [],
+            tenant_company_name=tenant_company_name,
+            tenant_plan=tenant_plan,
+            created_at_friendly=created_at_friendly,
+        )
+        subject = f"🚨 [DFeAxis] Chat escalado — {context_label}"
+        return self._send(to_email, subject, html, email_type="chat_escalation")
+
 
 # Singleton
 email_service = EmailService()

@@ -46,7 +46,10 @@
   var css = `
 .dfeax-chat-btn {
   position: fixed;
-  bottom: 24px;
+  /* Fica acima da sticky-bar da landing (~60px desktop, ~52px mobile).
+     Desktop: 24px margem + 64px sticky-bar = 88px
+     Mobile: ajustado via media query abaixo. */
+  bottom: 88px;
   right: 24px;
   z-index: 9999;
   display: flex;
@@ -69,15 +72,25 @@
   transform: translateY(-2px);
   box-shadow: 0 12px 32px rgba(12, 74, 48, 0.4);
 }
+@media (max-width: 800px) {
+  .dfeax-chat-btn {
+    /* Mobile: sticky-bar é menor, ~52px. Margem 16 + 52 = 68 */
+    bottom: 76px;
+    right: 16px;
+    padding: 10px 16px;
+    font-size: 13px;
+  }
+}
 .dfeax-chat-panel {
   position: fixed;
-  bottom: 24px;
+  /* Fica acima da sticky-bar da landing (mesmo cálculo do botão) */
+  bottom: 88px;
   right: 24px;
   z-index: 9999;
   width: 380px;
   max-width: calc(100vw - 48px);
   height: 560px;
-  max-height: calc(100vh - 48px);
+  max-height: calc(100vh - 112px);
   background: #fff;
   border-radius: 16px;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.2);
@@ -85,6 +98,14 @@
   flex-direction: column;
   font-family: -apple-system, BlinkMacSystemFont, 'Outfit', 'Segoe UI', sans-serif;
   overflow: hidden;
+}
+@media (max-width: 800px) {
+  .dfeax-chat-panel {
+    bottom: 76px;
+    right: 16px;
+    max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 100px);
+  }
 }
 .dfeax-chat-header {
   background: #0c4a30;

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 from datetime import datetime, timezone
 from typing import Literal, Optional
 
@@ -20,6 +21,7 @@ from pydantic import BaseModel, Field
 from db.supabase import get_supabase_client
 from middleware.security import verify_jwt_token
 from services.chat_service import chat_completion
+from services.email_service import email_service
 
 logger = logging.getLogger(__name__)
 
@@ -399,12 +401,107 @@ async def chat_dashboard(
 # ---------------------------------------------------------------------------
 
 
+def _format_friendly_datetime(iso_string: Optional[str]) -> str:
+    if not iso_string:
+        return datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M UTC")
+    try:
+        dt = datetime.fromisoformat(iso_string.replace("Z", "+00:00"))
+        return dt.strftime("%d/%m/%Y %H:%M UTC")
+    except Exception:
+        return iso_string
+
+
+def _send_escalation_email(
+    sb,
+    conv: dict,
+    body: "EscalateRequest",
+) -> None:
+    """Busca transcrição da conversa e envia e-mail pro time de suporte.
+
+    Nunca lança exceção — falha silenciosa com log, pra não quebrar o
+    endpoint de escalação mesmo se o Resend estiver offline.
+    """
+    support_email = os.environ.get("SUPPORT_EMAIL", "ferezaai@gmail.com")
+
+    try:
+        # Carrega todas as mensagens da conversa (ordem cronológica)
+        msg_res = (
+            sb.table("chat_messages")
+            .select("role, content, created_at")
+            .eq("conversation_id", conv["id"])
+            .order("created_at", desc=False)
+            .execute()
+        )
+        messages = []
+        for row in msg_res.data or []:
+            created_at = row.get("created_at", "")
+            try:
+                dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+                created_short = dt.strftime("%d/%m %H:%M")
+            except Exception:
+                created_short = ""
+            messages.append({
+                "role": row.get("role"),
+                "content": row.get("content", ""),
+                "created_at_short": created_short,
+            })
+
+        tenant_company_name = ""
+        tenant_plan = ""
+        if conv.get("tenant_id"):
+            try:
+                t_res = (
+                    sb.table("tenants")
+                    .select("company_name, plan")
+                    .eq("id", conv["tenant_id"])
+                    .single()
+                    .execute()
+                )
+                t = t_res.data or {}
+                tenant_company_name = t.get("company_name") or ""
+                tenant_plan = (t.get("plan") or "").capitalize()
+            except Exception:
+                pass
+
+        email_service.send_chat_escalation(
+            to_email=support_email,
+            context=conv.get("context", "landing"),
+            conversation_id=conv["id"],
+            contact_name=body.contact_name or "",
+            contact_email=body.contact_email or "",
+            reason=body.reason or "(não informado)",
+            messages=messages,
+            tenant_company_name=tenant_company_name,
+            tenant_plan=tenant_plan,
+            created_at_friendly=_format_friendly_datetime(conv.get("created_at")),
+        )
+        logger.info(
+            "Escalation email sent",
+            extra={
+                "conversation_id": conv["id"],
+                "to": support_email,
+                "messages_count": len(messages),
+            },
+        )
+    except Exception as exc:
+        logger.error(
+            "Failed to send escalation email (non-fatal): %s",
+            exc,
+            extra={"conversation_id": conv["id"]},
+        )
+
+
 @router.post("/chat/escalate", status_code=202)
 async def escalate_conversation(body: EscalateRequest):
-    """Marca a conversa como escalada pro time humano.
+    """Marca a conversa como escalada pro time humano + envia e-mail pro suporte.
 
     Não requer auth — qualquer um pode escalar a própria conversa (landing ou
     dashboard). O backend valida que a conversation_id é válida.
+
+    A escalação é passo FINAL: o bot já tentou resolver antes. O bot só
+    oferece este endpoint quando determina que não consegue ajudar (ex:
+    pergunta de contrato customizado, dúvida além do escopo, erro técnico
+    persistente). Usuários não devem conseguir escalar trivialmente.
     """
     sb = get_supabase_client()
 
@@ -418,26 +515,35 @@ async def escalate_conversation(body: EscalateRequest):
         logger.error("escalate lookup failed: %s", exc)
         raise HTTPException(status_code=500, detail="Erro ao processar escalação")
 
+    conv = conv_res.data[0]
+
+    # Idempotência: se já foi escalada, não reenvia email
+    already_escalated = conv.get("escalated_to_human", False)
+
     sb.table("chat_conversations").update({
         "status": "escalated",
         "escalated_to_human": True,
         "escalated_at": datetime.now(timezone.utc).isoformat(),
         "metadata": {
-            **(conv_res.data[0].get("metadata") or {}),
+            **(conv.get("metadata") or {}),
             "escalation_reason": body.reason or "",
             "contact_email": body.contact_email or "",
             "contact_name": body.contact_name or "",
         },
     }).eq("id", body.conversation_id).execute()
 
-    # TODO: notificar time via Slack/email quando tiver endpoint configurado
     logger.info(
         "Conversation escalated",
         extra={
             "conversation_id": body.conversation_id,
             "reason": body.reason,
             "email": body.contact_email,
+            "already_escalated": already_escalated,
         },
     )
+
+    # Envia email pro time se for primeira escalação (evita spam em reenvios)
+    if not already_escalated:
+        _send_escalation_email(sb, conv, body)
 
     return {"status": "escalated", "conversation_id": body.conversation_id}
