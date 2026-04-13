@@ -64,11 +64,12 @@ export const config = {
   matcher: [
     /*
      * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization)
-     * - favicon.ico (browser icon)
-     * - public assets
+     * - _next/static, _next/image (Next.js internals)
+     * - /api routes
+     * - landing-v3.html (static landing served at /)
+     * - Qualquer arquivo com extensão conhecida de asset estático
+     *   (imagens, fonts, scripts, css, json, xml, txt, html, maps)
      */
-    "/((?!_next/static|_next/image|favicon.ico|landing\\.html|hero-bg\\.jpg|logo-dfeaxis\\.png|apple-icon\\.png|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|api/|landing-v3\\.html|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|js|mjs|css|txt|xml|json|html|woff|woff2|ttf|otf|eot|map)$).*)",
   ],
 }
