@@ -29,57 +29,115 @@
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Funciona com qualquer ERP ou só SAP?","acceptedAnswer":{"@type":"Answer","text":"Funciona com qualquer ERP que consuma API REST — TOTVS, Oracle, Senior, Sankhya ou sistema próprio. Para SAP DRC, oferecemos integração nativa via RFC Destination HTTP, o que elimina a necessidade de middleware."}},{"@type":"Question","name":"Meus XMLs ficam armazenados em servidores de terceiros?","acceptedAnswer":{"@type":"Answer","text":"Não. O DFeAxis opera com zero-retention por design. O XML é capturado na SEFAZ, entregue ao seu ERP e descartado imediatamente após a confirmação."}},{"@type":"Question","name":"Posso testar 10 dias sem cartão?","acceptedAnswer":{"@type":"Answer","text":"Sim. Nenhum cartão é solicitado no cadastro. O trial dura 10 dias ou 500 documentos capturados (o que vier primeiro). Ao final, você escolhe um plano para continuar."}},{"@type":"Question","name":"O certificado digital A1 fica seguro?","acceptedAnswer":{"@type":"Answer","text":"Sim. O .pfx é cifrado com AES-256 com chave exclusiva derivada por tenant. Nunca é gravado em disco em texto claro. Isolamento total entre empresas."}},{"@type":"Question","name":"Preciso de middleware (SAP PI, CPI, MuleSoft) para integrar?","acceptedAnswer":{"@type":"Answer","text":"Não. O DFeAxis se conecta diretamente ao seu ERP via API REST. Sem SAP PI, sem CPI, sem MuleSoft. Para SAP DRC, basta configurar uma RFC Destination HTTP nativa."}},{"@type":"Question","name":"Migramos do SAP GRC NFe para o DRC e perdemos a automação. O DFeAxis resolve?","acceptedAnswer":{"@type":"Answer","text":"Exatamente. O GRC fazia polling automático via SAP PI a cada 15-30 min. O DRC não tem esse mecanismo nativo. O DFeAxis foi criado especificamente para resolver essa lacuna."}},{"@type":"Question","name":"Funciona com SAP DRC Cloud (Public Cloud)?","acceptedAnswer":{"@type":"Answer","text":"Sim. O DFeAxis expõe uma API REST pública acessível por qualquer ambiente SAP com acesso à internet via Communication Arrangement ou RFC Destination HTTP."}},{"@type":"Question","name":"Vocês respondem questionário de segurança para procurement enterprise?","acceptedAnswer":{"@type":"Answer","text":"Sim. Temos um questionário de segurança pré-preenchido com 44 perguntas cobrindo infraestrutura, controle de acesso, criptografia, compliance LGPD, resposta a incidentes e continuidade de negócio. Disponível sob demanda para empresas nos planos Business e Enterprise."}}]}
 </script>
-<!-- Google Tag Manager -->
-<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-})(window,document,'script','dataLayer','GTM-PLACEHOLDER');</script>
-<!-- End Google Tag Manager -->
-<!-- Meta Pixel -->
+<!-- ============================================================ -->
+<!-- DFEAXIS TRACKING — bloco unificado                              -->
+<!-- Edite os 6 IDs abaixo UMA vez. Scripts ativam automaticamente   -->
+<!-- apenas quando o ID estiver preenchido (não é mais placeholder). -->
+<!-- Docs: /docs/tracking-setup.md                                   -->
+<!-- ============================================================ -->
 <script>
-!function(f,b,e,v,n,t,s)
-{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-n.queue=[];t=b.createElement(e);t.async=!0;
-t.src=v;s=b.getElementsByTagName(e)[0];
-s.parentNode.insertBefore(t,s)}(window, document,'script',
-'https://connect.facebook.net/en_US/fbevents.js');
-fbq('init', 'PIXEL_PLACEHOLDER');
-fbq('track', 'PageView');
-</script>
-<noscript><img height="1" width="1" style="display:none"
-src="https://www.facebook.com/tr?id=PIXEL_PLACEHOLDER&ev=PageView&noscript=1"/></noscript>
-<!-- End Meta Pixel -->
-<!-- Google Ads (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=AW-PLACEHOLDER"></script>
-<script>
+window.DFEAXIS_TRACKING = {
+  GA4_ID:         "G-PLACEHOLDER",      // ex: G-XXXXXXXXXX — Google Analytics 4
+  GTM_ID:         "GTM-PLACEHOLDER",    // ex: GTM-XXXXXXX — Google Tag Manager (opcional)
+  META_PIXEL_ID:  "PIXEL_PLACEHOLDER",  // ex: 123456789012345 — Meta Pixel
+  GOOGLE_ADS_ID:  "AW-PLACEHOLDER",     // ex: AW-XXXXXXXXXX — Google Ads
+  CLARITY_ID:     "CLARITY_PLACEHOLDER",// ex: abc1234567 — Microsoft Clarity (heatmap)
+  LINKEDIN_ID:    "LINKEDIN_PLACEHOLDER" // ex: 1234567 — LinkedIn Insight (opcional)
+};
+(function(){
+  var T = window.DFEAXIS_TRACKING;
+  var isReal = function(v){ return v && v.indexOf("PLACEHOLDER") === -1; };
   window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', 'AW-PLACEHOLDER');
+  window.gtag = function(){ dataLayer.push(arguments); };
+
+  // Google Analytics 4 + Google Ads (mesmo gtag.js)
+  if (isReal(T.GA4_ID) || isReal(T.GOOGLE_ADS_ID)) {
+    var loaderId = isReal(T.GA4_ID) ? T.GA4_ID : T.GOOGLE_ADS_ID;
+    var s = document.createElement("script");
+    s.async = true;
+    s.src = "https://www.googletagmanager.com/gtag/js?id=" + loaderId;
+    document.head.appendChild(s);
+    gtag("js", new Date());
+    if (isReal(T.GA4_ID))        gtag("config", T.GA4_ID, { send_page_view: true });
+    if (isReal(T.GOOGLE_ADS_ID)) gtag("config", T.GOOGLE_ADS_ID);
+  }
+
+  // Google Tag Manager
+  if (isReal(T.GTM_ID)) {
+    (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer',T.GTM_ID);
+  }
+
+  // Meta Pixel
+  if (isReal(T.META_PIXEL_ID)) {
+    !function(f,b,e,v,n,t,s)
+    {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+    n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+    if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+    n.queue=[];t=b.createElement(e);t.async=!0;
+    t.src=v;s=b.getElementsByTagName(e)[0];
+    s.parentNode.insertBefore(t,s)}(window, document,'script',
+    'https://connect.facebook.net/en_US/fbevents.js');
+    fbq('init', T.META_PIXEL_ID);
+    fbq('track', 'PageView');
+  }
+
+  // Microsoft Clarity (heatmap + session recordings)
+  if (isReal(T.CLARITY_ID)) {
+    (function(c,l,a,r,i,t,y){
+      c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+      t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+      y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+    })(window, document, "clarity", "script", T.CLARITY_ID);
+  }
+
+  // LinkedIn Insight
+  if (isReal(T.LINKEDIN_ID)) {
+    window._linkedin_partner_id = T.LINKEDIN_ID;
+    window._linkedin_data_partner_ids = window._linkedin_data_partner_ids || [];
+    window._linkedin_data_partner_ids.push(T.LINKEDIN_ID);
+    (function(l){
+    if (!l){window.lintrk = function(a,b){window.lintrk.q.push([a,b])};
+    window.lintrk.q=[]}
+    var s = document.getElementsByTagName("script")[0];
+    var b = document.createElement("script");
+    b.type = "text/javascript";b.async = true;
+    b.src = "https://snap.licdn.com/li.lms-analytics/insight.min.js";
+    s.parentNode.insertBefore(b, s);})(window.lintrk);
+  }
+
+  // Helper unificado pra disparar conversão em TODAS as plataformas ativas.
+  // Chame como: DFEAXIS_CONVERT('cta_click_hero', { value: 50, plan: 'starter' })
+  window.DFEAXIS_CONVERT = function(eventName, params) {
+    params = params || {};
+    var value = params.value || 0;
+    var currency = params.currency || 'BRL';
+    try {
+      if (window.gtag && isReal(T.GA4_ID)) {
+        window.gtag('event', eventName, Object.assign({ currency: currency, value: value }, params));
+      }
+      if (window.fbq && isReal(T.META_PIXEL_ID)) {
+        // Mapeia nomes custom → eventos padrão Meta quando aplicável
+        var metaEvent = eventName === 'signup_complete' ? 'CompleteRegistration'
+                     : eventName === 'purchase'         ? 'Purchase'
+                     : eventName.indexOf('cta')   !== -1 ? 'Lead'
+                     : eventName.indexOf('plan')  !== -1 ? 'InitiateCheckout'
+                     : 'Lead';
+        window.fbq('track', metaEvent, { value: value, currency: currency, content_name: eventName });
+      }
+      if (window.lintrk && isReal(T.LINKEDIN_ID)) {
+        window.lintrk('track', { conversion_id: eventName });
+      }
+    } catch(e) { /* nunca quebra UX */ }
+  };
+})();
 </script>
-<!-- End Google Ads -->
-<!-- LinkedIn Insight Tag (B2B) -->
-<script type="text/javascript">
-_linkedin_partner_id = "LINKEDIN_PLACEHOLDER";
-window._linkedin_data_partner_ids = window._linkedin_data_partner_ids || [];
-window._linkedin_data_partner_ids.push(_linkedin_partner_id);
-</script><script type="text/javascript">
-(function(l) {
-if (!l){window.lintrk = function(a,b){window.lintrk.q.push([a,b])};
-window.lintrk.q=[]}
-var s = document.getElementsByTagName("script")[0];
-var b = document.createElement("script");
-b.type = "text/javascript";b.async = true;
-b.src = "https://snap.licdn.com/li.lms-analytics/insight.min.js";
-s.parentNode.insertBefore(b, s);})(window.lintrk);
-</script>
-<noscript>
-<img height="1" width="1" style="display:none;" alt="" src="https://px.ads.linkedin.com/collect/?pid=LINKEDIN_PLACEHOLDER&fmt=gif" />
-</noscript>
-<!-- End LinkedIn Insight Tag -->
+<!-- End DFEAXIS TRACKING -->
+<!-- Google Search Console verification — cole o content= do GSC -->
+<meta name="google-site-verification" content="GSC_VERIFY_PLACEHOLDER">
 <link rel="icon" href="/favicon.ico?v=3" type="image/x-icon">
 <link rel="shortcut icon" href="/favicon.ico?v=3">
 <link rel="apple-touch-icon" href="/apple-icon.png">
@@ -397,11 +455,18 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
 </style>
 </head>
 <body>
-<!-- Google Tag Manager (noscript) -->
-<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-PLACEHOLDER"
-height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
-<!-- End Google Tag Manager (noscript) -->
-<!--<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-XXXXXXX" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>-->
+<!-- GTM noscript fallback (o ID real é injetado via window.DFEAXIS_TRACKING) -->
+<script>
+(function(){
+  var gtmId = window.DFEAXIS_TRACKING && window.DFEAXIS_TRACKING.GTM_ID;
+  if (gtmId && gtmId.indexOf("PLACEHOLDER") === -1) {
+    var n = document.createElement("noscript");
+    n.innerHTML = '<iframe src="https://www.googletagmanager.com/ns.html?id=' + gtmId +
+      '" height="0" width="0" style="display:none;visibility:hidden"></iframe>';
+    document.body.appendChild(n);
+  }
+})();
+</script>
 
 <nav id="nav">
   <div class="logo"><img src="/logo-dfeaxis.png" alt="DFeAxis" height="56" style="height:56px;object-fit:contain"></div>
@@ -417,7 +482,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   </div>
   <div class="nav-btns" id="navBtns">
     <button class="btn-out" onclick="openAuth('login')">Entrar</button>
-    <button class="btn-fill" onclick="if(window.fbq)fbq('track','Lead');if(window.gtag)gtag('event','click_cta',{'event_category':'signup'});window.location.href='/signup'">Começar grátis</button>
+    <button class="btn-fill" onclick="DFEAXIS_CONVERT('cta_nav',{value:50});window.location.href='/signup'">Começar grátis</button>
   </div>
 </nav>
 
@@ -430,7 +495,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <h1>Documentos fiscais dos<br>seus fornecedores.<br>Capturados,<br><strong style="color:var(--gr-m)">Automaticamente.</strong></h1>
     <p class="hero-p">Capturamos NF-e, CT-e, MDF-e e NFS-e na SEFAZ e entregamos via API REST ao seu ERP. Sem middleware. Sem armazenamento.</p>
     <div class="hero-ctas">
-      <button class="cta-p" onclick="if(window.fbq)fbq('track','Lead');if(window.gtag)gtag('event','click_cta',{'event_category':'signup'});window.location.href='/signup'">Criar conta — 10 dias grátis</button>
+      <button class="cta-p" onclick="DFEAXIS_CONVERT('cta_hero',{value:50});window.location.href='/signup'">Criar conta — 10 dias grátis</button>
       <button class="cta-s" onclick="document.getElementById('features').scrollIntoView({behavior:'smooth'})">Ver como funciona</button>
     </div>
     <a href="mailto:contato@dfeaxis.com.br" class="hero-tertiary">Prefere uma demonstração? Fale com um especialista <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg></a>
@@ -732,7 +797,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       <div class="plan-f"><div class="chk">&#10003;</div>3.000 docs inclusos</div>
       <div class="plan-f"><div class="chk">&#10003;</div>NF-e + CT-e + MDF-e + NFS-e</div>
       <div class="plan-f"><div class="chk">&#10003;</div>Excedente: R$ 0,12/doc</div>
-      <button class="plan-btn" onclick="if(window.fbq)fbq('track','Lead');if(window.gtag)gtag('event','click_cta',{'event_category':'signup'});window.location.href='/signup'">Começar agora</button>
+      <button class="plan-btn" onclick="DFEAXIS_CONVERT('plan_click_starter',{value:150,plan:'starter'});window.location.href='/signup?plan=starter'">Começar agora</button>
     </div>
     <div class="plan fp">
       <div class="plan-badge">Mais popular</div>
@@ -744,7 +809,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       <div class="plan-f"><div class="chk">&#10003;</div>8.000 docs inclusos</div>
       <div class="plan-f"><div class="chk">&#10003;</div>NF-e + CT-e + MDF-e + NFS-e</div>
       <div class="plan-f"><div class="chk">&#10003;</div>Excedente: R$ 0,09/doc</div>
-      <button class="plan-btn" onclick="if(window.fbq)fbq('track','Lead');if(window.gtag)gtag('event','click_cta',{'event_category':'signup'});window.location.href='/signup'">Começar agora</button>
+      <button class="plan-btn" onclick="DFEAXIS_CONVERT('plan_click_business',{value:400,plan:'business'});window.location.href='/signup?plan=business'">Começar agora</button>
     </div>
     <div class="plan">
       <div class="plan-name">Enterprise</div>
@@ -756,7 +821,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       <div class="plan-f"><div class="chk">&#10003;</div>NF-e + CT-e + MDF-e + NFS-e</div>
       <div class="plan-f"><div class="chk">&#10003;</div>Questionário de segurança incluso</div>
       <div class="plan-f"><div class="chk">&#10003;</div>Excedente: R$ 0,07/doc</div>
-      <button class="plan-btn" onclick="if(window.fbq)fbq('track','Lead');if(window.gtag)gtag('event','click_cta',{'event_category':'signup'});window.location.href='/signup'">Começar agora</button>
+      <button class="plan-btn" onclick="DFEAXIS_CONVERT('plan_click_enterprise',{value:800,plan:'enterprise'});window.location.href='/signup?plan=enterprise'">Começar agora</button>
     </div>
   </div>
   <p class="price-note">Precisa de mais de 50 CNPJs? <a href="mailto:contato@dfeaxis.com.br" style="color:var(--gr-m);font-weight:600">Fale conosco</a>. Trial 10 dias grátis, sem cartão.</p>
@@ -904,7 +969,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 <div id="cta-band">
   <div class="cta-in">
     <h2>Pronto para receber seus<br><em>documentos fiscais automaticamente?</em></h2>
-    <button class="cta-p" onclick="if(window.fbq)fbq('track','Lead');if(window.gtag)gtag('event','click_cta',{'event_category':'signup'});window.location.href='/signup'">Criar conta e testar agora</button>
+    <button class="cta-p" onclick="DFEAXIS_CONVERT('cta_bottom',{value:50});window.location.href='/signup'">Criar conta e testar agora</button>
   </div>
 </div>
 
