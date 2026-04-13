@@ -15,12 +15,16 @@ import os
 from datetime import datetime, timezone
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from db.supabase import get_supabase_client
 from middleware.security import verify_jwt_token
-from services.chat_service import chat_completion
+from services.chat_service import (
+    chat_completion,
+    classify_escalation,
+    should_classify_for_escalation,
+)
 from services.email_service import email_service
 
 logger = logging.getLogger(__name__)
@@ -144,13 +148,122 @@ def _save_message(
     }).eq("id", conversation_id).execute()
 
 
+def _maybe_silent_escalate(
+    conversation_id: str,
+    context: Literal["landing", "dashboard"],
+    messages_payload: list[dict],
+) -> None:
+    """Roda o classificador silencioso e escala se necessário.
+
+    Executa em background — nunca bloqueia a resposta pro usuário.
+    Falha silenciosa com log, nunca lança exceção pro caller.
+
+    Regras:
+    - Só roda a partir do 4º turno do usuário (threshold)
+    - Depois do threshold, a cada 2 turnos (4, 6, 8...)
+    - Idempotente: se já escalou, não classifica de novo
+    - Usuário nunca vê nada (sem modificar a resposta do chat)
+    """
+    try:
+        sb = get_supabase_client()
+
+        # Recarrega conversa pra pegar estado atual de escalated_to_human
+        conv_res = sb.table("chat_conversations").select("*").eq("id", conversation_id).execute()
+        if not conv_res.data:
+            return
+        conv = conv_res.data[0]
+        already_escalated = bool(conv.get("escalated_to_human", False))
+
+        user_turn_count = sum(1 for m in messages_payload if m.get("role") == "user")
+
+        if not should_classify_for_escalation(user_turn_count, already_escalated):
+            return
+
+        logger.info(
+            "Running silent escalation classifier",
+            extra={
+                "conversation_id": conversation_id,
+                "user_turn_count": user_turn_count,
+                "context": context,
+            },
+        )
+
+        classification = classify_escalation(messages=messages_payload, context=context)
+        if classification is None:
+            return
+
+        # Registra tentativa de classificação no metadata (analytics)
+        try:
+            meta = conv.get("metadata") or {}
+            classifications = list(meta.get("classifications") or [])
+            classifications.append({
+                "at": datetime.now(timezone.utc).isoformat(),
+                "user_turn_count": user_turn_count,
+                "should_escalate": classification.should_escalate,
+                "severity": classification.severity,
+                "reason": classification.reason[:200],
+            })
+            meta["classifications"] = classifications[-10:]  # guarda só últimas 10
+            sb.table("chat_conversations").update({"metadata": meta}).eq("id", conversation_id).execute()
+        except Exception as exc:
+            logger.warning("failed to save classification metadata: %s", exc)
+
+        if not classification.should_escalate:
+            return
+
+        # Escala: monta EscalateRequest sintético e envia email
+        contact = classification.extracted_contact or {}
+        synth_body = EscalateRequest(
+            conversation_id=conversation_id,
+            reason=f"[AUTO] {classification.reason}"[:1000],
+            contact_email=(contact.get("email") or "")[:200] or None,
+            contact_name=(contact.get("name") or "")[:200] or None,
+        )
+
+        # Atualiza DB ANTES do email pra garantir idempotência mesmo em race
+        try:
+            meta = conv.get("metadata") or {}
+            sb.table("chat_conversations").update({
+                "status": "escalated",
+                "escalated_to_human": True,
+                "escalated_at": datetime.now(timezone.utc).isoformat(),
+                "metadata": {
+                    **meta,
+                    "escalation_source": "silent_classifier",
+                    "escalation_severity": classification.severity,
+                    "escalation_reason": classification.reason,
+                    "extracted_contact": contact,
+                },
+            }).eq("id", conversation_id).execute()
+        except Exception as exc:
+            logger.error("failed to mark conversation as escalated: %s", exc)
+            return
+
+        # Recarrega conv com o estado atualizado pra passar pro email helper
+        conv_fresh = sb.table("chat_conversations").select("*").eq("id", conversation_id).execute().data
+        conv_to_use = conv_fresh[0] if conv_fresh else conv
+
+        _send_escalation_email(sb, conv_to_use, synth_body)
+
+        logger.info(
+            "Silent escalation triggered",
+            extra={
+                "conversation_id": conversation_id,
+                "severity": classification.severity,
+                "user_turn_count": user_turn_count,
+            },
+        )
+    except Exception as exc:
+        logger.error("silent classifier background task failed (non-fatal): %s", exc)
+
+
 # ---------------------------------------------------------------------------
 # Endpoint 1: Landing bot (anônimo)
 # ---------------------------------------------------------------------------
 
 
 @router.post("/chat/landing", response_model=ChatResponse)
-async def chat_landing(body: LandingChatRequest, request: Request):
+async def chat_landing(body: LandingChatRequest, request: Request, background_tasks: BackgroundTasks):
     """Bot comercial da landing page — anônimo, sem auth."""
     sb = get_supabase_client()
 
@@ -221,6 +334,17 @@ async def chat_landing(body: LandingChatRequest, request: Request):
         input_tokens=result.input_tokens,
         output_tokens=result.output_tokens,
         latency_ms=result.latency_ms,
+    )
+
+    # Classificação silenciosa em background (nunca bloqueia a resposta)
+    full_messages = [m.model_dump() for m in body.messages] + [
+        {"role": "assistant", "content": result.content}
+    ]
+    background_tasks.add_task(
+        _maybe_silent_escalate,
+        conversation_id,
+        "landing",
+        full_messages,
     )
 
     return ChatResponse(
@@ -313,6 +437,7 @@ async def _build_user_context(sb, tenant_id: str, user_id: str, current_page: Op
 async def chat_dashboard(
     body: DashboardChatRequest,
     request: Request,
+    background_tasks: BackgroundTasks,
     auth: dict = Depends(verify_jwt_token),
 ):
     """Bot técnico do dashboard — autenticado, com contexto do tenant."""
@@ -387,6 +512,17 @@ async def chat_dashboard(
         input_tokens=result.input_tokens,
         output_tokens=result.output_tokens,
         latency_ms=result.latency_ms,
+    )
+
+    # Classificação silenciosa em background (nunca bloqueia a resposta)
+    full_messages = [m.model_dump() for m in body.messages] + [
+        {"role": "assistant", "content": result.content}
+    ]
+    background_tasks.add_task(
+        _maybe_silent_escalate,
+        conversation_id,
+        "dashboard",
+        full_messages,
     )
 
     return ChatResponse(
