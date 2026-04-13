@@ -74,11 +74,18 @@
 }
 @media (max-width: 800px) {
   .dfeax-chat-btn {
-    /* Mobile: sticky-bar é menor, ~52px. Margem 16 + 52 = 68 */
-    bottom: 76px;
+    /* Mobile portrait: sticky-bar empilha em 2 linhas + botão = ~110px.
+       Margem 16 + 110 = 126. Usamos 130 pra folga contra toolbars do iOS. */
+    bottom: 130px;
     right: 16px;
     padding: 10px 16px;
     font-size: 13px;
+  }
+}
+@media (max-width: 800px) and (orientation: landscape) {
+  .dfeax-chat-btn {
+    /* Landscape: sticky-bar volta a ser 1 linha, ~60px. */
+    bottom: 76px;
   }
 }
 .dfeax-chat-panel {
@@ -101,9 +108,15 @@
 }
 @media (max-width: 800px) {
   .dfeax-chat-panel {
-    bottom: 76px;
+    bottom: 130px;
     right: 16px;
     max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 160px);
+  }
+}
+@media (max-width: 800px) and (orientation: landscape) {
+  .dfeax-chat-panel {
+    bottom: 76px;
     max-height: calc(100vh - 100px);
   }
 }
