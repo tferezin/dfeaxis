@@ -88,6 +88,17 @@ export default function SignupPage() {
         return
       }
 
+      // Conversão — Supabase aceitou a criação do usuário (tanto com sessão
+      // imediata quanto aguardando confirmação de e-mail já contam como lead).
+      if (typeof window !== "undefined") {
+        const w = window as unknown as {
+          gtag?: (...args: unknown[]) => void
+          fbq?: (...args: unknown[]) => void
+        }
+        w.gtag?.("event", "sign_up", { method: "email" })
+        w.fbq?.("track", "CompleteRegistration")
+      }
+
       // Register tenant on backend (CNPJ will be collected later via cert upload).
       // Only attempt if we already have a session — otherwise email confirmation
       // is pending and the backend call will happen on first login.
