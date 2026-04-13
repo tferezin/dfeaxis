@@ -190,11 +190,24 @@ async def chat_landing(body: LandingChatRequest, request: Request):
             user_context=None,
         )
     except RuntimeError as exc:
-        logger.error("chat_completion failed: %s", exc)
-        raise HTTPException(status_code=503, detail="Bot temporariamente indisponível")
+        logger.error("chat_completion runtime error: %s", exc)
+        raise HTTPException(
+            status_code=503,
+            detail=f"Bot temporariamente indisponível: {type(exc).__name__}: {str(exc)[:200]}",
+        )
+    except FileNotFoundError as exc:
+        logger.error("chat_completion prompt file missing: %s", exc)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Prompt file missing: {str(exc)[:200]}",
+        )
     except Exception as exc:
         logger.exception("chat_completion unexpected error: %s", exc)
-        raise HTTPException(status_code=500, detail="Erro ao processar mensagem")
+        # Retorna tipo da exceção no detail pra debug (sem expor stack trace completo)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao processar mensagem: {type(exc).__name__}: {str(exc)[:300]}",
+        )
 
     # Salva resposta do assistant
     _save_message(
@@ -344,11 +357,24 @@ async def chat_dashboard(
             user_context=user_ctx,
         )
     except RuntimeError as exc:
-        logger.error("chat_completion failed: %s", exc)
-        raise HTTPException(status_code=503, detail="Bot temporariamente indisponível")
+        logger.error("chat_completion runtime error: %s", exc)
+        raise HTTPException(
+            status_code=503,
+            detail=f"Bot temporariamente indisponível: {type(exc).__name__}: {str(exc)[:200]}",
+        )
+    except FileNotFoundError as exc:
+        logger.error("chat_completion prompt file missing: %s", exc)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Prompt file missing: {str(exc)[:200]}",
+        )
     except Exception as exc:
         logger.exception("chat_completion unexpected error: %s", exc)
-        raise HTTPException(status_code=500, detail="Erro ao processar mensagem")
+        # Retorna tipo da exceção no detail pra debug (sem expor stack trace completo)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao processar mensagem: {type(exc).__name__}: {str(exc)[:300]}",
+        )
 
     _save_message(
         sb,
