@@ -17,6 +17,7 @@ uma **jornada fim-a-fim** (entrada → passos → retorno esperado → validaç�
 
 | # | Cenário | Passos | Retorno esperado | Status | Teste |
 |---|---|---|---|---|---|
+| 1.0 | 🚨 **Usuário esqueceu senha** — solicita reset | Click "Esqueci minha senha" → digita email → recebe link → define nova senha | Nova senha funciona no próximo login | 🚨 **NÃO EXISTE** | Feature missing completamente |
 | 1.1 | Novo usuário acessa landing sem UTM | GET `/` | Landing renderiza, gtag dispara `page_view`, cookie `_ga` é setado | 🟢 | `ga-cookie-real-gtag.spec.ts` |
 | 1.2 | Usuário vem de anúncio Google com UTM | GET `/?utm_source=google&utm_campaign=sap_drc&gclid=...` | UTMs gravados em localStorage, persistem até signup | 🟢 | `attribution-capture.spec.ts` |
 | 1.3 | Usuário clica "Criar conta grátis" na landing | Click CTA → navega pra `/signup` | Form de signup renderiza com todos os campos (nome, telefone, email, senha) | 🟢 | `signup.spec.ts` |

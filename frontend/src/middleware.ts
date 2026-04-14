@@ -42,16 +42,33 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Public pages that don't require auth
-  const isAuthPage = pathname.startsWith("/login") || pathname.startsWith("/signup")
-  const isPublicPage = pathname === "/" || pathname.startsWith("/landing") || pathname.startsWith("/api/") || pathname.startsWith("/termos") || pathname.startsWith("/privacidade")
+  // Auth pages — públicas (não exigem auth) E redirecionam pra dashboard
+  // se o usuário já estiver logado.
+  const isAuthPage =
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/signup") ||
+    pathname.startsWith("/forgot-password")
 
-  if (!user && !isAuthPage && !isPublicPage) {
+  // /reset-password é público MAS não redireciona mesmo quando autenticado —
+  // o magic link de recovery pode chegar pra alguém logado (ex: mesmo browser
+  // com sessão antiga ainda ativa) e precisamos permitir o flow de troca
+  // de senha mesmo assim.
+  const isResetPasswordPage = pathname.startsWith("/reset-password")
+
+  const isPublicPage =
+    pathname === "/" ||
+    pathname.startsWith("/landing") ||
+    pathname.startsWith("/api/") ||
+    pathname.startsWith("/termos") ||
+    pathname.startsWith("/privacidade")
+
+  if (!user && !isAuthPage && !isResetPasswordPage && !isPublicPage) {
     const loginUrl = new URL("/login", request.url)
     return NextResponse.redirect(loginUrl)
   }
 
-  // Redirect authenticated users away from /login
+  // Redirect authenticated users away from login/signup/forgot pages
+  // (mas NÃO de /reset-password — veja comentário acima)
   if (user && isAuthPage) {
     const dashboardUrl = new URL("/dashboard", request.url)
     return NextResponse.redirect(dashboardUrl)
