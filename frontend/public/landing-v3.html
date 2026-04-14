@@ -508,7 +508,7 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
     <a href="#faq">FAQ</a>
   </div>
   <div class="nav-btns" id="navBtns">
-    <button class="btn-out" onclick="openAuth('login')">Entrar</button>
+    <button class="btn-out" onclick="DFEAXIS_CONVERT('cta_nav_login',{value:10});window.location.href='/login'">Entrar</button>
     <button class="btn-fill" onclick="DFEAXIS_CONVERT('cta_nav',{value:50});window.location.href='/signup'">Começar grátis</button>
   </div>
 </nav>
@@ -1030,25 +1030,12 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
     </div>
     <div class="auth-body">
       <div id="form-login">
-        <div class="auth-hint">Credencial de teste: <strong>admin@dfeaxis.com.br</strong> / <strong>Admin@123</strong></div>
-        <label class="fl">E-mail</label>
-        <input id="lem" class="fi" type="email" placeholder="seu@email.com.br">
-        <label class="fl">Senha</label>
-        <input id="lpw" class="fi" type="password" placeholder="&#149;&#149;&#149;&#149;&#149;&#149;&#149;&#149;">
-        <div id="lerr" class="auth-err">E-mail ou senha incorretos</div>
-        <button class="auth-sub" onclick="doLogin()">Entrar na plataforma</button>
+        <div class="auth-hint">Você será redirecionado para a página de login real.</div>
+        <button class="auth-sub" onclick="window.location.href='/login'">Ir para o login</button>
       </div>
       <div id="form-reg" class="hidden">
-        <div class="frr">
-          <div><label class="fl">Nome</label><input id="rnm" class="fi" type="text" placeholder="Seu nome"></div>
-          <div><label class="fl">E-mail</label><input id="rem" class="fi" type="email" placeholder="você@empresa.com"></div>
-        </div>
-        <label class="fl">Senha</label>
-        <input id="rpw" class="fi" type="password" placeholder="Mínimo 8 caracteres">
-        <label class="fl">CNPJ principal</label>
-        <input id="rcn" class="fi" type="text" placeholder="00.000.000/0000-00" maxlength="18" oninput="msk(this)">
-        <div id="rerr" class="auth-err"></div>
-        <button class="auth-sub" onclick="doReg()">Criar conta grátis</button>
+        <div class="auth-hint">Você será redirecionado para a página de cadastro real.</div>
+        <button class="auth-sub" onclick="window.location.href='/signup'">Criar conta grátis</button>
       </div>
       <button class="bkl" onclick="closeAuth()">&#8592; Voltar para o site</button>
     </div>
@@ -1092,82 +1079,18 @@ document.querySelectorAll('.nav-links a').forEach(function(a){a.addEventListener
   document.getElementById('menuBtn').innerHTML='<svg viewBox="0 0 24 24" fill="none"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>';
 })});
 
-/* ===== AUTH MODAL ===== */
-var USERS = {
-  'admin@dfeaxis.com.br': { pw: 'Admin@123', nm: 'Admin DFeAxis' },
-  'teste@empresa.com.br': { pw: 'Teste@123', nm: 'Usuario Teste' }
-};
+/* ===== AUTH (legado) =====
+ * O modal antigo de login/cadastro foi REMOVIDO — a landing agora
+ * redireciona direto para /login e /signup (Next.js). As credenciais
+ * fake que ficavam no objeto USERS{} foram deletadas por segurança
+ * (eram expostas no HTML público da landing).
+ *
+ * Os stubs abaixo existem apenas pro caso de algum CTA legado ainda
+ * invocar openAuth() — ele redireciona pra página certa em vez de
+ * abrir o modal morto.
+ */
 function openAuth(t) {
-  document.getElementById('auth-overlay').classList.remove('hidden');
-  document.body.style.overflow = 'hidden';
-  swAuth(t);
-}
-function closeAuth() {
-  document.getElementById('auth-overlay').classList.add('hidden');
-  document.body.style.overflow = '';
-}
-document.getElementById('auth-overlay').addEventListener('click', function(e) {
-  if (e.target.id === 'auth-overlay') closeAuth();
-});
-document.getElementById('lpw').addEventListener('keydown', function(e) {
-  if (e.key === 'Enter') doLogin();
-});
-function swAuth(t) {
-  var isL = (t === 'login');
-  document.getElementById('form-login').classList.toggle('hidden', !isL);
-  document.getElementById('form-reg').classList.toggle('hidden', isL);
-  document.getElementById('tab-login').classList.toggle('on', isL);
-  document.getElementById('tab-reg').classList.toggle('on', !isL);
-  document.getElementById('authTitle').textContent = isL ? 'Entrar na plataforma' : 'Criar sua conta';
-  document.getElementById('authSub').textContent = isL
-    ? 'Acesse sua conta para gerenciar certificados.'
-    : 'Comece agora — grátis por 10 dias.';
-}
-function doLogin() {
-  var em = document.getElementById('lem').value.trim().toLowerCase();
-  var pw = document.getElementById('lpw').value;
-  var er = document.getElementById('lerr');
-  er.style.display = 'none';
-  ['lem','lpw'].forEach(function(id){ document.getElementById(id).classList.remove('err'); });
-  var u = USERS[em];
-  if (!u || u.pw !== pw) {
-    er.style.display = 'block';
-    ['lem','lpw'].forEach(function(id){ document.getElementById(id).classList.add('err'); });
-    return;
-  }
-  closeAuth();
-  window.location.href = '/app.html';
-}
-function doReg() {
-  var nm = document.getElementById('rnm').value.trim();
-  var em = document.getElementById('rem').value.trim().toLowerCase();
-  var pw = document.getElementById('rpw').value;
-  var cn = document.getElementById('rcn').value;
-  var er = document.getElementById('rerr');
-  er.style.display = 'none';
-  if (!nm || !em || pw.length < 8 || rawC(cn).length !== 14) {
-    er.textContent = 'Preencha todos os campos. Senha mínima 8 caracteres.';
-    er.style.display = 'block';
-    return;
-  }
-  closeAuth();
-  window.location.href = '/app.html';
-}
-function rawC(v) { return v.replace(/\D/g, ''); }
-function msk(el) {
-  var v = rawC(el.value).slice(0, 14);
-  if (v.length > 12) v = v.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d+)/, '$1.$2.$3/$4-$5');
-  else if (v.length > 8) v = v.replace(/^(\d{2})(\d{3})(\d{3})(\d+)/, '$1.$2.$3/$4');
-  else if (v.length > 5) v = v.replace(/^(\d{2})(\d{3})(\d+)/, '$1.$2.$3');
-  else if (v.length > 2) v = v.replace(/^(\d{2})(\d+)/, '$1.$2');
-  el.value = v;
-}
-function toast(msg, type) {
-  var t = document.createElement('div');
-  t.className = 'toast ' + (type || 'info');
-  t.textContent = msg;
-  document.body.appendChild(t);
-  setTimeout(function() { t.remove(); }, 4000);
+  window.location.href = t === 'register' ? '/signup' : '/login';
 }
 
 /* ===== SCROLL REVEAL — removido ===== */
