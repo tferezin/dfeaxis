@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import Script from "next/script"
+import { AttributionCapture } from "@/components/attribution-capture"
 import { Toaster } from "@/components/ui/sonner"
 import "./globals.css"
 
@@ -109,6 +110,7 @@ fbq('track','PageView');`}
             />
           </noscript>
         )}
+        <AttributionCapture />
         {children}
         <Toaster />
       </body>

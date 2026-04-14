@@ -150,6 +150,20 @@ class TenantRegisterRequest(BaseModel):
         max_length=64,
         pattern=r"^[A-Za-z0-9._-]+$",
     )
+    # Campaign attribution (last-touch) — capturado do localStorage no signup
+    # page. Vem dos query params do anúncio (utm_*) ou do auto-tagging do
+    # Google Ads (gclid). Usado para relatórios internos de ROAS sem depender
+    # exclusivamente do painel do GA4. Todos opcionais — signups orgânicos
+    # chegam com todos null.
+    utm_source: Optional[str] = Field(default=None, max_length=255)
+    utm_medium: Optional[str] = Field(default=None, max_length=255)
+    utm_campaign: Optional[str] = Field(default=None, max_length=255)
+    utm_term: Optional[str] = Field(default=None, max_length=255)
+    utm_content: Optional[str] = Field(default=None, max_length=255)
+    gclid: Optional[str] = Field(default=None, max_length=512)
+    fbclid: Optional[str] = Field(default=None, max_length=512)
+    referrer: Optional[str] = Field(default=None, max_length=2048)
+    landing_path: Optional[str] = Field(default=None, max_length=2048)
 
 
 # --- Polling ---

@@ -50,6 +50,33 @@ window.DFEAXIS_TRACKING = {
   window.dataLayer = window.dataLayer || [];
   window.gtag = function(){ dataLayer.push(arguments); };
 
+  // Campaign attribution — captura UTM params / click IDs da URL e salva
+  // em localStorage para sobreviver até o signup (e ser persistido em
+  // tenants via POST /tenants/register). Mesma lógica de
+  // frontend/src/lib/attribution.ts (last-touch). Precisa rodar na
+  // landing estática também, porque a maioria dos anúncios cai aqui
+  // antes de qualquer código React carregar.
+  try {
+    var qp = new URLSearchParams(window.location.search);
+    var trunc = function(v){ if(!v) return null; v = String(v).trim(); return v ? v.slice(0, 255) : null; };
+    var attr = {
+      utm_source:   trunc(qp.get("utm_source")),
+      utm_medium:   trunc(qp.get("utm_medium")),
+      utm_campaign: trunc(qp.get("utm_campaign")),
+      utm_term:     trunc(qp.get("utm_term")),
+      utm_content:  trunc(qp.get("utm_content")),
+      gclid:        trunc(qp.get("gclid")),
+      fbclid:       trunc(qp.get("fbclid"))
+    };
+    var hasAny = attr.utm_source || attr.utm_medium || attr.utm_campaign || attr.gclid || attr.fbclid;
+    if (hasAny) {
+      attr.referrer     = trunc(document.referrer);
+      attr.landing_path = trunc(window.location.pathname + window.location.search);
+      attr.captured_at  = new Date().toISOString();
+      window.localStorage.setItem("dfeaxis_attribution", JSON.stringify(attr));
+    }
+  } catch(e) { /* tracking nunca quebra UX */ }
+
   // Google Analytics 4 + Google Ads (mesmo gtag.js)
   if (isReal(T.GA4_ID) || isReal(T.GOOGLE_ADS_ID)) {
     var loaderId = isReal(T.GA4_ID) ? T.GA4_ID : T.GOOGLE_ADS_ID;

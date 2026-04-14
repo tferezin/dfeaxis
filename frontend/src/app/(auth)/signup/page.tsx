@@ -5,6 +5,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { supabase } from "@/lib/supabase"
 import { apiFetch } from "@/lib/api"
+import { getStoredAttribution } from "@/lib/attribution"
 import { getGaClientId } from "@/lib/ga-cookie"
 import { formatPhone, unmaskPhone } from "@/lib/masks"
 import { isValidBrazilianPhone } from "@/lib/validators"
@@ -74,6 +75,10 @@ export default function SignupPage() {
     // que o backend possa atribuir a conversão de venda ao clique original no
     // anúncio Google quando o Stripe confirmar o pagamento.
     const gaClientId = getGaClientId()
+    // Lê atribuição UTM/gclid do localStorage (capturada pelo AttributionCapture
+    // na primeira visita). Usado pra preencher tenants.utm_* no backend e
+    // permitir relatórios internos de ROAS por canal/campanha/keyword.
+    const attribution = getStoredAttribution()
 
     try {
       const { data, error: authError } = await supabase.auth.signUp({
@@ -123,6 +128,17 @@ export default function SignupPage() {
               email,
               phone: phoneDigits,
               ga_client_id: gaClientId,
+              // Campaign attribution (last-touch). Todos os campos são opcionais
+              // no backend; se null, o Pydantic aceita e o insert ignora.
+              utm_source: attribution?.utm_source ?? null,
+              utm_medium: attribution?.utm_medium ?? null,
+              utm_campaign: attribution?.utm_campaign ?? null,
+              utm_term: attribution?.utm_term ?? null,
+              utm_content: attribution?.utm_content ?? null,
+              gclid: attribution?.gclid ?? null,
+              fbclid: attribution?.fbclid ?? null,
+              referrer: attribution?.referrer ?? null,
+              landing_path: attribution?.landing_path ?? null,
             }),
           })
         } catch (registerErr) {

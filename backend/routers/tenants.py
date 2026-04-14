@@ -52,6 +52,23 @@ async def register_tenant(
     if body.ga_client_id:
         insert_data["ga_client_id"] = body.ga_client_id
 
+    # Campaign attribution — inclui apenas campos não-nulos pra manter
+    # o insert mínimo e deixar colunas com default NULL intactas.
+    for attr_field in (
+        "utm_source",
+        "utm_medium",
+        "utm_campaign",
+        "utm_term",
+        "utm_content",
+        "gclid",
+        "fbclid",
+        "referrer",
+        "landing_path",
+    ):
+        value = getattr(body, attr_field, None)
+        if value:
+            insert_data[attr_field] = value
+
     result = sb.table("tenants").insert(insert_data).execute()
 
     return {"tenant_id": result.data[0]["id"], "status": "created"}
