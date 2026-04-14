@@ -10,14 +10,17 @@ v2 binary layout (stored as hex string):
 
 import hashlib
 import os
+import re
 import tempfile
 from contextlib import contextmanager
 from datetime import datetime
 
+from cryptography import x509
 from cryptography.hazmat.primitives import padding, serialization
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.serialization import pkcs12
+from cryptography.x509.oid import ExtensionOID
 
 _PBKDF2_ITERATIONS_V2 = 600_000
 _PBKDF2_ITERATIONS_V1 = 100_000
@@ -198,11 +201,6 @@ def extract_cert_info(pfx_bytes: bytes, password: str) -> dict:
     1. subjectAltName otherName OID 2.16.76.1.3.3 (padrão ICP-Brasil PJ)
     2. Common Name no formato 'NOME RAZAO SOCIAL:CNPJ' (fallback)
     """
-    import re
-
-    from cryptography import x509
-    from cryptography.x509.oid import ExtensionOID
-
     private_key, certificate, _ = pkcs12.load_key_and_certificates(
         pfx_bytes, password.encode()
     )
@@ -237,8 +235,6 @@ def _extract_cnpj_from_cert(certificate, cn: str | None) -> str | None:
     oficial. Se não achar, faz fallback parsing do CN no formato 'NOME:CNPJ'.
     Retorna apenas os 14 dígitos (sem máscara).
     """
-    import re
-
     # Estratégia 1: subjectAltName otherName OID 2.16.76.1.3.3 (ICP-Brasil PJ)
     try:
         ext = certificate.extensions.get_extension_for_oid(
@@ -259,7 +255,10 @@ def _extract_cnpj_from_cert(certificate, cn: str | None) -> str | None:
                     digits = re.findall(r"\d{14}", text)
                     if digits:
                         return digits[0]
-    except (x509.ExtensionNotFound, AttributeError, Exception):
+    except (x509.ExtensionNotFound, AttributeError):
+        # Extensão SAN ausente ou cert inválido — cai no fallback CN abaixo.
+        pass
+    except Exception:  # noqa: BLE001 - parsing defensivo, nunca quebra extração
         pass
 
     # Estratégia 2: parsing do CN — formato comum 'RAZAO SOCIAL:CNPJ' ou similar
