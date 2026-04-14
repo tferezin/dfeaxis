@@ -87,6 +87,44 @@ def polling_job():
                 break
 
 
+def _normalize_pfx_blob(
+    pfx_encrypted, pfx_iv
+) -> tuple[object, bytes | None]:
+    """Normaliza `pfx_encrypted` e `pfx_iv` vindos do banco para os formatos
+    que `sefaz_client` / `nfse_client` esperam.
+
+    Regras (suporta cert v1 legado + cert v2 atual):
+      - Se `pfx_encrypted` já é string começando com "v2:", deixa como string.
+      - Se é string no formato BYTEA ("\\x<hex>"), converte pra bytes; se os
+        bytes resultantes decodificam para ASCII começando com "v2:",
+        converte de volta pra string (o sefaz_client detecta pelo prefixo).
+      - Se é raw hex string, tenta bytes.fromhex.
+      - Se já é bytes, deixa como bytes.
+      - `pfx_iv` segue mesma lógica mas é sempre bytes (ou None pra v2).
+
+    Compartilhada entre `_poll_single_detailed` e `_poll_nfse` pra garantir
+    que os dois fluxos tratam v1/v2 identicamente.
+    """
+    if isinstance(pfx_encrypted, str) and not pfx_encrypted.startswith("v2:"):
+        clean = pfx_encrypted.replace("\\x", "").replace("\\\\x", "")
+        try:
+            decoded = bytes.fromhex(clean)
+            decoded_str = decoded.decode("ascii", errors="ignore")
+            if decoded_str.startswith("v2:"):
+                pfx_encrypted = decoded_str
+            else:
+                pfx_encrypted = decoded
+        except (ValueError, UnicodeDecodeError):
+            pfx_encrypted = clean
+
+    if pfx_iv and isinstance(pfx_iv, str):
+        pfx_iv = bytes.fromhex(
+            pfx_iv.replace("\\x", "").replace("\\\\x", "")
+        )
+
+    return pfx_encrypted, pfx_iv
+
+
 def _poll_single_detailed(cert: dict, tipo: str, tenant_data: dict) -> dict:
     """Executa polling e retorna detalhes completos para a UI."""
     if tipo == "nfse":
@@ -114,30 +152,11 @@ def _poll_single_detailed(cert: dict, tipo: str, tenant_data: dict) -> dict:
             "error": "Senha do certificado não encontrada", "saved_to_db": False,
         }
 
-    # pfx_encrypted comes from Supabase as hex string
-    # v2 format stored as text: "v2:<hex>" — pass as-is to sefaz_client
-    # Legacy BYTEA comes as "\x<hex>" — convert to bytes
-    pfx_encrypted = cert["pfx_encrypted"]
-    pfx_iv = cert["pfx_iv"]
-
-    # If stored as text "v2:..." pass as string (sefaz_client handles it)
-    # If stored as Supabase BYTEA "\x..." convert to bytes
-    if isinstance(pfx_encrypted, str) and not pfx_encrypted.startswith("v2:"):
-        # Legacy BYTEA hex from Supabase: "\x<hex>"
-        clean = pfx_encrypted.replace("\\x", "").replace("\\\\x", "")
-        # Check if it's actually v2 encoded as hex bytes
-        try:
-            decoded = bytes.fromhex(clean)
-            decoded_str = decoded.decode("ascii", errors="ignore")
-            if decoded_str.startswith("v2:"):
-                pfx_encrypted = decoded_str
-            else:
-                pfx_encrypted = decoded
-        except (ValueError, UnicodeDecodeError):
-            pfx_encrypted = clean
-
-    if pfx_iv and isinstance(pfx_iv, str):
-        pfx_iv = bytes.fromhex(pfx_iv.replace("\\x", "").replace("\\\\x", ""))
+    # Normalização v1/v2 via helper compartilhado — suporta cert legado
+    # (CBC com pfx_iv separado) e cert atual (GCM v2 com prefixo "v2:").
+    pfx_encrypted, pfx_iv = _normalize_pfx_blob(
+        cert["pfx_encrypted"], cert["pfx_iv"]
+    )
 
     ambiente = tenant_data.get("sefaz_ambiente", "2")
 
@@ -449,14 +468,20 @@ def _poll_single(cert: dict, tipo: str, tenant_data: dict) -> int:
         return effective_count
 
     except Exception as e:
-        logger.error(f"Erro no polling {mask_cnpj(cnpj)}/{tipo}: {e}")
+        # Log sempre com type(e) — muitas exceptions (ex: cryptography
+        # InvalidTag) têm str(e) vazio, resultando em logs inúteis tipo
+        # "Erro no polling XXX: " sem mensagem.
+        err_msg = f"{type(e).__name__}: {e}" if str(e) else type(e).__name__
+        logger.exception(
+            f"Erro no polling {mask_cnpj(cnpj)}/{tipo}: {err_msg}"
+        )
         sb.table("polling_log").insert({
             "tenant_id": tenant_id,
             "cnpj": cnpj,
             "tipo": tipo,
             "triggered_by": "scheduler",
             "status": "error",
-            "error_message": str(e),
+            "error_message": err_msg,
         }).execute()
         return 0
 
@@ -472,12 +497,13 @@ def _poll_nfse(cert: dict, tenant_data: dict) -> int:
     if not pfx_password:
         return 0
 
-    pfx_encrypted = cert["pfx_encrypted"]
-    pfx_iv = cert["pfx_iv"]
-    if isinstance(pfx_encrypted, str):
-        pfx_encrypted = bytes.fromhex(pfx_encrypted.replace("\\x", ""))
-    if isinstance(pfx_iv, str):
-        pfx_iv = bytes.fromhex(pfx_iv.replace("\\x", ""))
+    # Normalização v1/v2 via helper compartilhado — sem esse fix o polling
+    # automático de NFS-e falhava com InvalidTag porque o código legado
+    # fazia `bytes.fromhex("76323a...")` e passava esses bytes como se
+    # fossem blob v1, quebrando a decryption do cert v2.
+    pfx_encrypted, pfx_iv = _normalize_pfx_blob(
+        cert["pfx_encrypted"], cert["pfx_iv"]
+    )
 
     try:
         response = nfse_client.consultar_dps_distribuicao(
@@ -544,14 +570,20 @@ def _poll_nfse(cert: dict, tenant_data: dict) -> int:
         return docs_found
 
     except Exception as e:
-        logger.error(f"Erro no polling NFS-e {mask_cnpj(cnpj)}: {e}")
+        # Log com type(e) sempre — InvalidTag e outras exceptions da
+        # cryptography têm str(e) vazio, resultava em logs tipo
+        # "Erro no polling NFS-e XXX: " sem info útil.
+        err_msg = f"{type(e).__name__}: {e}" if str(e) else type(e).__name__
+        logger.exception(
+            f"Erro no polling NFS-e {mask_cnpj(cnpj)}: {err_msg}"
+        )
         sb.table("polling_log").insert({
             "tenant_id": tenant_id,
             "cnpj": cnpj,
             "tipo": "nfse",
             "triggered_by": "scheduler",
             "status": "error",
-            "error_message": str(e),
+            "error_message": err_msg,
         }).execute()
         return 0
 
