@@ -5,6 +5,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { supabase } from "@/lib/supabase"
 import { apiFetch } from "@/lib/api"
+import { getGaClientId } from "@/lib/ga-cookie"
 import { formatPhone, unmaskPhone } from "@/lib/masks"
 import { isValidBrazilianPhone } from "@/lib/validators"
 import { Button } from "@/components/ui/button"
@@ -69,13 +70,20 @@ export default function SignupPage() {
     }
 
     const phoneDigits = unmaskPhone(phone)
+    // Captura o client_id do cookie _ga (setado pelo gtag no layout.tsx) para
+    // que o backend possa atribuir a conversão de venda ao clique original no
+    // anúncio Google quando o Stripe confirmar o pagamento.
+    const gaClientId = getGaClientId()
 
     try {
       const { data, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: { name, phone: phoneDigits },
+          // ga_client_id também vai para user_metadata para cobrir o fluxo
+          // de confirmação de e-mail (quando o tenant é criado só no primeiro
+          // login, o backend pode ler do user_metadata como fallback).
+          data: { name, phone: phoneDigits, ga_client_id: gaClientId },
         },
       })
 
@@ -106,7 +114,16 @@ export default function SignupPage() {
         try {
           await apiFetch("/tenants/register", {
             method: "POST",
-            body: JSON.stringify({ name, email, phone: phoneDigits }),
+            body: JSON.stringify({
+              // Backend TenantRegisterRequest exige `company_name` (não `name`).
+              // Historicamente enviávamos `name` mas esse branch quase nunca é
+              // executado (email confirmation ativo no Supabase faz o fluxo
+              // cair no else), por isso o 422 nunca foi notado em produção.
+              company_name: name,
+              email,
+              phone: phoneDigits,
+              ga_client_id: gaClientId,
+            }),
           })
         } catch (registerErr) {
           console.error("Tenant registration failed:", registerErr)

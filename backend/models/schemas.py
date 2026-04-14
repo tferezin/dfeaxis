@@ -140,6 +140,16 @@ class TenantRegisterRequest(BaseModel):
     company_name: str
     email: str
     phone: Optional[str] = None
+    # GA4 client_id do cookie _ga — capturado no signup do frontend
+    # para permitir atribuição correta de conversões no Google Ads quando
+    # o webhook do Stripe dispara o evento purchase via Measurement Protocol.
+    # Formato esperado: "XXXXXXXX.YYYYYYYY" (≤ 24 chars na prática). Limite
+    # generoso em 64 + regex restritivo para não aceitar lixo/strings gigantes.
+    ga_client_id: Optional[str] = Field(
+        default=None,
+        max_length=64,
+        pattern=r"^[A-Za-z0-9._-]+$",
+    )
 
 
 # --- Polling ---

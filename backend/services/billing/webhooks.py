@@ -12,6 +12,8 @@ import logging
 from typing import Any
 
 from db.supabase import get_supabase_client
+from services.billing.plans import get_plan_by_price_id
+from services.tracking import send_purchase_event
 
 from .stripe_client import get_stripe
 from .subscriptions import sync_subscription_to_db
@@ -102,7 +104,12 @@ def _dispatch(event_type: str, obj: dict[str, Any]) -> str | None:
 # ---------------------------------------------------------------------------
 
 def _on_checkout_completed(session: dict) -> str | None:
-    """User completed checkout. Pull the subscription and sync."""
+    """User completed checkout. Pull the subscription, sync, fire GA4 purchase.
+
+    Este é o ponto de conversão real do negócio: trial → cliente pagante.
+    Disparamos o evento `purchase` no GA4 via Measurement Protocol para que
+    a campanha do Google Ads otimize por receita real, não só por cadastros.
+    """
     tenant_id = (session.get("metadata") or {}).get("tenant_id") or session.get(
         "client_reference_id"
     )
@@ -117,7 +124,94 @@ def _on_checkout_completed(session: dict) -> str | None:
     stripe = get_stripe()
     sub = stripe.Subscription.retrieve(subscription_id)
     sync_subscription_to_db(sub)
+
+    # Dispara purchase no GA4 via Measurement Protocol.
+    # Tracking NUNCA pode quebrar o webhook — qualquer erro vira warning log.
+    try:
+        _fire_ga4_purchase(session=session, subscription=sub, tenant_id=tenant_id)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "ga4 purchase fire failed for tenant=%s session=%s: %s",
+            tenant_id, session.get("id"), exc,
+        )
+
     return tenant_id
+
+
+def _fire_ga4_purchase(
+    *,
+    session: dict,
+    subscription: dict,
+    tenant_id: str | None,
+) -> None:
+    """Dispara evento `purchase` server-side para GA4 via Measurement Protocol.
+
+    Separado do handler principal para facilitar teste unitário e isolamento
+    de erros (o caller já faz try/except).
+
+    Idempotência: retries do Stripe são sequenciais, mas a janela entre a
+    verificação de duplicata em `handle_webhook_event` e o insert em
+    `_record_event` permite race condition teórica. Contra isso, confiamos
+    em 2 camadas:
+      1. `billing_events.stripe_event_id` tem UNIQUE constraint (insert race
+         resolvido pelo banco)
+      2. O GA4 deduplica eventos `purchase` pelo `transaction_id` — vamos
+         usar `subscription.id` como transaction_id justamente pra ativar
+         esse mecanismo de segurança adicional.
+    """
+    # Busca ga_client_id do tenant (capturado no cookie _ga durante signup).
+    ga_client_id: str | None = None
+    if tenant_id:
+        sb = get_supabase_client()
+        res = (
+            sb.table("tenants")
+            .select("ga_client_id")
+            .eq("id", tenant_id)
+            .limit(1)
+            .execute()
+        )
+        if res.data:
+            ga_client_id = res.data[0].get("ga_client_id")
+
+    # Descobre o valor pago. Preferimos o amount da session (é o que o Stripe
+    # efetivamente cobrou); fallback pro plano via price_id da subscription.
+    amount_total_cents = session.get("amount_total")
+    currency = (session.get("currency") or "brl").upper()
+
+    items = (subscription.get("items") or {}).get("data") or []
+    first_item = items[0] if items else {}
+    # first_item vazio → .get() devolve None, sem necessidade de else extra.
+    price_id = (first_item.get("price") or {}).get("id")
+
+    item_id: str | None = None
+    item_name: str | None = None
+    if price_id:
+        lookup = get_plan_by_price_id(price_id)
+        if lookup:
+            item_id = lookup.plan.key
+            item_name = f"DFeAxis {lookup.plan.name}"
+            if amount_total_cents is None:
+                amount_total_cents = (
+                    lookup.plan.yearly_amount_cents
+                    if lookup.period == "yearly"
+                    else lookup.plan.monthly_amount_cents
+                )
+
+    if amount_total_cents is None:
+        amount_total_cents = 0
+
+    value_reais = round(amount_total_cents / 100.0, 2)
+
+    transaction_id = subscription.get("id") or session.get("id") or "unknown"
+
+    send_purchase_event(
+        client_id=ga_client_id,
+        transaction_id=transaction_id,
+        value_brl=value_reais,
+        currency=currency,
+        item_id=item_id,
+        item_name=item_name,
+    )
 
 
 def _on_subscription_change(subscription: dict) -> str | None:

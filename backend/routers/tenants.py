@@ -49,6 +49,8 @@ async def register_tenant(
     }
     if body.phone:
         insert_data["phone"] = body.phone
+    if body.ga_client_id:
+        insert_data["ga_client_id"] = body.ga_client_id
 
     result = sb.table("tenants").insert(insert_data).execute()
 

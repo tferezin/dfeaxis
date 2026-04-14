@@ -33,6 +33,13 @@ class Settings(BaseSettings):
     stripe_checkout_success_url: str = "http://localhost:3000/dashboard?checkout=success"
     stripe_checkout_cancel_url: str = "http://localhost:3000/financeiro/creditos"
 
+    # Google Analytics 4 — Measurement Protocol (server-side events)
+    # ID mantido em sync com frontend/src/app/layout.tsx e landing-v3.html.
+    ga4_measurement_id: str = "G-XZTRG63C53"
+    # Secret criado em GA4 Admin → Data Streams → Measurement Protocol API secrets.
+    # Deixar vazio desliga o envio server-side (código loga warning e segue).
+    ga4_api_secret: str = ""
+
     # SEFAZ
     sefaz_ambiente: str = "2"  # ALWAYS default to homologação
 
