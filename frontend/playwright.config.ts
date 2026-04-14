@@ -5,7 +5,10 @@ export default defineConfig({
   timeout: 60_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,
-  retries: 0,
+  // 1 retry apenas — testes que hit Supabase/backend real podem ter flakiness
+  // de timing (criação de N tenants em sequência durante a suite completa).
+  // Retry absorve isso sem mascarar bug real: se falhar 2x, é bug real.
+  retries: 1,
   workers: 1,
   reporter: [["list"]],
   use: {
