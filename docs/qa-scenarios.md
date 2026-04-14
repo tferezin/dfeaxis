@@ -58,11 +58,16 @@ uma **jornada fim-a-fim** (entrada → passos → retorno esperado → validaç�
 
 ## 4. CAPTURA DE DOCUMENTOS (POLLING SEFAZ)
 
+**Smoke test disponível**: `backend/tests/smoke_sefaz_capture.py` — dispara captura
+real contra SEFAZ homologação usando o cert do tenant admin. **Requer rodar
+dentro do ambiente do Railway** (`railway run python ...`) porque o `CERT_MASTER_SECRET`
+local é diferente do de produção por segurança (master secret separation dev/prod).
+
 | # | Cenário | Passos | Retorno esperado | Status | Teste |
 |---|---|---|---|---|---|
 | 4.1 | Usuário sem cert tenta disparar captura | POST /polling/trigger | 400 "Nenhum certificado ativo pra este CNPJ" | 🔴 | — |
-| 4.2 | Captura com cert válido, SEFAZ retorna 0 docs | POST /polling/trigger | 200 OK, `docs_found: 0`, mensagem "nenhum doc novo" | ⚪ | manual — requer SEFAZ real |
-| 4.3 | Captura retorna N docs | POST /polling/trigger | 200 OK, docs inseridos em `documentos` table | ⚪ | manual — requer SEFAZ real |
+| 4.2 | Captura com cert válido, SEFAZ retorna 0 docs | POST /polling/trigger | 200 OK, `docs_found: 0`, cstat=137 | 🟡 | `smoke_sefaz_capture.py` — roda no Railway |
+| 4.3 | Captura retorna N docs | POST /polling/trigger | 200 OK, docs inseridos em `documentos` table | 🟡 | `smoke_sefaz_capture.py` — roda no Railway |
 | 4.4 | SEFAZ retorna erro 656 (rate limit) | POST /polling/trigger | Circuit breaker abre, 503, retry sugerido | ⚪ | manual OU mock |
 | 4.5 | SEFAZ timeout (>30s) | POST /polling/trigger | Timeout gracioso, mensagem amigável, sem crash | ⚪ | mock |
 | 4.6 | Trial cap atingido (500 docs) durante captura | POST /polling/trigger com docs_consumidos_trial=499 | Bloqueia captura quando passar 500, 402 Payment Required | 🟢 | `trial-flow.spec.ts:80` |
