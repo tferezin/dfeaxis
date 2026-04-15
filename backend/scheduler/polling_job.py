@@ -454,13 +454,12 @@ def _poll_single(cert: dict, tipo: str, tenant_data: dict) -> int:
     if not pfx_password:
         return 0
 
-    # Supabase retorna BYTEA como string hex com prefixo \x
-    pfx_encrypted = cert["pfx_encrypted"]
-    pfx_iv = cert["pfx_iv"]
-    if isinstance(pfx_encrypted, str):
-        pfx_encrypted = bytes.fromhex(pfx_encrypted.replace("\\x", ""))
-    if isinstance(pfx_iv, str):
-        pfx_iv = bytes.fromhex(pfx_iv.replace("\\x", ""))
+    # Normalização v1/v2 via helper compartilhado — suporta cert legado
+    # (CBC com pfx_iv separado) e cert atual (GCM v2 com prefixo "v2:").
+    # Sem esse fix, retroativa quebrava em cert v2 com ValueError no fromhex.
+    pfx_encrypted, pfx_iv = _normalize_pfx_blob(
+        cert["pfx_encrypted"], cert["pfx_iv"]
+    )
 
     try:
         response = sefaz_client.consultar_distribuicao(
