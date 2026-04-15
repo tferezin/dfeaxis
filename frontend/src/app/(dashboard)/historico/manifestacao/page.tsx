@@ -81,12 +81,17 @@ export default function HistoricoManifestacaoPage() {
   const [filterTipo, setFilterTipo] = useState<TipoEvento>("")
   const [limit] = useState(100)
 
+  const chaveTrimmed = filterChave.trim()
+  const chaveInvalida = chaveTrimmed.length > 0 && chaveTrimmed.length !== 44
+
   const loadHistory = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
       const params = new URLSearchParams()
-      if (filterChave.trim()) params.set("chave_acesso", filterChave.trim())
+      // Backend exige exatamente 44 dígitos — só envia se completo,
+      // senão devolve 422 e a UI mostra erro feio.
+      if (chaveTrimmed.length === 44) params.set("chave_acesso", chaveTrimmed)
       if (filterTipo) params.set("tipo_evento", filterTipo)
       params.set("limit", String(limit))
 
@@ -104,7 +109,7 @@ export default function HistoricoManifestacaoPage() {
     } finally {
       setLoading(false)
     }
-  }, [filterChave, filterTipo, limit])
+  }, [chaveTrimmed, filterTipo, limit])
 
   useEffect(() => {
     loadHistory()
@@ -143,10 +148,19 @@ export default function HistoricoManifestacaoPage() {
                 type="text"
                 placeholder="Chave de acesso (44 dígitos)"
                 value={filterChave}
-                onChange={(e) => setFilterChave(e.target.value)}
-                className="pl-9 font-mono text-xs"
+                onChange={(e) => setFilterChave(e.target.value.replace(/\D/g, ""))}
+                className={cn(
+                  "pl-9 font-mono text-xs",
+                  chaveInvalida && "border-amber-500 focus-visible:ring-amber-500"
+                )}
                 maxLength={44}
+                aria-invalid={chaveInvalida}
               />
+              {chaveInvalida && (
+                <p className="text-[10px] text-amber-600 mt-1 ml-0.5">
+                  Digite os 44 dígitos ({chaveTrimmed.length}/44)
+                </p>
+              )}
             </div>
             <select
               value={filterTipo}

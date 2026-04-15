@@ -206,14 +206,20 @@ export default function DashboardPage() {
         (nfseRes.count ?? 0)
       setRealDocsNaCompetencia(totalCompetencia)
 
-      // Documentos recentes da competência — até 50 (não "últimos 20")
-      // pra a soma de valores refletir a competência completa.
-      // Usa as colunas novas de metadata (migration 015) — valor_total e
-      // dados do emitente já vêm populados pelo xml_parser.
+      // Estratégia de duas queries:
+      //
+      // Query A (displayDocs, limit 20): os 20 docs mais recentes pra
+      //   mostrar na tabela "Documentos Recentes" do dashboard.
+      //
+      // Query B (aggregationRows, sem limit, só colunas leves): TODOS
+      //   os documents da competência (tipo + valor_total + fetched_at)
+      //   pra soma de valores e volume chart refletirem o total real,
+      //   não só os 20 exibidos. Como o xml_content não vem, o payload
+      //   continua leve mesmo com milhares de rows.
       //
       // Nota de tipagem: o schema do Supabase TypeScript gerado pode não
       // conhecer as colunas da migration 015 ainda, então fazemos cast
-      // explícito pra dict flexível. Em runtime as colunas já existem.
+      // explícito. Em runtime as colunas já existem.
       type RecentDocRow = {
         tipo: string
         chave_acesso: string
@@ -228,58 +234,73 @@ export default function DashboardPage() {
         data_emissao?: string | null
         valor_total?: number | null
       }
-      const recentRes = (await sb
-        .from('documents')
-        .select(
-          'tipo, chave_acesso, cnpj, nsu, status, fetched_at, xml_content, ' +
-          'cnpj_emitente, razao_social_emitente, numero_documento, data_emissao, valor_total'
-        )
-        .gte('fetched_at', start)
-        .lte('fetched_at', end)
-        .order('fetched_at', { ascending: false })
-        .limit(50)) as unknown as { data: RecentDocRow[] | null }
-      const recentDocs = recentRes.data
-
-      if (recentDocs) {
-        setRealDocuments(recentDocs)
-
-        // Soma de valores por tipo usando valor_total (coluna nova do
-        // parser). Fallback pra extração via regex no xml_content pra
-        // docs antigos que ainda não passaram pelo backfill.
-        let nfeSum = 0, cteSum = 0, mdfeSum = 0, nfseSum = 0
-        for (const doc of recentDocs) {
-          const val =
-            doc.valor_total != null
-              ? Number(doc.valor_total)
-              : extractXmlValue(doc.xml_content || "", doc.tipo)
-          if (doc.tipo === "NFE") nfeSum += val
-          if (doc.tipo === "CTE") cteSum += val
-          if (doc.tipo === "MDFE") mdfeSum += val
-          if (doc.tipo === "NFSE") nfseSum += val
-        }
-        setRealNfeTotal(nfeSum)
-        setRealCteTotal(cteSum)
-        setRealMdfeTotal(mdfeSum)
-        setRealNfseTotal(nfseSum)
-
-        // Volume chart agrupado por dia da competência
-        const byDay: Record<string, { nfe: number; cte: number; mdfe: number; nfse: number }> = {}
-        for (const doc of recentDocs) {
-          const day = new Date(doc.fetched_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
-          if (!byDay[day]) byDay[day] = { nfe: 0, cte: 0, mdfe: 0, nfse: 0 }
-          const key = doc.tipo.toLowerCase() as "nfe" | "cte" | "mdfe" | "nfse"
-          if (key in byDay[day]) byDay[day][key]++
-        }
-        const volumeData = Object.entries(byDay).map(([date, counts]) => ({ date, ...counts }))
-        setRealVolumeData(volumeData)
-      } else {
-        setRealDocuments([])
-        setRealNfeTotal(0)
-        setRealCteTotal(0)
-        setRealMdfeTotal(0)
-        setRealNfseTotal(0)
-        setRealVolumeData([])
+      type AggregationRow = {
+        tipo: string
+        fetched_at: string
+        valor_total: number | null
+        xml_content: string | null
       }
+
+      const [displayRes, aggregationRes] = await Promise.all([
+        sb
+          .from('documents')
+          .select(
+            'tipo, chave_acesso, cnpj, nsu, status, fetched_at, xml_content, ' +
+            'cnpj_emitente, razao_social_emitente, numero_documento, data_emissao, valor_total'
+          )
+          .gte('fetched_at', start)
+          .lte('fetched_at', end)
+          .order('fetched_at', { ascending: false })
+          .limit(20) as unknown as Promise<{ data: RecentDocRow[] | null }>,
+        sb
+          .from('documents')
+          .select('tipo, fetched_at, valor_total, xml_content')
+          .gte('fetched_at', start)
+          .lte('fetched_at', end) as unknown as Promise<{ data: AggregationRow[] | null }>,
+      ])
+
+      const displayDocs = displayRes.data ?? []
+      const aggregationRows = aggregationRes.data ?? []
+
+      setRealDocuments(displayDocs)
+
+      // Soma total sobre TODOS os documents da competência (não só
+      // os 20 exibidos). Usa valor_total (coluna nova do parser) com
+      // fallback pra extração via regex pro xml_content dos docs antigos
+      // pré-backfill.
+      let nfeSum = 0, cteSum = 0, mdfeSum = 0, nfseSum = 0
+      for (const doc of aggregationRows) {
+        const val =
+          doc.valor_total != null
+            ? Number(doc.valor_total)
+            : extractXmlValue(doc.xml_content || "", doc.tipo)
+        if (doc.tipo === "NFE") nfeSum += val
+        if (doc.tipo === "CTE") cteSum += val
+        if (doc.tipo === "MDFE") mdfeSum += val
+        if (doc.tipo === "NFSE") nfseSum += val
+      }
+      setRealNfeTotal(nfeSum)
+      setRealCteTotal(cteSum)
+      setRealMdfeTotal(mdfeSum)
+      setRealNfseTotal(nfseSum)
+
+      // Volume chart agrupado por dia sobre TODOS os documents da competência
+      const byDay: Record<string, { nfe: number; cte: number; mdfe: number; nfse: number }> = {}
+      for (const doc of aggregationRows) {
+        const day = new Date(doc.fetched_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
+        if (!byDay[day]) byDay[day] = { nfe: 0, cte: 0, mdfe: 0, nfse: 0 }
+        const key = doc.tipo.toLowerCase() as "nfe" | "cte" | "mdfe" | "nfse"
+        if (key in byDay[day]) byDay[day][key]++
+      }
+      const volumeData = Object.entries(byDay)
+        .map(([date, counts]) => ({ date, ...counts }))
+        .sort((a, b) => {
+          // Ordena por data DD/MM (pt-BR) convertendo pra comparable
+          const [da, ma] = a.date.split("/").map(Number)
+          const [db, mb] = b.date.split("/").map(Number)
+          return (ma ?? 0) - (mb ?? 0) || (da ?? 0) - (db ?? 0)
+        })
+      setRealVolumeData(volumeData)
 
       // Polling log — últimos 5 (atemporal, feed de atividade recente)
       const { data: activityData } = await sb
