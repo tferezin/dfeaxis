@@ -1,6 +1,7 @@
 """Endpoints de documentos — integração SAP DRC."""
 
 import base64
+import logging
 import threading
 import uuid
 from datetime import datetime, timezone
@@ -23,6 +24,8 @@ from models.schemas import (
 )
 from scheduler.polling_job import run_retroactive_job
 from services.sefaz_client import sefaz_client
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -117,10 +120,18 @@ async def confirmar_documento(
     """Confirma entrega do documento e descarta o XML do banco.
 
     O SAP DRC chama este endpoint após processar cada documento.
+
+    Este é o ponto onde o contador do trial avança. A captura em si não
+    conta — apenas quando o SAP confirma que recebeu e processou, marcamos
+    como consumido contra o trial_cap. Mesmo racional pro contador mensal
+    de planos pagos (docs_consumidos_mes).
     """
     sb = get_supabase_client()
     tenant_id = auth["tenant_id"]
 
+    # Transição atômica available → delivered.
+    # O filtro `status=available` garante idempotência: se o SAP chamar 2x
+    # pra mesma chave, a segunda chamada retorna 404 (não duplica contagem).
     result = sb.table("documents").update({
         "status": "delivered",
         "xml_content": None,
@@ -137,6 +148,61 @@ async def confirmar_documento(
         raise HTTPException(
             status_code=404,
             detail=f"Documento {chave} não encontrado ou já confirmado",
+        )
+
+    # Lê status do tenant pra decidir qual contador incrementar.
+    # Preferimos incrementar DEPOIS do update pra evitar contar docs que
+    # nunca foram entregues (caso o update falhe por algum motivo).
+    try:
+        tenant_row = sb.table("tenants").select(
+            "subscription_status, trial_cap, docs_consumidos_trial"
+        ).eq("id", tenant_id).single().execute()
+        tenant_data = tenant_row.data or {}
+        sub_status = tenant_data.get("subscription_status")
+
+        if sub_status == "trial":
+            # Trial: incrementa docs_consumidos_trial. A RPC é atômica e
+            # retorna o novo valor. Se bateu cap, seta trial_blocked_at.
+            rpc_res = sb.rpc("increment_trial_docs", {
+                "p_tenant_id": tenant_id,
+                "p_count": 1,
+            }).execute()
+
+            new_count = 0
+            if rpc_res.data is not None:
+                if isinstance(rpc_res.data, int):
+                    new_count = rpc_res.data
+                elif isinstance(rpc_res.data, list) and rpc_res.data:
+                    first = rpc_res.data[0]
+                    if isinstance(first, dict):
+                        new_count = int(next(iter(first.values()), 0) or 0)
+                    else:
+                        new_count = int(first or 0)
+
+            trial_cap = int(tenant_data.get("trial_cap") or 500)
+            if new_count >= trial_cap:
+                # Cap batido — bloqueia tenant. Próximas chamadas de qualquer
+                # rota protegida por verify_trial_active vão retornar 403.
+                sb.table("tenants").update({
+                    "trial_blocked_at": datetime.now(timezone.utc).isoformat(),
+                    "trial_blocked_reason": "cap",
+                }).eq("id", tenant_id).execute()
+                logger.info(
+                    "tenant %s atingiu trial_cap=%d (confirmados=%d), bloqueando",
+                    tenant_id, trial_cap, new_count,
+                )
+
+        elif sub_status == "active":
+            # Plano pago: incrementa docs_consumidos_mes. Cobrança de excedente
+            # roda no scheduler monthly_overage_job no dia 1 de cada mês.
+            sb.rpc("increment_monthly_docs", {
+                "p_tenant_id": tenant_id,
+                "p_count": 1,
+            }).execute()
+    except Exception as exc:  # noqa: BLE001 — contador nunca quebra confirmação
+        logger.warning(
+            "falha ao incrementar contador de consumo para tenant %s chave %s: %s",
+            tenant_id, chave, exc,
         )
 
     return ConfirmarResponse(status="discarded")

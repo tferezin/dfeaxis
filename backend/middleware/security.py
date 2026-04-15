@@ -313,11 +313,25 @@ def _is_trial_exempt(path: str) -> bool:
     return any(exempt in path for exempt in _TRIAL_EXEMPT_PATHS)
 
 
+# Mensagem unificada pra trial bloqueado (cap OU tempo). Decisão de
+# produto 2026-04-15: uma só mensagem em vez de 3 variantes — o cliente
+# entende melhor e a call-to-action é a mesma (assinar um plano).
+_TRIAL_BLOCKED_MESSAGE = (
+    "Limite do período de teste atingido (500 documentos ou 10 dias). "
+    "Assine um plano para continuar ativo em nossa plataforma."
+)
+
+
 async def verify_trial_active(request: Request, auth: dict) -> None:
     """Check if the tenant's trial is still active.
 
-    If the trial has expired, updates the tenant and raises 403.
-    Called after verify_jwt_token for protected endpoints.
+    Blocks access when any of:
+    - subscription_status is 'expired' or 'cancelled'
+    - trial_blocked_at is set (cap=500 docs confirmed OR time=10 days)
+    - trial_expires_at is in the past (auto-marks expired)
+
+    Raises 403 with unified message. Called after verify_jwt_token for
+    protected endpoints.
     """
     if _is_trial_exempt(request.url.path):
         return
@@ -328,7 +342,8 @@ async def verify_trial_active(request: Request, auth: dict) -> None:
 
     sb = get_supabase_client()
     result = sb.table("tenants").select(
-        "subscription_status, trial_expires_at, trial_active"
+        "subscription_status, trial_expires_at, trial_active, "
+        "trial_blocked_at, trial_blocked_reason"
     ).eq("id", tenant_id).single().execute()
 
     if not result.data:
@@ -337,18 +352,34 @@ async def verify_trial_active(request: Request, auth: dict) -> None:
     data = result.data
     status = data.get("subscription_status")
 
-    # Only check trial-related statuses
-    if status not in ("trial",):
-        if status == "expired":
-            raise HTTPException(
-                status_code=403,
-                detail={
-                    "message": "Período de teste expirado. Realize o pagamento para continuar usando o DFeAxis.",
-                    "code": "TRIAL_EXPIRED",
-                },
-            )
+    # Hard block: subscription ended (expired, cancelled, past_due — todos
+    # mapeados pra 'expired' em subscriptions.py)
+    if status in ("expired", "cancelled"):
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "message": _TRIAL_BLOCKED_MESSAGE,
+                "code": "TRIAL_EXPIRED",
+            },
+        )
+
+    # Se não está em trial (ex: active), libera
+    if status != "trial":
         return
 
+    # Em trial: checa se foi bloqueado por cap (500 docs confirmados)
+    # ou tempo (10 dias). Ambos setam trial_blocked_at via polling/confirmar
+    # ou via email_job/middleware.
+    if data.get("trial_blocked_at"):
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "message": _TRIAL_BLOCKED_MESSAGE,
+                "code": "TRIAL_EXPIRED",
+            },
+        )
+
+    # Checa expiração por tempo (fallback se o email_job não rodou ainda)
     expires_at = data.get("trial_expires_at")
     if not expires_at:
         return
@@ -357,16 +388,18 @@ async def verify_trial_active(request: Request, auth: dict) -> None:
     now = datetime.now(timezone.utc)
 
     if now >= expires_dt:
-        # Trial expired — update tenant
+        # Trial expirado — marca tenant como expired e bloqueia
         sb.table("tenants").update({
             "subscription_status": "expired",
             "trial_active": False,
+            "trial_blocked_at": now.isoformat(),
+            "trial_blocked_reason": "time",
         }).eq("id", tenant_id).execute()
 
         raise HTTPException(
             status_code=403,
             detail={
-                "message": "Período de teste expirado. Realize o pagamento para continuar usando o DFeAxis.",
+                "message": _TRIAL_BLOCKED_MESSAGE,
                 "code": "TRIAL_EXPIRED",
             },
         )
