@@ -10,6 +10,7 @@ import {
   Truck,
   Building2,
   FileStack,
+  FileCheck,
   Building,
   ShieldCheck,
   Key,
@@ -89,6 +90,7 @@ const navigation: NavSection[] = [
       { title: "CT-e Recebidos", href: "/historico/cte", icon: Truck, badge: "SAP" },
       { title: "NFS-e Recebidas", href: "/historico/nfse", icon: Building2, badge: "ADN" },
       { title: "MDF-e Recebidos", href: "/historico/mdfe", icon: FileStack },
+      { title: "Manifestação", href: "/historico/manifestacao", icon: FileCheck },
     ],
   },
   {

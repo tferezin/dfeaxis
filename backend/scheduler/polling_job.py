@@ -13,6 +13,7 @@ from services.manifestacao import manifestacao_service
 from services.sefaz_client import sefaz_client
 from services.nfse_client import nfse_client
 from services.nsu_controller import nsu_controller
+from services.xml_parser import metadata_to_db_dict, parse_document_xml
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +86,50 @@ def polling_job():
             if tenant_data.get("_trial_blocked_now"):
                 blocked_in_run.add(tenant_id)
                 break
+
+
+def _build_document_row(
+    *,
+    tenant_id: str,
+    cnpj: str,
+    doc,
+    is_resumo: bool,
+    doc_status: str,
+    manif_status,
+) -> dict:
+    """Constrói o dict de upsert em `documents` incluindo metadata extraída do XML.
+
+    Centraliza a lógica pra os 3 fluxos de polling (NFE/CTE/MDFE via
+    _poll_single_detailed/_poll_single, e NFSE via _poll_nfse) usarem os
+    mesmos campos — evita divergência.
+    """
+    row: dict = {
+        "tenant_id": tenant_id,
+        "cnpj": cnpj,
+        "tipo": doc.tipo,
+        "chave_acesso": doc.chave,
+        "nsu": doc.nsu,
+        "xml_content": doc.xml_content if not is_resumo else None,
+        "status": doc_status,
+        "is_resumo": is_resumo,
+        "manifestacao_status": manif_status,
+    }
+
+    # Extrai metadata do XML (emit, dest, número, data, valor). Parser é
+    # defensive — nunca levanta. Resumos têm xml_content=None e vão retornar
+    # metadata quase vazia (só CNPJ emitente quando o resumo contém).
+    xml_source = doc.xml_content if hasattr(doc, "xml_content") else None
+    if xml_source:
+        try:
+            meta = parse_document_xml(xml_source, doc.tipo)
+            row.update(metadata_to_db_dict(meta))
+        except Exception as exc:  # noqa: BLE001 — tracking nunca quebra polling
+            logger.warning(
+                "xml_parser falhou pra chave=%s tipo=%s: %s: %s",
+                doc.chave, doc.tipo, type(exc).__name__, exc,
+            )
+
+    return row
 
 
 def _normalize_pfx_blob(
@@ -206,14 +251,17 @@ def _poll_single_detailed(cert: dict, tipo: str, tenant_data: dict) -> dict:
                     manif_status = "nao_aplicavel" if not is_nfe else None
                     doc_status = "available"
 
-                sb.table("documents").upsert({
-                    "tenant_id": tenant_id, "cnpj": cnpj,
-                    "tipo": doc.tipo, "chave_acesso": doc.chave,
-                    "nsu": doc.nsu,
-                    "xml_content": doc.xml_content if not is_resumo else None,
-                    "status": doc_status, "is_resumo": is_resumo,
-                    "manifestacao_status": manif_status,
-                }, on_conflict="tenant_id,chave_acesso").execute()
+                row = _build_document_row(
+                    tenant_id=tenant_id,
+                    cnpj=cnpj,
+                    doc=doc,
+                    is_resumo=is_resumo,
+                    doc_status=doc_status,
+                    manif_status=manif_status,
+                )
+                sb.table("documents").upsert(
+                    row, on_conflict="tenant_id,chave_acesso"
+                ).execute()
 
             saved = True
             nsu_controller.update_last_nsu(cert["id"], tipo, response.ult_nsu)
@@ -387,17 +435,17 @@ def _poll_single(cert: dict, tipo: str, tenant_data: dict) -> int:
                 manif_status = "nao_aplicavel" if not is_nfe else None
                 doc_status = "available"
 
-            sb.table("documents").upsert({
-                "tenant_id": tenant_id,
-                "cnpj": cnpj,
-                "tipo": doc.tipo,
-                "chave_acesso": doc.chave,
-                "nsu": doc.nsu,
-                "xml_content": doc.xml_content if not is_resumo else None,
-                "status": doc_status,
-                "is_resumo": is_resumo,
-                "manifestacao_status": manif_status,
-            }, on_conflict="tenant_id,chave_acesso").execute()
+            row = _build_document_row(
+                tenant_id=tenant_id,
+                cnpj=cnpj,
+                doc=doc,
+                is_resumo=is_resumo,
+                doc_status=doc_status,
+                manif_status=manif_status,
+            )
+            sb.table("documents").upsert(
+                row, on_conflict="tenant_id,chave_acesso"
+            ).execute()
 
         # Se modo auto_ciencia e há resumos NF-e, envia Ciência automaticamente
         if tipo == "nfe" and tenant_data.get("manifestacao_mode") == "auto_ciencia":
@@ -546,21 +594,31 @@ def _poll_nfse(cert: dict, tenant_data: dict) -> int:
             )
             return 0
 
-        # Salva documentos
+        # Salva documentos. NFSe precisa de 2 campos extra (codigo_municipio,
+        # codigo_servico) que não estão no DocumentMetadata padrão — adicionamos
+        # manualmente após o helper popular o resto.
         for doc in response.documents:
-            sb.table("documents").upsert({
-                "tenant_id": tenant_id,
-                "cnpj": cnpj,
-                "tipo": "NFSE",
-                "chave_acesso": doc.chave,
-                "nsu": doc.nsu,
-                "xml_content": doc.xml_content,
-                "status": "available",
-                "is_resumo": False,
-                "manifestacao_status": "nao_aplicavel",
-                "codigo_municipio": doc.codigo_municipio,
-                "codigo_servico": doc.codigo_servico,
-            }, on_conflict="tenant_id,chave_acesso").execute()
+            # NfseDocument não tem .tipo, fingimos pra o helper funcionar
+            class _NfseDocShim:
+                def __init__(self, d):
+                    self.tipo = "NFSE"
+                    self.chave = d.chave
+                    self.nsu = d.nsu
+                    self.xml_content = d.xml_content
+
+            row = _build_document_row(
+                tenant_id=tenant_id,
+                cnpj=cnpj,
+                doc=_NfseDocShim(doc),
+                is_resumo=False,
+                doc_status="available",
+                manif_status="nao_aplicavel",
+            )
+            row["codigo_municipio"] = doc.codigo_municipio
+            row["codigo_servico"] = doc.codigo_servico
+            sb.table("documents").upsert(
+                row, on_conflict="tenant_id,chave_acesso"
+            ).execute()
 
         # Atualiza ultimo NSU
         sb.table("certificates").update({

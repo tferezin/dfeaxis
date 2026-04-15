@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import {
   FileText,
   Truck,
@@ -24,6 +24,13 @@ import { useTrial } from "@/hooks/use-trial"
 import { useMonthlyUsage } from "@/hooks/use-monthly-usage"
 import { getSupabase } from "@/lib/supabase"
 import { listPlans, type Plan } from "@/lib/billing"
+import {
+  buildCompetenciaOptions,
+  currentCompetencia,
+  getCompetenciaRange,
+  formatCompetenciaLabel,
+  type CompetenciaId,
+} from "@/lib/competencia"
 
 interface DashboardCounts {
   nfe: number
@@ -47,6 +54,19 @@ export default function DashboardPage() {
   const { trialActive, subscriptionStatus } = useTrial()
   const showTrialCounter = subscriptionStatus !== "active" && trialActive
   const showUsageCard = subscriptionStatus === "active"
+
+  // Competência (mês calendário) selecionada — default = mês atual.
+  // O filtro é aplicado em TODAS as queries do dashboard (stats, documentos
+  // recentes, volume chart, totais financeiros). Dropdown mostra até 12
+  // meses pra trás.
+  const [selectedCompetencia, setSelectedCompetencia] = useState<CompetenciaId>(
+    currentCompetencia()
+  )
+  const competenciaOptions = useMemo(() => buildCompetenciaOptions(11), [])
+  const currentRange = useMemo(
+    () => getCompetenciaRange(selectedCompetencia),
+    [selectedCompetencia]
+  )
 
   // Monthly usage only loads when subscription is active (decoupled from trial state)
   const { docsConsumidosMes, docsIncludedMes, stripePriceId } = useMonthlyUsage(showUsageCard)
@@ -78,7 +98,19 @@ export default function DashboardPage() {
   const [realCounts, setRealCounts] = useState<DashboardCounts>({ nfe: 0, cte: 0, mdfe: 0, nfse: 0 })
   const [realActivity, setRealActivity] = useState<ActivityEntry[]>([])
   const [realCredits, setRealCredits] = useState<number | null>(null)
-  const [realDocuments, setRealDocuments] = useState<Array<{ tipo: string; chave_acesso: string; cnpj: string; nsu: string; status: string; fetched_at: string }>>([])
+  const [realDocuments, setRealDocuments] = useState<Array<{
+    tipo: string
+    chave_acesso: string
+    cnpj: string
+    nsu: string
+    status: string
+    fetched_at: string
+    cnpj_emitente?: string | null
+    razao_social_emitente?: string | null
+    numero_documento?: string | null
+    data_emissao?: string | null
+    valor_total?: number | null
+  }>>([])
   const [realNfeTotal, setRealNfeTotal] = useState(0)
   const [realCteTotal, setRealCteTotal] = useState(0)
   const [realMdfeTotal, setRealMdfeTotal] = useState(0)
@@ -86,6 +118,9 @@ export default function DashboardPage() {
   const [realCnpjCount, setRealCnpjCount] = useState(0)
   const [realVolumeData, setRealVolumeData] = useState<Array<{ date: string; nfe: number; cte: number; mdfe: number; nfse: number }>>([])
   const [realLoading, setRealLoading] = useState(false)
+  // Total agregado de docs capturados na competência selecionada (NFE+CTE+MDFE+NFSE).
+  // É a base pra cálculo de consumo mensal e overage.
+  const [realDocsNaCompetencia, setRealDocsNaCompetencia] = useState(0)
 
   // Extract value from XML string using regex (no DOM parser needed)
   function extractXmlValue(xml: string, tipo: string): number {
@@ -112,20 +147,44 @@ export default function DashboardPage() {
     setRealLoading(true)
     try {
       const sb = getSupabase()
+      // Range da competência selecionada (ISO UTC cobrindo o mês SP inteiro)
+      const { start, end } = currentRange
 
-      // Count ALL documents by tipo (total transacionado, não só available)
+      // Counts por tipo — SOMENTE documentos capturados na competência
       const [nfeRes, cteRes, mdfeRes, nfseRes] = await Promise.all([
-        sb.from('documents').select('id', { count: 'exact', head: true }).eq('tipo', 'NFE'),
-        sb.from('documents').select('id', { count: 'exact', head: true }).eq('tipo', 'CTE'),
-        sb.from('documents').select('id', { count: 'exact', head: true }).eq('tipo', 'MDFE'),
-        sb.from('documents').select('id', { count: 'exact', head: true }).eq('tipo', 'NFSE'),
+        sb
+          .from('documents')
+          .select('id', { count: 'exact', head: true })
+          .eq('tipo', 'NFE')
+          .gte('fetched_at', start)
+          .lte('fetched_at', end),
+        sb
+          .from('documents')
+          .select('id', { count: 'exact', head: true })
+          .eq('tipo', 'CTE')
+          .gte('fetched_at', start)
+          .lte('fetched_at', end),
+        sb
+          .from('documents')
+          .select('id', { count: 'exact', head: true })
+          .eq('tipo', 'MDFE')
+          .gte('fetched_at', start)
+          .lte('fetched_at', end),
+        sb
+          .from('documents')
+          .select('id', { count: 'exact', head: true })
+          .eq('tipo', 'NFSE')
+          .gte('fetched_at', start)
+          .lte('fetched_at', end),
       ])
 
-      // Count CNPJs + get company name
-      const { data: certData } = await sb.from('certificates').select('cnpj, company_name').eq('is_active', true)
+      // CNPJs + nome da empresa (atemporal — não depende de competência)
+      const { data: certData } = await sb
+        .from('certificates')
+        .select('cnpj, company_name')
+        .eq('is_active', true)
       setRealCnpjCount(certData?.length ?? 0)
       if (certData && certData.length > 0 && certData[0].company_name) {
-        // Clean up company name (remove CNPJ suffix if present)
         const name = certData[0].company_name.split(':')[0].trim()
         setRealCompanyName(name)
       }
@@ -137,44 +196,113 @@ export default function DashboardPage() {
         nfse: nfseRes.count ?? 0,
       })
 
-      // Recent documents with XML for value extraction
-      const { data: recentDocs } = await sb
-        .from('documents')
-        .select('tipo, chave_acesso, cnpj, nsu, status, fetched_at, xml_content')
-        .eq('status', 'available')
-        .order('fetched_at', { ascending: false })
-        .limit(20)
+      // Total consolidado dos 4 tipos pra o card "Uso do mês" — é assim
+      // que o contador de cobrança funciona: um único número que zera
+      // dia 1 e serve de base pro cálculo de excedente (overage).
+      const totalCompetencia =
+        (nfeRes.count ?? 0) +
+        (cteRes.count ?? 0) +
+        (mdfeRes.count ?? 0) +
+        (nfseRes.count ?? 0)
+      setRealDocsNaCompetencia(totalCompetencia)
 
-      if (recentDocs) {
-        setRealDocuments(recentDocs)
-
-        // Sum values by type
-        let nfeSum = 0, cteSum = 0, mdfeSum = 0, nfseSum = 0
-        for (const doc of recentDocs) {
-          const val = extractXmlValue(doc.xml_content || "", doc.tipo)
-          if (doc.tipo === "NFE") nfeSum += val
-          if (doc.tipo === "CTE") cteSum += val
-          if (doc.tipo === "MDFE") mdfeSum += val
-          if (doc.tipo === "NFSE") nfseSum += val
-        }
-        setRealNfeTotal(nfeSum)
-        setRealCteTotal(cteSum)
-        setRealMdfeTotal(mdfeSum)
-        setRealNfseTotal(nfseSum)
-
-        // Build volume chart data (group by day)
-        const byDay: Record<string, { nfe: number; cte: number; mdfe: number; nfse: number }> = {}
-        for (const doc of recentDocs) {
-          const day = new Date(doc.fetched_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
-          if (!byDay[day]) byDay[day] = { nfe: 0, cte: 0, mdfe: 0, nfse: 0 }
-          const key = doc.tipo.toLowerCase() as "nfe" | "cte" | "mdfe" | "nfse"
-          if (key in byDay[day]) byDay[day][key]++
-        }
-        const volumeData = Object.entries(byDay).map(([date, counts]) => ({ date, ...counts }))
-        setRealVolumeData(volumeData)
+      // Estratégia de duas queries:
+      //
+      // Query A (displayDocs, limit 20): os 20 docs mais recentes pra
+      //   mostrar na tabela "Documentos Recentes" do dashboard.
+      //
+      // Query B (aggregationRows, sem limit, só colunas leves): TODOS
+      //   os documents da competência (tipo + valor_total + fetched_at)
+      //   pra soma de valores e volume chart refletirem o total real,
+      //   não só os 20 exibidos. Como o xml_content não vem, o payload
+      //   continua leve mesmo com milhares de rows.
+      //
+      // Nota de tipagem: o schema do Supabase TypeScript gerado pode não
+      // conhecer as colunas da migration 015 ainda, então fazemos cast
+      // explícito. Em runtime as colunas já existem.
+      type RecentDocRow = {
+        tipo: string
+        chave_acesso: string
+        cnpj: string
+        nsu: string
+        status: string
+        fetched_at: string
+        xml_content?: string | null
+        cnpj_emitente?: string | null
+        razao_social_emitente?: string | null
+        numero_documento?: string | null
+        data_emissao?: string | null
+        valor_total?: number | null
+      }
+      type AggregationRow = {
+        tipo: string
+        fetched_at: string
+        valor_total: number | null
+        xml_content: string | null
       }
 
-      // Last 5 polling_log entries for activity feed
+      const [displayRes, aggregationRes] = await Promise.all([
+        sb
+          .from('documents')
+          .select(
+            'tipo, chave_acesso, cnpj, nsu, status, fetched_at, xml_content, ' +
+            'cnpj_emitente, razao_social_emitente, numero_documento, data_emissao, valor_total'
+          )
+          .gte('fetched_at', start)
+          .lte('fetched_at', end)
+          .order('fetched_at', { ascending: false })
+          .limit(20) as unknown as Promise<{ data: RecentDocRow[] | null }>,
+        sb
+          .from('documents')
+          .select('tipo, fetched_at, valor_total, xml_content')
+          .gte('fetched_at', start)
+          .lte('fetched_at', end) as unknown as Promise<{ data: AggregationRow[] | null }>,
+      ])
+
+      const displayDocs = displayRes.data ?? []
+      const aggregationRows = aggregationRes.data ?? []
+
+      setRealDocuments(displayDocs)
+
+      // Soma total sobre TODOS os documents da competência (não só
+      // os 20 exibidos). Usa valor_total (coluna nova do parser) com
+      // fallback pra extração via regex pro xml_content dos docs antigos
+      // pré-backfill.
+      let nfeSum = 0, cteSum = 0, mdfeSum = 0, nfseSum = 0
+      for (const doc of aggregationRows) {
+        const val =
+          doc.valor_total != null
+            ? Number(doc.valor_total)
+            : extractXmlValue(doc.xml_content || "", doc.tipo)
+        if (doc.tipo === "NFE") nfeSum += val
+        if (doc.tipo === "CTE") cteSum += val
+        if (doc.tipo === "MDFE") mdfeSum += val
+        if (doc.tipo === "NFSE") nfseSum += val
+      }
+      setRealNfeTotal(nfeSum)
+      setRealCteTotal(cteSum)
+      setRealMdfeTotal(mdfeSum)
+      setRealNfseTotal(nfseSum)
+
+      // Volume chart agrupado por dia sobre TODOS os documents da competência
+      const byDay: Record<string, { nfe: number; cte: number; mdfe: number; nfse: number }> = {}
+      for (const doc of aggregationRows) {
+        const day = new Date(doc.fetched_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
+        if (!byDay[day]) byDay[day] = { nfe: 0, cte: 0, mdfe: 0, nfse: 0 }
+        const key = doc.tipo.toLowerCase() as "nfe" | "cte" | "mdfe" | "nfse"
+        if (key in byDay[day]) byDay[day][key]++
+      }
+      const volumeData = Object.entries(byDay)
+        .map(([date, counts]) => ({ date, ...counts }))
+        .sort((a, b) => {
+          // Ordena por data DD/MM (pt-BR) convertendo pra comparable
+          const [da, ma] = a.date.split("/").map(Number)
+          const [db, mb] = b.date.split("/").map(Number)
+          return (ma ?? 0) - (mb ?? 0) || (da ?? 0) - (db ?? 0)
+        })
+      setRealVolumeData(volumeData)
+
+      // Polling log — últimos 5 (atemporal, feed de atividade recente)
       const { data: activityData } = await sb
         .from('polling_log')
         .select('id, tipo, cnpj, status, docs_found, created_at')
@@ -183,7 +311,7 @@ export default function DashboardPage() {
 
       if (activityData) setRealActivity(activityData)
 
-      // Credits balance from tenants
+      // Créditos do tenant (atemporal)
       const { data: tenantData } = await sb
         .from('tenants')
         .select('credits')
@@ -196,17 +324,14 @@ export default function DashboardPage() {
     } finally {
       setRealLoading(false)
     }
-  }, [])
+  }, [currentRange])
 
   useEffect(() => {
     if (!settings.showMockData) loadRealData()
   }, [settings.showMockData, loadRealData])
 
-  // Current month/year label, e.g. "abr 2026"
-  const now = new Date()
-  const mesAtual = now.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "")
-  const anoAtual = now.getFullYear()
-  const periodoAtual = `${mesAtual.charAt(0).toUpperCase()}${mesAtual.slice(1)} ${anoAtual}`
+  // Label da competência atual pra exibir no dashboard
+  const periodoAtual = currentRange.shortLabel
 
   const nfeValue = showMock ? "1.247" : realCounts.nfe.toLocaleString("pt-BR")
   const cteValue = showMock ? "384" : realCounts.cte.toLocaleString("pt-BR")
@@ -242,11 +367,28 @@ export default function DashboardPage() {
             <span>{showMock ? "Tech Solutions Ltda" : (realCompanyName || "Empresa")}</span>
             <ChevronDown className="h-3 w-3 text-muted-foreground" />
           </button>
-          <button className="inline-flex items-center gap-2 rounded-lg border bg-background px-2.5 py-1.5 text-xs font-medium shadow-sm transition-colors hover:bg-muted">
+          <label
+            htmlFor="competencia-select"
+            className="relative inline-flex items-center gap-2 rounded-lg border bg-background px-2.5 py-1.5 text-xs font-medium shadow-sm transition-colors hover:bg-muted cursor-pointer"
+          >
             <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
             <span>{periodoAtual}</span>
-            <ChevronDown className="h-3 w-3 text-muted-foreground" />
-          </button>
+            <select
+              id="competencia-select"
+              aria-label="Selecionar competência mensal"
+              value={selectedCompetencia}
+              onChange={(e) =>
+                setSelectedCompetencia(e.target.value as CompetenciaId)
+              }
+              className="absolute inset-0 cursor-pointer opacity-0"
+            >
+              {competenciaOptions.map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.shortLabel}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       </div>
 
@@ -262,7 +404,7 @@ export default function DashboardPage() {
           title="NF-e"
           value={nfeValue}
           icon={<FileText className="h-4 w-4" />}
-          period="Últimos 30 dias"
+          period={`Competência ${periodoAtual}`}
           trend={showMock ? { value: 12.5, label: "vs. mês anterior" } : undefined}
           color="text-blue-600"
         />
@@ -270,7 +412,7 @@ export default function DashboardPage() {
           title="CT-e"
           value={cteValue}
           icon={<Truck className="h-4 w-4" />}
-          period="Últimos 30 dias"
+          period={`Competência ${periodoAtual}`}
           trend={showMock ? { value: 8.3, label: "vs. mês anterior" } : undefined}
           color="text-violet-600"
         />
@@ -278,7 +420,7 @@ export default function DashboardPage() {
           title="MDF-e"
           value={mdfeValue}
           icon={<FileCheck className="h-4 w-4" />}
-          period="Últimos 30 dias"
+          period={`Competência ${periodoAtual}`}
           trend={showMock ? { value: -3.2, label: "vs. mês anterior" } : undefined}
           color="text-emerald-600"
         />
@@ -286,7 +428,7 @@ export default function DashboardPage() {
           title="NFS-e"
           value={nfseValue}
           icon={<Receipt className="h-4 w-4" />}
-          period="Últimos 30 dias"
+          period={`Competência ${periodoAtual}`}
           trend={showMock ? { value: 4.1, label: "vs. mês anterior" } : undefined}
           badge="ADN"
           color="text-amber-600"
@@ -311,43 +453,72 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* Uso do mês — apenas para assinaturas ativas */}
-      {showUsageCard && (
-        <Card size="sm">
-          <CardHeader>
-            <CardTitle>Uso do mês</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-              <div
-                className={`h-full rounded-full transition-all ${
-                  overageDocs > 0
-                    ? "bg-amber-500"
-                    : usagePct >= 90
-                      ? "bg-amber-400"
-                      : "bg-emerald-500"
-                }`}
-                style={{ width: `${Math.max(usagePct, overageDocs > 0 ? 100 : usagePct)}%` }}
-              />
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">
-                {docsConsumidosMes.toLocaleString("pt-BR")} de{" "}
-                {docsIncludedMes.toLocaleString("pt-BR")} documentos capturados
-              </span>
-              {overageDocs > 0 ? (
-                <span className="font-semibold text-amber-600">
-                  Excedente previsto: R$ {overageBRL}
+      {/* Uso do mês — SEMPRE visível (trial e active). O número mostrado
+          vem da contagem real dos documents na competência selecionada,
+          não do `docs_consumidos_mes` do tenant — isso permite o usuário
+          navegar competências passadas e ver o consumo histórico.
+          Pra `subscription_status='active'`, exibe barra de progresso +
+          excedente previsto contra o plano contratado. Pra trial, exibe
+          contra o trial cap (500 docs) quando aplicável. */}
+      {(() => {
+        const isActive = subscriptionStatus === "active"
+        const limiteTotal = isActive
+          ? docsIncludedMes
+          : 500 // trial cap fixo
+        const pctUso = limiteTotal > 0
+          ? Math.min(100, Math.round((realDocsNaCompetencia / limiteTotal) * 100))
+          : 0
+        const excedenteDocs = Math.max(0, realDocsNaCompetencia - limiteTotal)
+        const excedenteValorCents = isActive ? excedenteDocs * overageCentsPerDoc : 0
+        const excedenteBRL = (excedenteValorCents / 100).toLocaleString("pt-BR", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })
+
+        return (
+          <Card size="sm">
+            <CardHeader>
+              <CardTitle>Uso do mês — {periodoAtual}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className={`h-full rounded-full transition-all ${
+                    excedenteDocs > 0
+                      ? "bg-amber-500"
+                      : pctUso >= 90
+                        ? "bg-amber-400"
+                        : "bg-emerald-500"
+                  }`}
+                  style={{ width: `${Math.max(pctUso, excedenteDocs > 0 ? 100 : pctUso)}%` }}
+                />
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">
+                  {realDocsNaCompetencia.toLocaleString("pt-BR")} de{" "}
+                  {limiteTotal.toLocaleString("pt-BR")} documentos capturados
+                  {!isActive && " (limite do trial)"}
                 </span>
-              ) : (
-                <span className="font-semibold text-emerald-600">
-                  Dentro do limite
-                </span>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                {excedenteDocs > 0 ? (
+                  isActive ? (
+                    <span className="font-semibold text-amber-600">
+                      Excedente previsto: {excedenteDocs.toLocaleString("pt-BR")} docs · R$ {excedenteBRL}
+                    </span>
+                  ) : (
+                    <span className="font-semibold text-red-600">
+                      Trial excedido — {excedenteDocs.toLocaleString("pt-BR")} docs acima
+                    </span>
+                  )
+                ) : (
+                  <span className="font-semibold text-emerald-600">
+                    Dentro do limite
+                  </span>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )
+      })()}
 
       {/* Financial + Chart side by side */}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
