@@ -142,6 +142,14 @@ interface RealDocument {
   nsu: string
   status: string
   fetched_at: string
+  // Metadata extraída do XML (migration 015). Campos null pra resumos
+  // que não têm xml_content, pra docs antigos sem backfill, ou pra
+  // XMLs que o parser não conseguiu interpretar.
+  cnpj_emitente?: string | null
+  razao_social_emitente?: string | null
+  numero_documento?: string | null
+  data_emissao?: string | null
+  valor_total?: number | null
 }
 
 const tipoLabels: Record<string, string> = { NFE: "NF-e", CTE: "CT-e", MDFE: "MDF-e", NFSE: "NFS-e" }
@@ -152,9 +160,19 @@ const tipoColors: Record<string, string> = {
   NFSE: "bg-amber-50 text-amber-700",
 }
 
-function formatCnpj(cnpj: string) {
-  if (cnpj.length !== 14) return cnpj
-  return `${cnpj.slice(0,2)}.${cnpj.slice(2,5)}.${cnpj.slice(5,8)}/${cnpj.slice(8,12)}-${cnpj.slice(12)}`
+function formatCnpj(cnpj: string | null | undefined) {
+  if (!cnpj) return "—"
+  const digits = cnpj.replace(/\D/g, "")
+  if (digits.length !== 14) return cnpj
+  return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`
+}
+
+function formatValor(valor: number | null | undefined): string {
+  if (valor == null) return "—"
+  return valor.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  })
 }
 
 export function RecentDocuments({ empty = false, documents }: { empty?: boolean; documents?: RealDocument[] }) {
@@ -187,11 +205,12 @@ export function RecentDocuments({ empty = false, documents }: { empty?: boolean;
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableHead className="pl-4">CNPJ</TableHead>
-              <TableHead>Data</TableHead>
+              <TableHead className="pl-4">Fornecedor</TableHead>
+              <TableHead>Emissão</TableHead>
               <TableHead>Tipo</TableHead>
+              <TableHead>Número</TableHead>
               <TableHead>NSU</TableHead>
-              <TableHead>Chave de Acesso</TableHead>
+              <TableHead className="text-right">Valor</TableHead>
               <TableHead className="pr-4 text-right">Status</TableHead>
             </TableRow>
           </TableHeader>
@@ -199,10 +218,19 @@ export function RecentDocuments({ empty = false, documents }: { empty?: boolean;
             {documents.map((doc, i) => (
               <TableRow key={i} className="group cursor-pointer">
                 <TableCell className="pl-4">
-                  <p className="font-mono text-xs">{formatCnpj(doc.cnpj)}</p>
+                  <div>
+                    <p className="font-medium text-foreground text-sm">
+                      {doc.razao_social_emitente || "—"}
+                    </p>
+                    <p className="font-mono text-xs text-muted-foreground">
+                      {formatCnpj(doc.cnpj_emitente)}
+                    </p>
+                  </div>
                 </TableCell>
                 <TableCell className="text-muted-foreground text-sm">
-                  {new Date(doc.fetched_at).toLocaleDateString("pt-BR")}
+                  {doc.data_emissao
+                    ? new Date(doc.data_emissao).toLocaleDateString("pt-BR")
+                    : new Date(doc.fetched_at).toLocaleDateString("pt-BR")}
                 </TableCell>
                 <TableCell>
                   <span className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold", tipoColors[doc.tipo] || "bg-gray-50 text-gray-700")}>
@@ -210,10 +238,13 @@ export function RecentDocuments({ empty = false, documents }: { empty?: boolean;
                   </span>
                 </TableCell>
                 <TableCell className="font-mono text-xs text-muted-foreground">
-                  {doc.nsu}
+                  {doc.numero_documento || "—"}
                 </TableCell>
                 <TableCell className="font-mono text-xs text-muted-foreground">
-                  {doc.chave_acesso.slice(0, 12)}...{doc.chave_acesso.slice(-6)}
+                  {doc.nsu}
+                </TableCell>
+                <TableCell className="text-right font-semibold tabular-nums">
+                  {formatValor(doc.valor_total)}
                 </TableCell>
                 <TableCell className="pr-4 text-right">
                   <span className={cn(

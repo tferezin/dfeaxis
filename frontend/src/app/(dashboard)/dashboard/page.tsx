@@ -98,7 +98,19 @@ export default function DashboardPage() {
   const [realCounts, setRealCounts] = useState<DashboardCounts>({ nfe: 0, cte: 0, mdfe: 0, nfse: 0 })
   const [realActivity, setRealActivity] = useState<ActivityEntry[]>([])
   const [realCredits, setRealCredits] = useState<number | null>(null)
-  const [realDocuments, setRealDocuments] = useState<Array<{ tipo: string; chave_acesso: string; cnpj: string; nsu: string; status: string; fetched_at: string }>>([])
+  const [realDocuments, setRealDocuments] = useState<Array<{
+    tipo: string
+    chave_acesso: string
+    cnpj: string
+    nsu: string
+    status: string
+    fetched_at: string
+    cnpj_emitente?: string | null
+    razao_social_emitente?: string | null
+    numero_documento?: string | null
+    data_emissao?: string | null
+    valor_total?: number | null
+  }>>([])
   const [realNfeTotal, setRealNfeTotal] = useState(0)
   const [realCteTotal, setRealCteTotal] = useState(0)
   const [realMdfeTotal, setRealMdfeTotal] = useState(0)
@@ -182,22 +194,51 @@ export default function DashboardPage() {
       })
 
       // Documentos recentes da competência — até 50 (não "últimos 20")
-      // pra a soma de valores refletir a competência completa
-      const { data: recentDocs } = await sb
+      // pra a soma de valores refletir a competência completa.
+      // Usa as colunas novas de metadata (migration 015) — valor_total e
+      // dados do emitente já vêm populados pelo xml_parser.
+      //
+      // Nota de tipagem: o schema do Supabase TypeScript gerado pode não
+      // conhecer as colunas da migration 015 ainda, então fazemos cast
+      // explícito pra dict flexível. Em runtime as colunas já existem.
+      type RecentDocRow = {
+        tipo: string
+        chave_acesso: string
+        cnpj: string
+        nsu: string
+        status: string
+        fetched_at: string
+        xml_content?: string | null
+        cnpj_emitente?: string | null
+        razao_social_emitente?: string | null
+        numero_documento?: string | null
+        data_emissao?: string | null
+        valor_total?: number | null
+      }
+      const recentRes = (await sb
         .from('documents')
-        .select('tipo, chave_acesso, cnpj, nsu, status, fetched_at, xml_content')
+        .select(
+          'tipo, chave_acesso, cnpj, nsu, status, fetched_at, xml_content, ' +
+          'cnpj_emitente, razao_social_emitente, numero_documento, data_emissao, valor_total'
+        )
         .gte('fetched_at', start)
         .lte('fetched_at', end)
         .order('fetched_at', { ascending: false })
-        .limit(50)
+        .limit(50)) as unknown as { data: RecentDocRow[] | null }
+      const recentDocs = recentRes.data
 
       if (recentDocs) {
         setRealDocuments(recentDocs)
 
-        // Soma de valores por tipo (apenas docs da competência)
+        // Soma de valores por tipo usando valor_total (coluna nova do
+        // parser). Fallback pra extração via regex no xml_content pra
+        // docs antigos que ainda não passaram pelo backfill.
         let nfeSum = 0, cteSum = 0, mdfeSum = 0, nfseSum = 0
         for (const doc of recentDocs) {
-          const val = extractXmlValue(doc.xml_content || "", doc.tipo)
+          const val =
+            doc.valor_total != null
+              ? Number(doc.valor_total)
+              : extractXmlValue(doc.xml_content || "", doc.tipo)
           if (doc.tipo === "NFE") nfeSum += val
           if (doc.tipo === "CTE") cteSum += val
           if (doc.tipo === "MDFE") mdfeSum += val
