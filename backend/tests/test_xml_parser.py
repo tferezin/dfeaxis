@@ -19,6 +19,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from services.xml_parser import (  # noqa: E402
     DocumentMetadata,
+    is_evento_xml,
     metadata_to_db_dict,
     parse_cte,
     parse_document_xml,
@@ -164,6 +165,80 @@ NFSE_PAULISTA = """<?xml version="1.0" encoding="UTF-8"?>
   </Nfse>
 </CompNfse>"""
 
+# ABRASF 2.04 é o padrão nacional que a maioria das prefeituras modernas
+# usa. Tem default namespace xmlns="http://www.abrasf.org.br/nfse.xsd" —
+# o parser tem que stripar esse namespace pra xpaths baterem.
+NFSE_ABRASF_204 = """<?xml version="1.0" encoding="UTF-8"?>
+<CompNfse xmlns="http://www.abrasf.org.br/nfse.xsd">
+  <Nfse versao="2.04">
+    <InfNfse Id="NFSE123">
+      <Numero>4567</Numero>
+      <DataEmissao>2026-04-14T11:30:00</DataEmissao>
+      <PrestadorServico>
+        <IdentificacaoPrestador>
+          <CpfCnpj>
+            <Cnpj>33445566778899</Cnpj>
+          </CpfCnpj>
+          <InscricaoMunicipal>1234567</InscricaoMunicipal>
+        </IdentificacaoPrestador>
+        <RazaoSocial>PRESTADOR ABRASF EXEMPLO LTDA</RazaoSocial>
+      </PrestadorServico>
+      <TomadorServico>
+        <IdentificacaoTomador>
+          <CpfCnpj>
+            <Cnpj>01786983000368</Cnpj>
+          </CpfCnpj>
+        </IdentificacaoTomador>
+        <RazaoSocial>TOMADOR EXEMPLO SA</RazaoSocial>
+      </TomadorServico>
+      <Servico>
+        <Valores>
+          <ValorServicos>5890.75</ValorServicos>
+          <ValorIss>294.54</ValorIss>
+        </Valores>
+      </Servico>
+    </InfNfse>
+  </Nfse>
+</CompNfse>"""
+
+# procEventoNFe de manifestação (ciência 210210). Chega pelo DistDFe
+# misturado com as NFes — polling precisa filtrar antes de gravar.
+PROC_EVENTO_NFE = """<?xml version="1.0" encoding="UTF-8"?>
+<procEventoNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="1.00">
+  <evento versao="1.00">
+    <infEvento Id="ID210210351200000000000000000000000000000000000000000001">
+      <cOrgao>91</cOrgao>
+      <tpAmb>2</tpAmb>
+      <CNPJ>46389383000647</CNPJ>
+      <chNFe>35260301786983000368550010000000121234567890</chNFe>
+      <dhEvento>2026-03-23T19:12:56-03:00</dhEvento>
+      <tpEvento>210210</tpEvento>
+      <nSeqEvento>1</nSeqEvento>
+      <verEvento>1.00</verEvento>
+      <detEvento versao="1.00">
+        <descEvento>Ciencia da Operacao</descEvento>
+      </detEvento>
+    </infEvento>
+  </evento>
+  <retEvento versao="1.00">
+    <infEvento>
+      <cStat>135</cStat>
+      <xMotivo>Evento registrado e vinculado a NF-e</xMotivo>
+      <nProt>135260000123456</nProt>
+    </infEvento>
+  </retEvento>
+</procEventoNFe>"""
+
+PROC_EVENTO_CTE = """<?xml version="1.0" encoding="UTF-8"?>
+<procEventoCTe xmlns="http://www.portalfiscal.inf.br/cte" versao="3.00">
+  <eventoCTe versao="3.00">
+    <infEvento>
+      <tpEvento>110111</tpEvento>
+      <descEvento>Cancelamento</descEvento>
+    </infEvento>
+  </eventoCTe>
+</procEventoCTe>"""
+
 
 # ---------------------------------------------------------------------------
 # Tests
@@ -231,15 +306,61 @@ def test_nfse_adn() -> None:
 def test_nfse_paulista() -> None:
     print("\n[6] parse_nfse — Paulista (legado)")
     m = parse_nfse(NFSE_PAULISTA)
-    # Paulista NÃO usa prestador/identificacaoPrestador (é PrestadorServico)
-    # A implementação atual pode não extrair perfeitamente. Validamos
-    # que pelo menos pegou o tomador (tem CpfCnpj padronizado).
-    assert m.cnpj_destinatario == "01786983000368", (
-        f"cnpj_destinatario={m.cnpj_destinatario!r}"
-    )
+    # Com _strip_namespaces + xpaths ABRASF, agora extrai TUDO do Paulista
+    # incluindo prestador (PrestadorServico/IdentificacaoPrestador/Cnpj)
+    assert m.cnpj_emitente == "11223344556677", f"cnpj_emitente={m.cnpj_emitente!r}"
+    assert m.razao_social_emitente == "SERVICOS PAULISTA LTDA"
+    assert m.cnpj_destinatario == "01786983000368"
     assert m.numero_documento == "99"
     assert m.valor_total == Decimal("2100.00")
-    log("NFSe Paulista extrai tomador, numero, valor", "PASS")
+    log("NFSe Paulista extrai os 5 campos (agora inclui prestador)", "PASS")
+
+
+def test_nfse_abrasf_204() -> None:
+    print("\n[6b] parse_nfse — ABRASF 2.04 com default namespace")
+    m = parse_nfse(NFSE_ABRASF_204)
+    # Fixture tem xmlns="http://www.abrasf.org.br/nfse.xsd" — o parser
+    # deve stripar esse namespace e fazer match nos xpaths sem prefixo.
+    # Se a regression voltar, TODOS os 5 campos ficam None.
+    assert m.cnpj_emitente == "33445566778899", (
+        f"cnpj_emitente={m.cnpj_emitente!r} (bug: default namespace não strip?)"
+    )
+    assert m.razao_social_emitente == "PRESTADOR ABRASF EXEMPLO LTDA"
+    assert m.cnpj_destinatario == "01786983000368"
+    assert m.numero_documento == "4567"
+    assert m.valor_total == Decimal("5890.75")
+    assert m.data_emissao is not None and m.data_emissao.year == 2026
+    log("ABRASF 2.04 com xmlns default extrai todos os 6 campos", "PASS")
+
+
+def test_is_evento_nfe_detected() -> None:
+    print("\n[6c] is_evento_xml — detecta procEventoNFe")
+    assert is_evento_xml(PROC_EVENTO_NFE) is True
+    # Parser em NFE retorna empty (não tem emit/ide/total) — é evento
+    m = parse_nfe(PROC_EVENTO_NFE)
+    assert m.empty or m.cnpj_emitente is None, (
+        "procEventoNFe não deveria ter cnpj_emitente (é evento, não NFe)"
+    )
+    log("procEventoNFe detectado + parse_nfe retorna vazio", "PASS")
+
+
+def test_is_evento_cte_detected() -> None:
+    print("\n[6d] is_evento_xml — detecta procEventoCTe")
+    assert is_evento_xml(PROC_EVENTO_CTE) is True
+    log("procEventoCTe detectado", "PASS")
+
+
+def test_is_evento_xml_negative() -> None:
+    print("\n[6e] is_evento_xml — NFe/CTe/NFSe normais retornam False")
+    assert is_evento_xml(NFE_FULL) is False
+    assert is_evento_xml(NFE_RESUMO) is False
+    assert is_evento_xml(CTE_FULL) is False
+    assert is_evento_xml(MDFE_FULL) is False
+    assert is_evento_xml(NFSE_ADN) is False
+    assert is_evento_xml(NFSE_ABRASF_204) is False
+    assert is_evento_xml("") is False
+    assert is_evento_xml("<<<malformado>>>") is False
+    log("docs fiscais e inputs inválidos retornam False", "PASS")
 
 
 def test_xml_malformado() -> None:
@@ -322,6 +443,10 @@ def main() -> int:
         test_mdfe_full,
         test_nfse_adn,
         test_nfse_paulista,
+        test_nfse_abrasf_204,
+        test_is_evento_nfe_detected,
+        test_is_evento_cte_detected,
+        test_is_evento_xml_negative,
         test_xml_malformado,
         test_xml_vazio,
         test_parse_document_xml_dispatch,

@@ -13,7 +13,11 @@ from services.manifestacao import manifestacao_service
 from services.sefaz_client import sefaz_client
 from services.nfse_client import nfse_client
 from services.nsu_controller import nsu_controller
-from services.xml_parser import metadata_to_db_dict, parse_document_xml
+from services.xml_parser import (
+    is_evento_xml,
+    metadata_to_db_dict,
+    parse_document_xml,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -96,13 +100,29 @@ def _build_document_row(
     is_resumo: bool,
     doc_status: str,
     manif_status,
-) -> dict:
+) -> dict | None:
     """Constrói o dict de upsert em `documents` incluindo metadata extraída do XML.
 
     Centraliza a lógica pra os 3 fluxos de polling (NFE/CTE/MDFE via
     _poll_single_detailed/_poll_single, e NFSE via _poll_nfse) usarem os
     mesmos campos — evita divergência.
+
+    Retorna None se o XML for um EVENTO SEFAZ (procEventoNFe, procEventoCTe,
+    etc.) em vez de documento fiscal. Eventos chegam pelo mesmo canal
+    DistDFe que as notas mas não devem ser persistidos em `documents` —
+    caller deve tratar None e pular o upsert.
     """
+    xml_source = doc.xml_content if hasattr(doc, "xml_content") else None
+
+    # Filtra eventos (manifestação, cancelamento, carta de correção) —
+    # não são documentos fiscais, não devem ir pra `documents`.
+    if xml_source and is_evento_xml(xml_source):
+        logger.info(
+            "polling: skip evento xml chave=%s tipo=%s — não é doc fiscal",
+            getattr(doc, "chave", "?"), getattr(doc, "tipo", "?"),
+        )
+        return None
+
     row: dict = {
         "tenant_id": tenant_id,
         "cnpj": cnpj,
@@ -118,7 +138,6 @@ def _build_document_row(
     # Extrai metadata do XML (emit, dest, número, data, valor). Parser é
     # defensive — nunca levanta. Resumos têm xml_content=None e vão retornar
     # metadata quase vazia (só CNPJ emitente quando o resumo contém).
-    xml_source = doc.xml_content if hasattr(doc, "xml_content") else None
     if xml_source:
         try:
             meta = parse_document_xml(xml_source, doc.tipo)
@@ -259,6 +278,9 @@ def _poll_single_detailed(cert: dict, tipo: str, tenant_data: dict) -> dict:
                     doc_status=doc_status,
                     manif_status=manif_status,
                 )
+                if row is None:
+                    # Era evento SEFAZ (procEventoNFe/CTe/...), não doc fiscal
+                    continue
                 sb.table("documents").upsert(
                     row, on_conflict="tenant_id,chave_acesso"
                 ).execute()
@@ -443,6 +465,9 @@ def _poll_single(cert: dict, tipo: str, tenant_data: dict) -> int:
                 doc_status=doc_status,
                 manif_status=manif_status,
             )
+            if row is None:
+                # Evento SEFAZ (manifestação, cancelamento, etc.) — skip
+                continue
             sb.table("documents").upsert(
                 row, on_conflict="tenant_id,chave_acesso"
             ).execute()
@@ -614,6 +639,9 @@ def _poll_nfse(cert: dict, tenant_data: dict) -> int:
                 doc_status="available",
                 manif_status="nao_aplicavel",
             )
+            if row is None:
+                # NFSe não tem eventos no mesmo canal, mas defensivo
+                continue
             row["codigo_municipio"] = doc.codigo_municipio
             row["codigo_servico"] = doc.codigo_servico
             sb.table("documents").upsert(
