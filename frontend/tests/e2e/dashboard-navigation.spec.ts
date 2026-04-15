@@ -24,6 +24,7 @@ const ROUTES: RouteCheck[] = [
   { path: "/historico/cte", expectedText: /ct-?e|transporte/i, description: "Histórico CT-e" },
   { path: "/historico/mdfe", expectedText: /mdf-?e|manifesto/i, description: "Histórico MDF-e" },
   { path: "/historico/nfse", expectedText: /nfs-?e|servi/i, description: "Histórico NFS-e" },
+  { path: "/historico/manifestacao", expectedText: /manifesta|ci[eê]ncia|evento/i, description: "Histórico Manifestação" },
   { path: "/cadastros/certificados", expectedText: /certificad/i, description: "Certificados" },
   { path: "/cadastros/empresas", expectedText: /empresa|cnpj/i, description: "Empresas" },
   { path: "/cadastros/api-keys", expectedText: /api ?key/i, description: "API Keys" },
