@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
 from db.supabase import get_supabase_client
-from middleware.security import verify_api_key
+from middleware.security import verify_api_key_with_trial
 from models.sap_drc_schemas import (
     EventFragment,
     InboundInvoiceDeleteRequest,
@@ -195,7 +195,7 @@ async def health():
 )
 async def retrieve_inbound_invoices(
     body: InboundInvoiceRetrieveRequest,
-    auth: dict = Depends(verify_api_key),
+    auth: dict = Depends(verify_api_key_with_trial),
 ):
     """Retrieve inbound NF-e documents for the given CNPJs.
 
@@ -258,7 +258,7 @@ async def download_official_document(
     accessKey: str = Query(..., description="Chave de acesso (44 digits)"),
     eventSequence: str | None = Query(None),
     eventType: str | None = Query(None),
-    auth: dict = Depends(verify_api_key),
+    auth: dict = Depends(verify_api_key_with_trial),
 ):
     """Download the XML file of an official document.
 
@@ -291,7 +291,7 @@ async def download_official_document(
 @router.post("/v1/receiveOfficialDocument", status_code=202)
 async def receive_official_document(
     body: OfficialDocumentReceiveRequest,
-    auth: dict = Depends(verify_api_key),
+    auth: dict = Depends(verify_api_key_with_trial),
 ):
     """Receive an NF-e XML document (push model).
 
@@ -358,12 +358,14 @@ async def receive_official_document(
 @router.delete("/v1/deleteInboundInvoices", status_code=204)
 async def delete_inbound_invoices(
     body: InboundInvoiceDeleteRequest,
-    auth: dict = Depends(verify_api_key),
+    auth: dict = Depends(verify_api_key_with_trial),
 ):
     """Delete (confirm delivery of) inbound invoices by UUID list.
 
     Marks documents as 'delivered' and clears the XML content.
-    This is equivalent to the confirmar endpoint in our native API.
+    This is equivalent to the confirmar endpoint in our native API and is
+    the point where the trial/monthly counter advances (same racional do
+    /documentos/{chave}/confirmar nativo).
     """
     if not body.uuidList:
         raise HTTPException(status_code=400, detail="No UUID informed")
@@ -371,12 +373,74 @@ async def delete_inbound_invoices(
     sb = get_supabase_client()
     tenant_id = auth["tenant_id"]
 
+    # Transição atômica available → delivered por UUID. O filtro
+    # status=available garante idempotência: se o SAP chamar 2x com o mesmo
+    # UUID, a segunda chamada não conta nada (result.data vazio).
+    confirmed_count = 0
     for doc_uuid in body.uuidList:
-        sb.table("documents").update({
+        result = sb.table("documents").update({
             "status": "delivered",
             "xml_content": None,
             "delivered_at": datetime.now(timezone.utc).isoformat(),
-        }).eq("id", doc_uuid).eq("tenant_id", tenant_id).execute()
+        }).eq(
+            "id", doc_uuid,
+        ).eq(
+            "tenant_id", tenant_id,
+        ).eq(
+            "status", "available",
+        ).execute()
+
+        if result.data:
+            confirmed_count += 1
+
+    # Incrementa contador de consumo apenas pelos docs que de fato
+    # transicionaram. Graceful — contador nunca quebra a confirmação.
+    if confirmed_count > 0:
+        try:
+            tenant_row = sb.table("tenants").select(
+                "subscription_status, trial_cap, docs_consumidos_trial"
+            ).eq("id", tenant_id).single().execute()
+            tenant_data = tenant_row.data or {}
+            sub_status = tenant_data.get("subscription_status")
+
+            if sub_status == "trial":
+                rpc_res = sb.rpc("increment_trial_docs", {
+                    "p_tenant_id": tenant_id,
+                    "p_count": confirmed_count,
+                }).execute()
+
+                new_count = 0
+                if rpc_res.data is not None:
+                    if isinstance(rpc_res.data, int):
+                        new_count = rpc_res.data
+                    elif isinstance(rpc_res.data, list) and rpc_res.data:
+                        first = rpc_res.data[0]
+                        if isinstance(first, dict):
+                            new_count = int(next(iter(first.values()), 0) or 0)
+                        else:
+                            new_count = int(first or 0)
+
+                trial_cap = int(tenant_data.get("trial_cap") or 500)
+                if new_count >= trial_cap:
+                    sb.table("tenants").update({
+                        "trial_blocked_at": datetime.now(timezone.utc).isoformat(),
+                        "trial_blocked_reason": "cap",
+                    }).eq("id", tenant_id).execute()
+                    logger.info(
+                        "tenant %s atingiu trial_cap=%d (confirmados=%d) via SAP DRC deleteInboundInvoices",
+                        tenant_id, trial_cap, new_count,
+                    )
+
+            elif sub_status == "active":
+                sb.rpc("increment_monthly_docs", {
+                    "p_tenant_id": tenant_id,
+                    "p_count": confirmed_count,
+                }).execute()
+        except Exception as exc:  # noqa: BLE001 — contador nunca quebra confirmação
+            logger.warning(
+                "falha ao incrementar contador de consumo (SAP DRC batch) para tenant %s: %s",
+                tenant_id, exc,
+            )
 
     return Response(status_code=204)
 
@@ -386,11 +450,13 @@ async def delete_official_document(
     accessKey: str = Query(..., description="Chave de acesso"),
     eventSequence: str | None = Query(None),
     eventType: str | None = Query(None),
-    auth: dict = Depends(verify_api_key),
+    auth: dict = Depends(verify_api_key_with_trial),
 ):
     """Delete the XML of an official document by access key.
 
-    Marks the document as 'delivered' and clears XML content.
+    Marks the document as 'delivered' and clears XML content. Avança o
+    contador de consumo (trial ou mensal) exatamente como o endpoint
+    nativo /documentos/{chave}/confirmar.
     """
     if not accessKey:
         raise HTTPException(status_code=400, detail="Invalid accessKey")
@@ -398,6 +464,8 @@ async def delete_official_document(
     sb = get_supabase_client()
     tenant_id = auth["tenant_id"]
 
+    # Filtro status=available garante idempotência: chamada repetida retorna
+    # 404 em vez de contar 2x o mesmo documento.
     result = (
         sb.table("documents")
         .update({
@@ -407,10 +475,59 @@ async def delete_official_document(
         })
         .eq("tenant_id", tenant_id)
         .eq("chave_acesso", accessKey)
+        .eq("status", "available")
         .execute()
     )
 
     if not result.data:
         raise HTTPException(status_code=404, detail="Document not found")
+
+    # Incrementa contador de consumo. Graceful — contador nunca quebra
+    # a confirmação em si.
+    try:
+        tenant_row = sb.table("tenants").select(
+            "subscription_status, trial_cap, docs_consumidos_trial"
+        ).eq("id", tenant_id).single().execute()
+        tenant_data = tenant_row.data or {}
+        sub_status = tenant_data.get("subscription_status")
+
+        if sub_status == "trial":
+            rpc_res = sb.rpc("increment_trial_docs", {
+                "p_tenant_id": tenant_id,
+                "p_count": 1,
+            }).execute()
+
+            new_count = 0
+            if rpc_res.data is not None:
+                if isinstance(rpc_res.data, int):
+                    new_count = rpc_res.data
+                elif isinstance(rpc_res.data, list) and rpc_res.data:
+                    first = rpc_res.data[0]
+                    if isinstance(first, dict):
+                        new_count = int(next(iter(first.values()), 0) or 0)
+                    else:
+                        new_count = int(first or 0)
+
+            trial_cap = int(tenant_data.get("trial_cap") or 500)
+            if new_count >= trial_cap:
+                sb.table("tenants").update({
+                    "trial_blocked_at": datetime.now(timezone.utc).isoformat(),
+                    "trial_blocked_reason": "cap",
+                }).eq("id", tenant_id).execute()
+                logger.info(
+                    "tenant %s atingiu trial_cap=%d (confirmados=%d) via SAP DRC deleteOfficialDocument",
+                    tenant_id, trial_cap, new_count,
+                )
+
+        elif sub_status == "active":
+            sb.rpc("increment_monthly_docs", {
+                "p_tenant_id": tenant_id,
+                "p_count": 1,
+            }).execute()
+    except Exception as exc:  # noqa: BLE001 — contador nunca quebra confirmação
+        logger.warning(
+            "falha ao incrementar contador de consumo (SAP DRC single) para tenant %s chave %s: %s",
+            tenant_id, accessKey, exc,
+        )
 
     return Response(status_code=204)

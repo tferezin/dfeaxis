@@ -416,6 +416,21 @@ async def verify_jwt_with_trial(request: Request) -> dict:
     return auth
 
 
+async def verify_api_key_with_trial(
+    request: Request, api_key: str = Security(api_key_header)
+) -> dict:
+    """Combined dependency: API key auth + trial/block check.
+
+    Use instead of verify_api_key on endpoints where trial_blocked_at should
+    return 403. Same unified message as verify_jwt_with_trial for consistency.
+    Used by the SAP DRC compatibility layer so SAP systems hit the same
+    enforcement gate as our native dashboard.
+    """
+    auth = await verify_api_key(request, api_key)
+    await verify_trial_active(request, auth)
+    return auth
+
+
 async def verify_jwt_or_api_key(request: Request) -> dict:
     """Dual auth: accepts either JWT Bearer token or X-API-Key header.
 
