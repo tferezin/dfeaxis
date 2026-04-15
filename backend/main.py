@@ -91,11 +91,19 @@ async def lifespan(app: FastAPI):
     logger.info("DFeAxis shut down")
 
 
+# Em produção, desligamos Swagger/ReDoc/openapi.json para não expor o
+# schema da API (rotas, auth, modelos) a scanners automatizados. Em
+# dev/staging continuam abertos pra facilitar debug.
+_IS_PRODUCTION = os.getenv("ENVIRONMENT") == "production"
+
 app = FastAPI(
     title="DFeAxis API",
     description="Captura automática de documentos fiscais recebidos da SEFAZ para SAP DRC",
     version="0.1.0",
     lifespan=lifespan,
+    docs_url=None if _IS_PRODUCTION else "/docs",
+    redoc_url=None if _IS_PRODUCTION else "/redoc",
+    openapi_url=None if _IS_PRODUCTION else "/openapi.json",
 )
 
 # --- Middleware (order matters — outermost first) ---

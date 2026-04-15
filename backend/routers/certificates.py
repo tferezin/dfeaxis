@@ -75,9 +75,33 @@ async def upload_certificate(
             detail=f"Certificado invalido ou senha incorreta: {e}",
         )
 
-    # Anti-fraude: o CNPJ informado no form deve bater com o do certificado
+    # Anti-fraude: o CNPJ informado no form deve bater com o do certificado.
+    # Antes: `if cert_cnpj and cert_cnpj != cnpj` deixava passar silenciosamente
+    # quando `cert_cnpj is None` (cert PF / sem OID 2.16.76.1.3.3). Usuário
+    # podia declarar qualquer CNPJ e queimar múltiplos trials. Agora rejeitamos
+    # qualquer certificado sem CNPJ extraível.
     cert_cnpj = cert_info.get("cnpj")
-    if cert_cnpj and cert_cnpj != cnpj:
+    if not cert_cnpj:
+        audit_log(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            action="certificate.upload.rejected",
+            resource_type="certificate",
+            details={
+                "reason": "missing_cnpj_in_san",
+                "declared_cnpj": mask_cnpj(cnpj),
+            },
+            ip_address=client_ip,
+        )
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "Certificado sem CNPJ no campo Subject Alternative Name "
+                "(OID 2.16.76.1.3.3). Use um certificado A1 ICP-Brasil "
+                "para Pessoa Jurídica (e-CNPJ)."
+            ),
+        )
+    if cert_cnpj != cnpj:
         raise HTTPException(
             status_code=422,
             detail=(

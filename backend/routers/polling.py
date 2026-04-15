@@ -1,75 +1,18 @@
 """Endpoints de polling manual e logs."""
 
 import asyncio
-import base64
 import json
-import subprocess
-import os
 from typing import AsyncGenerator
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
 
 from db.supabase import get_supabase_client
-from middleware.security import verify_api_key, verify_jwt_token, verify_jwt_with_trial
+from middleware.security import verify_jwt_with_trial
 from models.schemas import PollingTriggerRequest, PollingTriggerResponse, PollingTipoResult
 from scheduler.polling_job import _poll_single_detailed
 
 router = APIRouter()
-
-
-class TestCaptureRequest(BaseModel):
-    pfx_base64: str
-    password: str
-    cnpj: str
-    tipos: list[str] = ["nfe", "cte", "mdfe"]
-
-
-@router.post("/test-capture")
-async def test_capture(body: TestCaptureRequest):
-    """Teste direto de captura na SEFAZ — sem banco de dados.
-
-    Recebe o certificado .pfx em base64, a senha e o CNPJ.
-    Consulta a SEFAZ homologação e retorna o resultado.
-    """
-    script_path = os.path.join(
-        os.path.dirname(os.path.dirname(__file__)),
-        "scripts",
-        "test_sefaz.py",
-    )
-
-    if not os.path.exists(script_path):
-        raise HTTPException(status_code=500, detail="Script de teste não encontrado")
-
-    tipos_str = ",".join(body.tipos)
-
-    try:
-        result = subprocess.run(
-            [
-                "python3", script_path,
-                body.pfx_base64,
-                body.password,
-                body.cnpj,
-                tipos_str,
-            ],
-            capture_output=True,
-            text=True,
-            timeout=120,
-        )
-
-        if result.returncode != 0:
-            error_msg = result.stderr.strip() or result.stdout.strip() or "Erro desconhecido"
-            return {"error": error_msg}
-
-        return json.loads(result.stdout.strip())
-
-    except subprocess.TimeoutExpired:
-        return {"error": "Timeout: a SEFAZ não respondeu em 120 segundos"}
-    except json.JSONDecodeError:
-        return {"error": "Resposta inválida do script de teste"}
-    except Exception as e:
-        return {"error": str(e)}
 
 
 @router.post("/polling/trigger", response_model=PollingTriggerResponse)
