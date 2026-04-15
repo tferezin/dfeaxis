@@ -330,8 +330,8 @@ async def verify_trial_active(request: Request, auth: dict) -> None:
     - trial_blocked_at is set (cap=500 docs confirmed OR time=10 days)
     - trial_expires_at is in the past (auto-marks expired)
 
-    Raises 403 with unified message. Called after verify_jwt_token for
-    protected endpoints.
+    Raises 402 (Payment Required) with unified message. Called after
+    verify_jwt_token for protected endpoints.
     """
     if _is_trial_exempt(request.url.path):
         return
@@ -356,7 +356,7 @@ async def verify_trial_active(request: Request, auth: dict) -> None:
     # mapeados pra 'expired' em subscriptions.py)
     if status in ("expired", "cancelled"):
         raise HTTPException(
-            status_code=403,
+            status_code=402,
             detail={
                 "message": _TRIAL_BLOCKED_MESSAGE,
                 "code": "TRIAL_EXPIRED",
@@ -372,7 +372,7 @@ async def verify_trial_active(request: Request, auth: dict) -> None:
     # ou via email_job/middleware.
     if data.get("trial_blocked_at"):
         raise HTTPException(
-            status_code=403,
+            status_code=402,
             detail={
                 "message": _TRIAL_BLOCKED_MESSAGE,
                 "code": "TRIAL_EXPIRED",
@@ -397,7 +397,7 @@ async def verify_trial_active(request: Request, auth: dict) -> None:
         }).eq("id", tenant_id).execute()
 
         raise HTTPException(
-            status_code=403,
+            status_code=402,
             detail={
                 "message": _TRIAL_BLOCKED_MESSAGE,
                 "code": "TRIAL_EXPIRED",
@@ -422,7 +422,7 @@ async def verify_api_key_with_trial(
     """Combined dependency: API key auth + trial/block check.
 
     Use instead of verify_api_key on endpoints where trial_blocked_at should
-    return 403. Same unified message as verify_jwt_with_trial for consistency.
+    return 402. Same unified message as verify_jwt_with_trial for consistency.
     Used by the SAP DRC compatibility layer so SAP systems hit the same
     enforcement gate as our native dashboard.
     """
@@ -434,8 +434,10 @@ async def verify_api_key_with_trial(
 async def verify_jwt_or_api_key(request: Request) -> dict:
     """Dual auth: accepts either JWT Bearer token or X-API-Key header.
 
-    Checks Authorization header first; falls back to X-API-Key.
-    Raises 401 if neither is provided.
+    Checks Authorization header first; falls back to X-API-Key. Both paths
+    run the trial/block enforcement gate so SAP DRC clients hitting with
+    API keys still get 402 when the trial is over — same enforcement as
+    the native dashboard. Raises 401 if neither header is provided.
     """
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
@@ -443,7 +445,9 @@ async def verify_jwt_or_api_key(request: Request) -> dict:
 
     api_key_val = request.headers.get("X-API-Key")
     if api_key_val:
-        return await verify_api_key(request, api_key_val)
+        auth = await verify_api_key(request, api_key_val)
+        await verify_trial_active(request, auth)
+        return auth
 
     raise HTTPException(
         status_code=401,

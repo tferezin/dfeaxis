@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
 from db.supabase import get_supabase_client
-from middleware.security import verify_jwt_with_trial
+from middleware.security import verify_jwt_or_api_key, verify_jwt_with_trial
 from models.schemas import PollingTriggerRequest, PollingTriggerResponse, PollingTipoResult
 from scheduler.polling_job import _poll_single_detailed
 
@@ -18,9 +18,10 @@ router = APIRouter()
 @router.post("/polling/trigger", response_model=PollingTriggerResponse)
 async def trigger_polling(
     body: PollingTriggerRequest,
-    auth: dict = Depends(verify_jwt_with_trial),
+    auth: dict = Depends(verify_jwt_or_api_key),
 ):
-    """Força polling manual imediato para um CNPJ (modo teste)."""
+    """Dispara polling on-demand pro CNPJ. Aceita JWT Bearer (dashboard
+    nativo) ou X-API-Key (ERP externo, padrão SAP DRC/TOTVS)."""
     sb = get_supabase_client()
     tenant_id = auth["tenant_id"]
 

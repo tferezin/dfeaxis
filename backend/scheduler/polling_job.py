@@ -6,6 +6,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 from apscheduler.schedulers.background import BackgroundScheduler
+from fastapi import HTTPException
 
 from db.supabase import get_supabase_client
 from middleware.lgpd import mask_cnpj
@@ -844,15 +845,37 @@ def _auto_ciencia(
 
 
 def _get_pfx_password(cert_id: str, tenant_id: str) -> str | None:
-    """Recupera e decifra a senha do .pfx do certificado."""
+    """Recupera e decifra a senha do .pfx do certificado.
+
+    Se a senha armazenada estiver corrompida/mal-formada (hex inválido,
+    tag GCM quebrada, chave errada), levanta HTTPException 502 com mensagem
+    clara em vez de propagar ValueError cru como 500 genérico.
+    """
     sb = get_supabase_client()
     result = sb.table("certificates").select(
         "pfx_password_encrypted"
     ).eq("id", cert_id).execute()
 
-    if result.data and result.data[0].get("pfx_password_encrypted"):
+    if not (result.data and result.data[0].get("pfx_password_encrypted")):
+        return None
+
+    try:
         return decrypt_password(result.data[0]["pfx_password_encrypted"], tenant_id)
-    return None
+    except (ValueError, Exception) as exc:
+        logger.error(
+            "Falha ao decifrar pfx_password_encrypted cert=%s tenant=%s: %s",
+            cert_id, tenant_id, exc,
+        )
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "message": (
+                    "Certificado com senha armazenada inválida ou corrompida. "
+                    "Reenvie o certificado pela tela Configurações → Certificados."
+                ),
+                "code": "CERT_PASSWORD_DECRYPT_FAILED",
+            },
+        )
 
 
 def run_retroactive_job(

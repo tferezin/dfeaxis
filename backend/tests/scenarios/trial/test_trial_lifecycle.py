@@ -15,9 +15,9 @@ Esses testes usam:
     auth dict sintético, exercitando a enforcement real).
 
 Notas sobre divergências da spec vs. código real de produção:
-  - A spec fala em HTTP 402 pra trial bloqueado; o backend hoje retorna
-    **403** com `code=TRIAL_EXPIRED`. Os asserts batem no que o código
-    realmente faz e o desvio está listado no relatório final.
+  - Trial bloqueado retorna **HTTP 402** (Payment Required) com
+    `code=TRIAL_EXPIRED`. Padrão alinhado com a spec após ajuste no
+    middleware `verify_trial_active`.
   - T06 fala em `docs_consumidos_trial=500` após o trigger. O cap real
     de captura do `_poll_single_detailed` é medido via
     `count(documents WHERE tenant_id=X)`, não `docs_consumidos_trial`
@@ -332,8 +332,8 @@ def test_t04_trial_expirado_por_tempo_bloqueia_polling(
     )
 
     # O middleware bloqueia com 403 (spec falava em 402 — ver relatório)
-    assert result["status_code"] == 403, (
-        f"esperava 403 TRIAL_EXPIRED, obtido={result['status_code']} body={result['body']}"
+    assert result["status_code"] == 402, (
+        f"esperava 402 TRIAL_EXPIRED, obtido={result['status_code']} body={result['body']}"
     )
     body = result["body"]
     if isinstance(body, dict):
@@ -370,8 +370,8 @@ def test_t05_trial_cap_atingido_bloqueia_polling(
         test_app, test_tenant["tenant_id"], test_tenant["cnpj"],
     )
 
-    assert result["status_code"] == 403, (
-        f"esperava 403 (cap); obtido={result['status_code']} body={result['body']}"
+    assert result["status_code"] == 402, (
+        f"esperava 402 (cap); obtido={result['status_code']} body={result['body']}"
     )
     assert fake_sefaz.get_calls(cnpj=test_tenant["cnpj"]) == [], (
         "SEFAZ foi chamado apesar do trial bloqueado por cap"
@@ -414,7 +414,7 @@ def test_t06_trial_consome_doc_e_aplica_cap_no_proximo_trigger(
     first = _trigger_polling(
         test_app, test_tenant["tenant_id"], test_tenant["cnpj"],
     )
-    assert first["status_code"] != 403, (
+    assert first["status_code"] != 402, (
         f"gate bloqueou um trial que ainda não deveria estar bloqueado: "
         f"{first['status_code']} body={first['body']}"
     )
@@ -433,7 +433,7 @@ def test_t06_trial_consome_doc_e_aplica_cap_no_proximo_trigger(
     second = _trigger_polling(
         test_app, test_tenant["tenant_id"], test_tenant["cnpj"],
     )
-    assert second["status_code"] == 403, (
+    assert second["status_code"] == 402, (
         f"segundo trigger deveria ser bloqueado pós-cap: {second['status_code']}"
     )
     assert fake_sefaz.get_calls(cnpj=test_tenant["cnpj"]) == [], (
@@ -498,7 +498,7 @@ def test_t07_checkout_completed_desbloqueia_trial(
     trig = _trigger_polling(
         test_app, test_tenant["tenant_id"], test_tenant["cnpj"],
     )
-    assert trig["status_code"] != 403, (
+    assert trig["status_code"] != 402, (
         f"polling ainda bloqueado pós-upgrade: {trig['status_code']} {trig['body']}"
     )
 
@@ -553,8 +553,8 @@ def test_t08_invoice_payment_failed_bloqueia_acesso(
     trig = _trigger_polling(
         test_app, test_tenant["tenant_id"], test_tenant["cnpj"],
     )
-    assert trig["status_code"] == 403, (
-        f"esperava 403 pós-payment_failed, obtido={trig['status_code']}"
+    assert trig["status_code"] == 402, (
+        f"esperava 402 pós-payment_failed, obtido={trig['status_code']}"
     )
 
 
@@ -602,7 +602,7 @@ def test_t09_invoice_paid_restaura_acesso(
     trig = _trigger_polling(
         test_app, test_tenant["tenant_id"], test_tenant["cnpj"],
     )
-    assert trig["status_code"] != 403, (
+    assert trig["status_code"] != 402, (
         f"polling ainda bloqueado pós-invoice.paid: {trig['status_code']}"
     )
 
@@ -647,6 +647,6 @@ def test_t10_subscription_deleted_revoga_acesso(
     trig = _trigger_polling(
         test_app, test_tenant["tenant_id"], test_tenant["cnpj"],
     )
-    assert trig["status_code"] == 403, (
-        f"esperava 403 pós-cancelamento, obtido={trig['status_code']}"
+    assert trig["status_code"] == 402, (
+        f"esperava 402 pós-cancelamento, obtido={trig['status_code']}"
     )
