@@ -118,6 +118,9 @@ export default function DashboardPage() {
   const [realCnpjCount, setRealCnpjCount] = useState(0)
   const [realVolumeData, setRealVolumeData] = useState<Array<{ date: string; nfe: number; cte: number; mdfe: number; nfse: number }>>([])
   const [realLoading, setRealLoading] = useState(false)
+  // Total agregado de docs capturados na competência selecionada (NFE+CTE+MDFE+NFSE).
+  // É a base pra cálculo de consumo mensal e overage.
+  const [realDocsNaCompetencia, setRealDocsNaCompetencia] = useState(0)
 
   // Extract value from XML string using regex (no DOM parser needed)
   function extractXmlValue(xml: string, tipo: string): number {
@@ -192,6 +195,16 @@ export default function DashboardPage() {
         mdfe: mdfeRes.count ?? 0,
         nfse: nfseRes.count ?? 0,
       })
+
+      // Total consolidado dos 4 tipos pra o card "Uso do mês" — é assim
+      // que o contador de cobrança funciona: um único número que zera
+      // dia 1 e serve de base pro cálculo de excedente (overage).
+      const totalCompetencia =
+        (nfeRes.count ?? 0) +
+        (cteRes.count ?? 0) +
+        (mdfeRes.count ?? 0) +
+        (nfseRes.count ?? 0)
+      setRealDocsNaCompetencia(totalCompetencia)
 
       // Documentos recentes da competência — até 50 (não "últimos 20")
       // pra a soma de valores refletir a competência completa.
@@ -419,43 +432,72 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* Uso do mês — apenas para assinaturas ativas */}
-      {showUsageCard && (
-        <Card size="sm">
-          <CardHeader>
-            <CardTitle>Uso do mês</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-              <div
-                className={`h-full rounded-full transition-all ${
-                  overageDocs > 0
-                    ? "bg-amber-500"
-                    : usagePct >= 90
-                      ? "bg-amber-400"
-                      : "bg-emerald-500"
-                }`}
-                style={{ width: `${Math.max(usagePct, overageDocs > 0 ? 100 : usagePct)}%` }}
-              />
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">
-                {docsConsumidosMes.toLocaleString("pt-BR")} de{" "}
-                {docsIncludedMes.toLocaleString("pt-BR")} documentos capturados
-              </span>
-              {overageDocs > 0 ? (
-                <span className="font-semibold text-amber-600">
-                  Excedente previsto: R$ {overageBRL}
+      {/* Uso do mês — SEMPRE visível (trial e active). O número mostrado
+          vem da contagem real dos documents na competência selecionada,
+          não do `docs_consumidos_mes` do tenant — isso permite o usuário
+          navegar competências passadas e ver o consumo histórico.
+          Pra `subscription_status='active'`, exibe barra de progresso +
+          excedente previsto contra o plano contratado. Pra trial, exibe
+          contra o trial cap (500 docs) quando aplicável. */}
+      {(() => {
+        const isActive = subscriptionStatus === "active"
+        const limiteTotal = isActive
+          ? docsIncludedMes
+          : 500 // trial cap fixo
+        const pctUso = limiteTotal > 0
+          ? Math.min(100, Math.round((realDocsNaCompetencia / limiteTotal) * 100))
+          : 0
+        const excedenteDocs = Math.max(0, realDocsNaCompetencia - limiteTotal)
+        const excedenteValorCents = isActive ? excedenteDocs * overageCentsPerDoc : 0
+        const excedenteBRL = (excedenteValorCents / 100).toLocaleString("pt-BR", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })
+
+        return (
+          <Card size="sm">
+            <CardHeader>
+              <CardTitle>Uso do mês — {periodoAtual}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className={`h-full rounded-full transition-all ${
+                    excedenteDocs > 0
+                      ? "bg-amber-500"
+                      : pctUso >= 90
+                        ? "bg-amber-400"
+                        : "bg-emerald-500"
+                  }`}
+                  style={{ width: `${Math.max(pctUso, excedenteDocs > 0 ? 100 : pctUso)}%` }}
+                />
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">
+                  {realDocsNaCompetencia.toLocaleString("pt-BR")} de{" "}
+                  {limiteTotal.toLocaleString("pt-BR")} documentos capturados
+                  {!isActive && " (limite do trial)"}
                 </span>
-              ) : (
-                <span className="font-semibold text-emerald-600">
-                  Dentro do limite
-                </span>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                {excedenteDocs > 0 ? (
+                  isActive ? (
+                    <span className="font-semibold text-amber-600">
+                      Excedente previsto: {excedenteDocs.toLocaleString("pt-BR")} docs · R$ {excedenteBRL}
+                    </span>
+                  ) : (
+                    <span className="font-semibold text-red-600">
+                      Trial excedido — {excedenteDocs.toLocaleString("pt-BR")} docs acima
+                    </span>
+                  )
+                ) : (
+                  <span className="font-semibold text-emerald-600">
+                    Dentro do limite
+                  </span>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )
+      })()}
 
       {/* Financial + Chart side by side */}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
