@@ -14,23 +14,15 @@ import { useReadOnly } from "@/contexts/read-only-context"
  * Render this inside the scrollable <main> container (positioned absolute).
  */
 export function TrialExpiredOverlay() {
-  const { reason } = useReadOnly()
+  useReadOnly() // mantém o contexto ativo mesmo não usando reason aqui
   const router = useRouter()
   const [billingDay, setBillingDay] = useState<5 | 10 | 15>(5)
 
-  const title =
-    reason === "cap"
-      ? "Você atingiu o limite do trial"
-      : reason === "time"
-        ? "Seu período de teste terminou"
-        : "Acesso bloqueado"
-
+  // Mensagem unificada acordada 2026-04-15: uma só copy pra cap e tempo.
+  // Motivo: cliente entende melhor e a call-to-action é idêntica.
+  const title = "Limite do período de teste atingido"
   const description =
-    reason === "cap"
-      ? "Você atingiu o limite de 500 documentos do trial. Para liberar a captura de novos documentos, escolha um plano."
-      : reason === "time"
-        ? "Seu período de teste de 10 dias terminou. Para continuar capturando documentos, escolha um plano."
-        : "Seu acesso de teste está encerrado. Escolha um plano para continuar capturando documentos."
+    "Limite do período de teste atingido (500 documentos ou 10 dias). Assine um plano para continuar ativo em nossa plataforma."
 
   const handleAddPayment = () => {
     // Persist billing day so the pricing table can forward it to

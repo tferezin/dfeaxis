@@ -2,6 +2,7 @@
 
 import base64
 import logging
+import time
 from datetime import datetime, timedelta, timezone
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -189,8 +190,34 @@ def _normalize_pfx_blob(
     return pfx_encrypted, pfx_iv
 
 
+# Limites do loop interno SEFAZ dentro de um único POST /polling/trigger.
+# Cada batch traz no máximo ~50 docs (limitação do protocolo SEFAZ
+# NFeDistribuicaoDFe), então pra plano Business (8000 docs) o loop pode
+# rodar ~160 iterações no pior caso. 300 é teto de segurança; 300s
+# (5 min) é o timeout razoável pra o SAP esperar uma resposta.
+_MAX_BATCHES_PER_TRIGGER = 300
+_MAX_SECONDS_PER_TRIGGER = 300
+
+
 def _poll_single_detailed(cert: dict, tipo: str, tenant_data: dict) -> dict:
-    """Executa polling e retorna detalhes completos para a UI."""
+    """Executa polling e retorna detalhes completos para a UI / SAP.
+
+    Loop interno: faz múltiplas chamadas SEFAZ dentro de UM único
+    /polling/trigger do cliente até acontecer um dos 4:
+
+    1. A SEFAZ devolve `ultNSU == maxNSU` (fila esgotada, nada mais)
+    2. A SEFAZ devolve 0 docs no batch (idem)
+    3. Trial cap atingido (count na tabela documents bate em trial_cap)
+    4. Timeout de _MAX_SECONDS_PER_TRIGGER ou _MAX_BATCHES_PER_TRIGGER
+
+    Trial cap enforcement:
+    - Se tenant em trial, limite = trial_cap - count(documents WHERE tenant_id=X)
+    - Inclui tanto docs 'available' (fila) quanto 'delivered' (já confirmados)
+    - Quando o limite bate, o batch atual é truncado e o loop para
+    - Contador docs_consumidos_trial NÃO é tocado aqui — só avança em /confirmar
+
+    Retorna totais agregados do loop (docs_found = soma de todos os batches).
+    """
     if tipo == "nfse":
         docs = _poll_nfse(cert, tenant_data)
         return {
@@ -206,7 +233,6 @@ def _poll_single_detailed(cert: dict, tipo: str, tenant_data: dict) -> dict:
     sb = get_supabase_client()
     tenant_id = cert["tenant_id"]
     cnpj = cert["cnpj"]
-    ult_nsu = cert.get(f"last_nsu_{tipo}", "000000000000000")
     pfx_password = _get_pfx_password(cert["id"], tenant_id)
 
     if not pfx_password:
@@ -223,41 +249,103 @@ def _poll_single_detailed(cert: dict, tipo: str, tenant_data: dict) -> dict:
     )
 
     ambiente = tenant_data.get("sefaz_ambiente", "2")
+    is_trial = tenant_data.get("subscription_status") == "trial"
+    trial_cap = int(tenant_data.get("trial_cap") or 500)
+
+    # Gate inicial: se já está bloqueado por cap ou tempo, não chama SEFAZ.
+    # verify_trial_active no middleware já bloqueia a entrada, mas dupla
+    # defesa aqui evita qualquer race entre requests concorrentes.
+    if is_trial and tenant_data.get("trial_blocked_at"):
+        return {
+            "tipo": tipo.upper(), "status": "blocked", "cstat": "999",
+            "xmotivo": "Trial bloqueado", "docs_found": 0, "latency_ms": 0,
+            "error": "trial_blocked", "saved_to_db": False,
+        }
+
+    # Calcula remaining inicial pro trial via count na tabela documents.
+    # Isto inclui todos os docs já capturados na vida do trial (tanto
+    # 'available' quanto 'delivered') — o cap de captura é acumulado,
+    # não reseta quando o SAP confirma.
+    def _trial_remaining() -> int:
+        if not is_trial:
+            return -1  # sem limite (plano pago usa overage billing)
+        count_res = sb.table("documents").select(
+            "id", count="exact", head=True
+        ).eq("tenant_id", tenant_id).execute()
+        total_in_bank = count_res.count or 0
+        return max(trial_cap - total_in_bank, 0)
+
+    # Cursor inicial vem do nsu_state (por ambiente) — mais preciso que o
+    # last_nsu legado no certificates. Cai no legado se nsu_state não tem
+    # entrada ainda pra esse cert/tipo/ambiente.
+    try:
+        ult_nsu = nsu_controller.get_cursor(cert["id"], tipo, ambiente)
+    except Exception:
+        ult_nsu = cert.get(f"last_nsu_{tipo}", "000000000000000")
+
+    start_time = time.time()
+    total_docs_saved = 0
+    total_latency_ms = 0
+    last_cstat = "137"
+    last_xmotivo = "Nenhum documento localizado"
+    last_response_ult_nsu = ult_nsu
+    last_response_max_nsu = ult_nsu
 
     try:
-        response = sefaz_client.consultar_distribuicao(
-            cnpj=cnpj, tipo=tipo, ult_nsu=ult_nsu,
-            pfx_encrypted=pfx_encrypted, pfx_iv=pfx_iv,
-            tenant_id=tenant_id, pfx_password=pfx_password,
-            ambiente=ambiente,
-        )
+        for batch_idx in range(_MAX_BATCHES_PER_TRIGGER):
+            # Timeout interno — não deixa o SAP esperando mais que 5min
+            if time.time() - start_time > _MAX_SECONDS_PER_TRIGGER:
+                logger.info(
+                    "polling/trigger: timeout %ds atingido após %d batches, "
+                    "tenant=%s cnpj=%s tipo=%s",
+                    _MAX_SECONDS_PER_TRIGGER, batch_idx, tenant_id, mask_cnpj(cnpj), tipo,
+                )
+                break
 
-        docs_found = len(response.documents)
-        saved = False
+            # Checa cap antes de bater na SEFAZ
+            remaining = _trial_remaining()
+            if is_trial and remaining == 0:
+                logger.info(
+                    "polling/trigger: trial cap=%d atingido (batch %d), parando loop",
+                    trial_cap, batch_idx,
+                )
+                break
 
-        # Log
-        sb.table("polling_log").insert({
-            "tenant_id": tenant_id, "cnpj": cnpj, "tipo": tipo,
-            "triggered_by": "manual",
-            "status": "success" if response.cstat in ("137", "138") else "error",
-            "docs_found": docs_found, "ult_nsu": response.ult_nsu,
-            "latency_ms": response.latency_ms,
-            "error_message": response.xmotivo if response.cstat not in ("137", "138") else None,
-        }).execute()
+            # Chamada SEFAZ
+            response = sefaz_client.consultar_distribuicao(
+                cnpj=cnpj, tipo=tipo, ult_nsu=ult_nsu,
+                pfx_encrypted=pfx_encrypted, pfx_iv=pfx_iv,
+                tenant_id=tenant_id, pfx_password=pfx_password,
+                ambiente=ambiente,
+            )
 
-        if docs_found > 0:
-            # Debit credits (non-blocking — save docs even if credits fail)
+            total_latency_ms += response.latency_ms
+            last_cstat = response.cstat
+            last_xmotivo = response.xmotivo
+            last_response_ult_nsu = response.ult_nsu
+            last_response_max_nsu = response.max_nsu
+
+            batch_docs = list(response.documents)
+            batch_size = len(batch_docs)
+
+            # Ordena por NSU asc pra garantir corte determinístico quando trunca
             try:
-                sb.rpc("debit_credits", {
-                    "p_tenant_id": tenant_id,
-                    "p_amount": -docs_found,
-                    "p_description": f"Captura manual {tipo.upper()} CNPJ {mask_cnpj(cnpj)}: {docs_found} docs",
-                }).execute()
-            except Exception as credit_err:
-                logger.warning(f"Credits debit skipped (non-blocking): {credit_err}")
+                batch_docs.sort(key=lambda d: int(d.nsu) if d.nsu else 0)
+            except Exception:
+                pass
 
-            # Save documents
-            for doc in response.documents:
+            # Aplica truncamento do trial no batch atual
+            if is_trial and remaining > 0 and batch_size > remaining:
+                batch_docs = batch_docs[:remaining]
+                logger.info(
+                    "polling/trigger: trial cap trunca batch %d em %d/%d docs",
+                    batch_idx, remaining, batch_size,
+                )
+
+            # Salva os docs do batch truncado
+            saved_in_batch = 0
+            last_saved_nsu: str | None = None
+            for doc in batch_docs:
                 is_resumo = doc.schema.startswith("res")
                 is_nfe = tipo == "nfe"
                 if is_resumo and is_nfe:
@@ -284,14 +372,53 @@ def _poll_single_detailed(cert: dict, tipo: str, tenant_data: dict) -> dict:
                 sb.table("documents").upsert(
                     row, on_conflict="tenant_id,chave_acesso"
                 ).execute()
+                saved_in_batch += 1
+                last_saved_nsu = doc.nsu or last_saved_nsu
 
-            saved = True
-            nsu_controller.update_last_nsu(cert["id"], tipo, response.ult_nsu)
+            total_docs_saved += saved_in_batch
+
+            # Avança cursor NSU de acordo com o que foi efetivamente salvo:
+            # - Se salvou o batch inteiro (não truncou), usa o ult_nsu da
+            #   resposta SEFAZ (inclui também quaisquer eventos que pulamos)
+            # - Se truncou por cap, avança só até o último NSU salvo
+            full_batch = len(batch_docs) == batch_size
+            if full_batch:
+                effective_cursor = response.ult_nsu
+            else:
+                effective_cursor = last_saved_nsu or response.ult_nsu
+
+            nsu_controller.update_cursor(
+                cert["id"], tipo, ambiente, effective_cursor, response.max_nsu or effective_cursor
+            )
+            nsu_controller.update_last_nsu(cert["id"], tipo, effective_cursor)
+            ult_nsu = effective_cursor
+
+            # Condições de parada do loop:
+            # 1. Batch truncado por cap → não adianta continuar, próxima
+            #    chamada SEFAZ daria mais docs que a gente não pode salvar
+            if not full_batch:
+                break
+            # 2. SEFAZ esgotou a fila (ultNSU == maxNSU ou 0 docs)
+            if batch_size == 0 or response.ult_nsu >= response.max_nsu:
+                break
+
+        saved = total_docs_saved > 0
+
+        # Log único agregando o resultado de todos os batches
+        sb.table("polling_log").insert({
+            "tenant_id": tenant_id, "cnpj": cnpj, "tipo": tipo,
+            "triggered_by": "manual",
+            "status": "success" if last_cstat in ("137", "138") else "error",
+            "docs_found": total_docs_saved,
+            "ult_nsu": last_response_ult_nsu,
+            "latency_ms": total_latency_ms,
+            "error_message": last_xmotivo if last_cstat not in ("137", "138") else None,
+        }).execute()
 
         return {
-            "tipo": tipo.upper(), "status": "success", "cstat": response.cstat,
-            "xmotivo": response.xmotivo, "docs_found": docs_found,
-            "latency_ms": response.latency_ms, "saved_to_db": saved,
+            "tipo": tipo.upper(), "status": "success", "cstat": last_cstat,
+            "xmotivo": last_xmotivo, "docs_found": total_docs_saved,
+            "latency_ms": total_latency_ms, "saved_to_db": saved,
         }
 
     except Exception as e:
@@ -304,8 +431,8 @@ def _poll_single_detailed(cert: dict, tipo: str, tenant_data: dict) -> dict:
         }).execute()
         return {
             "tipo": tipo.upper(), "status": "error", "cstat": "999",
-            "xmotivo": "", "docs_found": 0, "latency_ms": 0,
-            "error": str(e), "saved_to_db": False,
+            "xmotivo": "", "docs_found": total_docs_saved, "latency_ms": total_latency_ms,
+            "error": str(e), "saved_to_db": total_docs_saved > 0,
         }
 
 
@@ -371,8 +498,13 @@ def _poll_single(cert: dict, tipo: str, tenant_data: dict) -> int:
             return 0
 
         # --- Trial cap enforcement ---------------------------------------
-        # Se tenant é trial, limita quantos docs podem ser persistidos nesta
-        # rodada ao remaining = trial_cap - docs_consumidos_trial.
+        # Limita quantos docs podem ser persistidos nesta rodada pelo total
+        # de docs já salvos na vida do trial (available + delivered). NÃO
+        # usa `docs_consumidos_trial` porque esse campo só avança quando
+        # o SAP confirma via /confirmar — ver documents.py:confirmar_documento.
+        # Se usássemos o contador, docs já salvos mas ainda não confirmados
+        # não seriam contados e a retroativa poderia explodir (cada iteração
+        # do loop re-calcularia remaining=500 e baixaria mais 500 sem limite).
         is_trial = tenant_data.get("subscription_status") == "trial"
         docs_to_save = list(response.documents)
         # Ordena por NSU asc para garantir corte determinístico
@@ -383,15 +515,18 @@ def _poll_single(cert: dict, tipo: str, tenant_data: dict) -> int:
 
         if is_trial:
             trial_cap = int(tenant_data.get("trial_cap") or 500)
-            consumed = int(tenant_data.get("docs_consumidos_trial") or 0)
-            remaining = max(trial_cap - consumed, 0)
+            count_res = sb.table("documents").select(
+                "id", count="exact", head=True
+            ).eq("tenant_id", tenant_id).execute()
+            total_in_bank = count_res.count or 0
+            remaining = max(trial_cap - total_in_bank, 0)
 
             if remaining == 0:
                 # Cap já atingido antes deste batch: não salva, não avança cursor,
                 # apenas registra pendentes e marca tenant como bloqueado no run.
                 logger.info(
                     f"Tenant {tenant_id} trial cap atingido — {docs_found} docs "
-                    f"{tipo.upper()} não serão capturados (remaining=0)"
+                    f"{tipo.upper()} não serão capturados (total_in_bank={total_in_bank}, cap={trial_cap})"
                 )
                 if response.max_nsu:
                     nsu_controller.update_pending_count(
@@ -403,7 +538,7 @@ def _poll_single(cert: dict, tipo: str, tenant_data: dict) -> int:
             if len(docs_to_save) > remaining:
                 logger.info(
                     f"Tenant {tenant_id} trial cap: salvando apenas {remaining}/{len(docs_to_save)} "
-                    f"docs {tipo.upper()} (consumed={consumed}, cap={trial_cap})"
+                    f"docs {tipo.upper()} (total_in_bank={total_in_bank}, cap={trial_cap})"
                 )
                 docs_to_save = docs_to_save[:remaining]
 
@@ -489,48 +624,16 @@ def _poll_single(cert: dict, tipo: str, tenant_data: dict) -> int:
         # Mantém coluna legada sincronizada (deprecada, mas ainda lida por outros fluxos)
         nsu_controller.update_last_nsu(cert["id"], tipo, effective_cursor)
 
-        # Incrementa contador mensal para tenants ativos (cobra excedente no fim do mês)
-        if not is_trial and tenant_data.get("subscription_status") == "active":
-            try:
-                sb.rpc("increment_monthly_docs", {
-                    "p_tenant_id": tenant_id,
-                    "p_count": effective_count,
-                }).execute()
-            except Exception as inc_err:
-                logger.warning(
-                    f"increment_monthly_docs falhou para {tenant_id}: {inc_err}"
-                )
-
-        # Incrementa contador de trial e bloqueia se atingir cap
-        if is_trial:
-            try:
-                rpc_res = sb.rpc("increment_trial_docs", {
-                    "p_tenant_id": tenant_id,
-                    "p_count": effective_count,
-                }).execute()
-                new_count = 0
-                if rpc_res.data is not None:
-                    # RPC pode retornar int ou [{"...": int}]
-                    if isinstance(rpc_res.data, int):
-                        new_count = rpc_res.data
-                    elif isinstance(rpc_res.data, list) and rpc_res.data:
-                        first = rpc_res.data[0]
-                        if isinstance(first, dict):
-                            new_count = int(next(iter(first.values()), 0) or 0)
-                        else:
-                            new_count = int(first or 0)
-                trial_cap = int(tenant_data.get("trial_cap") or 500)
-                tenant_data["docs_consumidos_trial"] = new_count
-                if new_count >= trial_cap:
-                    logger.info(
-                        f"Tenant {tenant_id} atingiu trial_cap={trial_cap} "
-                        f"(count={new_count}), bloqueando polling neste run"
-                    )
-                    tenant_data["_trial_blocked_now"] = True
-            except Exception as inc_err:
-                logger.warning(
-                    f"increment_trial_docs falhou para {tenant_id}: {inc_err}"
-                )
+        # Contadores (trial e plano pago) NÃO são incrementados aqui.
+        # O modelo é: captura vai pra fila, mas o contador só avança quando
+        # o SAP confirma recebimento via POST /documentos/{chave}/confirmar.
+        # Motivo: cobrar pelo que foi capturado mas nunca consumido pelo
+        # cliente é injusto. Ver routers/documents.py:confirmar_documento.
+        #
+        # O limite do trial (500 docs) continua sendo aplicado como limite
+        # DE CAPTURA (quanto a gente salva na fila de uma vez) — vem de
+        # docs_consumidos_trial + saved_not_delivered_yet. Isso é calculado
+        # lá em cima via `remaining = trial_cap - consumed`.
 
         # Detecta gaps
         received_nsus = [d.nsu for d in docs_to_save]
