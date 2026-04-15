@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import {
   FileText,
   Truck,
@@ -24,6 +24,13 @@ import { useTrial } from "@/hooks/use-trial"
 import { useMonthlyUsage } from "@/hooks/use-monthly-usage"
 import { getSupabase } from "@/lib/supabase"
 import { listPlans, type Plan } from "@/lib/billing"
+import {
+  buildCompetenciaOptions,
+  currentCompetencia,
+  getCompetenciaRange,
+  formatCompetenciaLabel,
+  type CompetenciaId,
+} from "@/lib/competencia"
 
 interface DashboardCounts {
   nfe: number
@@ -47,6 +54,19 @@ export default function DashboardPage() {
   const { trialActive, subscriptionStatus } = useTrial()
   const showTrialCounter = subscriptionStatus !== "active" && trialActive
   const showUsageCard = subscriptionStatus === "active"
+
+  // Competência (mês calendário) selecionada — default = mês atual.
+  // O filtro é aplicado em TODAS as queries do dashboard (stats, documentos
+  // recentes, volume chart, totais financeiros). Dropdown mostra até 12
+  // meses pra trás.
+  const [selectedCompetencia, setSelectedCompetencia] = useState<CompetenciaId>(
+    currentCompetencia()
+  )
+  const competenciaOptions = useMemo(() => buildCompetenciaOptions(11), [])
+  const currentRange = useMemo(
+    () => getCompetenciaRange(selectedCompetencia),
+    [selectedCompetencia]
+  )
 
   // Monthly usage only loads when subscription is active (decoupled from trial state)
   const { docsConsumidosMes, docsIncludedMes, stripePriceId } = useMonthlyUsage(showUsageCard)
@@ -112,20 +132,44 @@ export default function DashboardPage() {
     setRealLoading(true)
     try {
       const sb = getSupabase()
+      // Range da competência selecionada (ISO UTC cobrindo o mês SP inteiro)
+      const { start, end } = currentRange
 
-      // Count ALL documents by tipo (total transacionado, não só available)
+      // Counts por tipo — SOMENTE documentos capturados na competência
       const [nfeRes, cteRes, mdfeRes, nfseRes] = await Promise.all([
-        sb.from('documents').select('id', { count: 'exact', head: true }).eq('tipo', 'NFE'),
-        sb.from('documents').select('id', { count: 'exact', head: true }).eq('tipo', 'CTE'),
-        sb.from('documents').select('id', { count: 'exact', head: true }).eq('tipo', 'MDFE'),
-        sb.from('documents').select('id', { count: 'exact', head: true }).eq('tipo', 'NFSE'),
+        sb
+          .from('documents')
+          .select('id', { count: 'exact', head: true })
+          .eq('tipo', 'NFE')
+          .gte('fetched_at', start)
+          .lte('fetched_at', end),
+        sb
+          .from('documents')
+          .select('id', { count: 'exact', head: true })
+          .eq('tipo', 'CTE')
+          .gte('fetched_at', start)
+          .lte('fetched_at', end),
+        sb
+          .from('documents')
+          .select('id', { count: 'exact', head: true })
+          .eq('tipo', 'MDFE')
+          .gte('fetched_at', start)
+          .lte('fetched_at', end),
+        sb
+          .from('documents')
+          .select('id', { count: 'exact', head: true })
+          .eq('tipo', 'NFSE')
+          .gte('fetched_at', start)
+          .lte('fetched_at', end),
       ])
 
-      // Count CNPJs + get company name
-      const { data: certData } = await sb.from('certificates').select('cnpj, company_name').eq('is_active', true)
+      // CNPJs + nome da empresa (atemporal — não depende de competência)
+      const { data: certData } = await sb
+        .from('certificates')
+        .select('cnpj, company_name')
+        .eq('is_active', true)
       setRealCnpjCount(certData?.length ?? 0)
       if (certData && certData.length > 0 && certData[0].company_name) {
-        // Clean up company name (remove CNPJ suffix if present)
         const name = certData[0].company_name.split(':')[0].trim()
         setRealCompanyName(name)
       }
@@ -137,18 +181,20 @@ export default function DashboardPage() {
         nfse: nfseRes.count ?? 0,
       })
 
-      // Recent documents with XML for value extraction
+      // Documentos recentes da competência — até 50 (não "últimos 20")
+      // pra a soma de valores refletir a competência completa
       const { data: recentDocs } = await sb
         .from('documents')
         .select('tipo, chave_acesso, cnpj, nsu, status, fetched_at, xml_content')
-        .eq('status', 'available')
+        .gte('fetched_at', start)
+        .lte('fetched_at', end)
         .order('fetched_at', { ascending: false })
-        .limit(20)
+        .limit(50)
 
       if (recentDocs) {
         setRealDocuments(recentDocs)
 
-        // Sum values by type
+        // Soma de valores por tipo (apenas docs da competência)
         let nfeSum = 0, cteSum = 0, mdfeSum = 0, nfseSum = 0
         for (const doc of recentDocs) {
           const val = extractXmlValue(doc.xml_content || "", doc.tipo)
@@ -162,7 +208,7 @@ export default function DashboardPage() {
         setRealMdfeTotal(mdfeSum)
         setRealNfseTotal(nfseSum)
 
-        // Build volume chart data (group by day)
+        // Volume chart agrupado por dia da competência
         const byDay: Record<string, { nfe: number; cte: number; mdfe: number; nfse: number }> = {}
         for (const doc of recentDocs) {
           const day = new Date(doc.fetched_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
@@ -172,9 +218,16 @@ export default function DashboardPage() {
         }
         const volumeData = Object.entries(byDay).map(([date, counts]) => ({ date, ...counts }))
         setRealVolumeData(volumeData)
+      } else {
+        setRealDocuments([])
+        setRealNfeTotal(0)
+        setRealCteTotal(0)
+        setRealMdfeTotal(0)
+        setRealNfseTotal(0)
+        setRealVolumeData([])
       }
 
-      // Last 5 polling_log entries for activity feed
+      // Polling log — últimos 5 (atemporal, feed de atividade recente)
       const { data: activityData } = await sb
         .from('polling_log')
         .select('id, tipo, cnpj, status, docs_found, created_at')
@@ -183,7 +236,7 @@ export default function DashboardPage() {
 
       if (activityData) setRealActivity(activityData)
 
-      // Credits balance from tenants
+      // Créditos do tenant (atemporal)
       const { data: tenantData } = await sb
         .from('tenants')
         .select('credits')
@@ -196,17 +249,14 @@ export default function DashboardPage() {
     } finally {
       setRealLoading(false)
     }
-  }, [])
+  }, [currentRange])
 
   useEffect(() => {
     if (!settings.showMockData) loadRealData()
   }, [settings.showMockData, loadRealData])
 
-  // Current month/year label, e.g. "abr 2026"
-  const now = new Date()
-  const mesAtual = now.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "")
-  const anoAtual = now.getFullYear()
-  const periodoAtual = `${mesAtual.charAt(0).toUpperCase()}${mesAtual.slice(1)} ${anoAtual}`
+  // Label da competência atual pra exibir no dashboard
+  const periodoAtual = currentRange.shortLabel
 
   const nfeValue = showMock ? "1.247" : realCounts.nfe.toLocaleString("pt-BR")
   const cteValue = showMock ? "384" : realCounts.cte.toLocaleString("pt-BR")
@@ -242,11 +292,28 @@ export default function DashboardPage() {
             <span>{showMock ? "Tech Solutions Ltda" : (realCompanyName || "Empresa")}</span>
             <ChevronDown className="h-3 w-3 text-muted-foreground" />
           </button>
-          <button className="inline-flex items-center gap-2 rounded-lg border bg-background px-2.5 py-1.5 text-xs font-medium shadow-sm transition-colors hover:bg-muted">
+          <label
+            htmlFor="competencia-select"
+            className="relative inline-flex items-center gap-2 rounded-lg border bg-background px-2.5 py-1.5 text-xs font-medium shadow-sm transition-colors hover:bg-muted cursor-pointer"
+          >
             <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
             <span>{periodoAtual}</span>
-            <ChevronDown className="h-3 w-3 text-muted-foreground" />
-          </button>
+            <select
+              id="competencia-select"
+              aria-label="Selecionar competência mensal"
+              value={selectedCompetencia}
+              onChange={(e) =>
+                setSelectedCompetencia(e.target.value as CompetenciaId)
+              }
+              className="absolute inset-0 cursor-pointer opacity-0"
+            >
+              {competenciaOptions.map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.shortLabel}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       </div>
 
@@ -262,7 +329,7 @@ export default function DashboardPage() {
           title="NF-e"
           value={nfeValue}
           icon={<FileText className="h-4 w-4" />}
-          period="Últimos 30 dias"
+          period={`Competência ${periodoAtual}`}
           trend={showMock ? { value: 12.5, label: "vs. mês anterior" } : undefined}
           color="text-blue-600"
         />
@@ -270,7 +337,7 @@ export default function DashboardPage() {
           title="CT-e"
           value={cteValue}
           icon={<Truck className="h-4 w-4" />}
-          period="Últimos 30 dias"
+          period={`Competência ${periodoAtual}`}
           trend={showMock ? { value: 8.3, label: "vs. mês anterior" } : undefined}
           color="text-violet-600"
         />
@@ -278,7 +345,7 @@ export default function DashboardPage() {
           title="MDF-e"
           value={mdfeValue}
           icon={<FileCheck className="h-4 w-4" />}
-          period="Últimos 30 dias"
+          period={`Competência ${periodoAtual}`}
           trend={showMock ? { value: -3.2, label: "vs. mês anterior" } : undefined}
           color="text-emerald-600"
         />
@@ -286,7 +353,7 @@ export default function DashboardPage() {
           title="NFS-e"
           value={nfseValue}
           icon={<Receipt className="h-4 w-4" />}
-          period="Últimos 30 dias"
+          period={`Competência ${periodoAtual}`}
           trend={showMock ? { value: 4.1, label: "vs. mês anterior" } : undefined}
           badge="ADN"
           color="text-amber-600"
