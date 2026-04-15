@@ -230,6 +230,9 @@ class FakeStripeClient:
         self.billingPortal = _FakeNamespace(
             Session=FakeStripeCollection("BillingPortalSession", self),
         )
+        # Real stripe SDK expõe `billing_portal` como alias snake_case de
+        # `billingPortal`. O código de portal.py usa o snake_case.
+        self.billing_portal = self.billingPortal
 
         # Webhook + erros
         self.Webhook = FakeWebhook(self)
