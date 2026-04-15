@@ -151,6 +151,61 @@ def _safe_parse(xml_str: str) -> Optional[etree._Element]:
         return None
 
 
+def _strip_namespaces(root: etree._Element) -> etree._Element:
+    """Remove namespaces de todos os elementos da árvore in-place.
+
+    Necessário pra NFSe porque não há namespace padronizado entre
+    padrões (ADN, Paulista, ABRASF 2.04, etc.). Com default namespace
+    xmlns="...abrasf.org.br/nfse.xsd" lxml exige mapeamento de prefixo
+    em XPath, e os nossos xpaths usam tags puras. Stripar os
+    namespaces deixa todos os xpaths funcionando pros 3 padrões.
+    """
+    for elem in root.iter():
+        if isinstance(elem.tag, str) and "}" in elem.tag:
+            elem.tag = elem.tag.split("}", 1)[1]
+    etree.cleanup_namespaces(root)
+    return root
+
+
+# Eventos da NFe/CTe/MDFe (manifestação, cancelamento, carta de correção)
+# chegam pelo mesmo canal DistDFe que as notas — precisam ser filtrados
+# antes de persistir em `documents`, senão poluem a tabela com rows sem
+# emitente/valor/numero e inflam a contagem da competência.
+_EVENTO_ROOT_TAGS = frozenset(
+    {
+        "procEventoNFe",
+        "procEventoCTe",
+        "procEventoMDFe",
+        "evento",
+        "eventoNFe",
+        "eventoCTe",
+        "eventoMDFe",
+    }
+)
+
+
+def is_evento_xml(xml_str: str) -> bool:
+    """Detecta se um XML é evento SEFAZ (manifestação, cancelamento, etc.)
+    em vez de documento fiscal (NFe/CTe/MDFe/NFSe).
+
+    Usado pelo pipeline de polling pra pular upsert em `documents` — eventos
+    não devem ser gravados como se fossem notas.
+
+    Retorna False se xml_str for vazio, malformado, ou root tag não for
+    um evento conhecido. Never raises.
+    """
+    if not xml_str:
+        return False
+    root = _safe_parse(xml_str)
+    if root is None:
+        return False
+    try:
+        localname = etree.QName(root).localname
+    except ValueError:
+        return False
+    return localname in _EVENTO_ROOT_TAGS
+
+
 # ---------------------------------------------------------------------------
 # NFe
 # ---------------------------------------------------------------------------
@@ -396,10 +451,17 @@ def parse_mdfe(xml_str: str) -> DocumentMetadata:
 
 
 def parse_nfse(xml_str: str) -> DocumentMetadata:
-    """Extrai metadata de NFSe. Suporta ADN (novo) e Paulista (legado).
+    """Extrai metadata de NFSe. Suporta ADN, Paulista e ABRASF 2.04.
 
-    NFSe não tem namespace padronizado ainda (só em 2026+ com DPS nacional).
-    Usa tags sem namespace como fallback universal.
+    NFSe é heterogênea — cada município tem seu padrão. Os 3 mais comuns:
+      - ADN (Ambiente Nacional): `<NFSe><infNFSe><prestador><cnpj>`
+      - Paulista (São Paulo legado): sem namespace, tags com PascalCase
+      - ABRASF 2.04: `xmlns="http://www.abrasf.org.br/nfse.xsd"` com
+        `<CompNfse><Nfse><InfNfse><PrestadorServico>`
+
+    Estratégia: stripa namespaces após parse (para ABRASF cair no mesmo
+    XPath sem prefixo do Paulista) e tenta XPaths de cada variante em
+    cascata. O primeiro match vence.
     """
     meta = DocumentMetadata()
     root = _safe_parse(xml_str)
@@ -407,20 +469,27 @@ def parse_nfse(xml_str: str) -> DocumentMetadata:
         meta.parse_errors.append("xml_parse_failed")
         return meta
 
-    # Estratégia: tentar tags de cada formato conhecido
-    # ADN (novo): <infNFSe><prestador><cnpj>
-    # Paulista: <Prestador><CpfCnpj><Cnpj>
+    # ABRASF tem default namespace — strip torna todos os xpaths agnósticos
+    root = _strip_namespaces(root)
 
     # CNPJ emitente (prestador)
     meta.cnpj_emitente = _clean_cnpj(
         _find_text_any(
             root,
             [
+                # ADN
                 (".//infNFSe/prestador/cnpj", {}),
                 (".//infNFSe/prestador/CNPJ", {}),
+                # ABRASF 2.04
+                (".//PrestadorServico/IdentificacaoPrestador/CpfCnpj/Cnpj", {}),
+                (".//PrestadorServico/IdentificacaoPrestador/Cnpj", {}),
+                # Paulista legado
                 (".//Prestador/CpfCnpj/Cnpj", {}),
                 (".//prestador/CpfCnpj/Cnpj", {}),
                 (".//prestadorServico/identificacaoPrestador/cnpj", {}),
+                # Fallback: IdentificacaoPrestador direto em qualquer lugar
+                (".//IdentificacaoPrestador/CpfCnpj/Cnpj", {}),
+                (".//IdentificacaoPrestador/Cnpj", {}),
             ],
         )
     )
@@ -430,6 +499,9 @@ def parse_nfse(xml_str: str) -> DocumentMetadata:
         [
             (".//infNFSe/prestador/xNome", {}),
             (".//infNFSe/prestador/razaoSocial", {}),
+            # ABRASF 2.04
+            (".//PrestadorServico/RazaoSocial", {}),
+            # Paulista
             (".//Prestador/RazaoSocial", {}),
             (".//prestadorServico/razaoSocial", {}),
         ],
@@ -440,9 +512,14 @@ def parse_nfse(xml_str: str) -> DocumentMetadata:
             root,
             [
                 (".//infNFSe/tomador/cnpj", {}),
+                # ABRASF 2.04
+                (".//TomadorServico/IdentificacaoTomador/CpfCnpj/Cnpj", {}),
+                (".//TomadorServico/IdentificacaoTomador/Cnpj", {}),
+                # Paulista
                 (".//Tomador/CpfCnpj/Cnpj", {}),
                 (".//tomador/CpfCnpj/Cnpj", {}),
-                (".//TomadorServico/IdentificacaoTomador/CpfCnpj/Cnpj", {}),
+                # Fallback
+                (".//IdentificacaoTomador/CpfCnpj/Cnpj", {}),
             ],
         )
     )
