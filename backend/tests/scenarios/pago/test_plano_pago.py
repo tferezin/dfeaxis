@@ -291,13 +291,6 @@ def test_p02_webhook_checkout_completed_ativa_subscription(
 # P03 — Renewal mensal reseta contador de docs
 # ===========================================================================
 
-@pytest.mark.xfail(
-    reason=(
-        "invoice.paid atualmente NÃO reseta docs_consumidos_mes — isso só "
-        "acontece no monthly_overage_job do dia 1. Ver relatório do agente."
-    ),
-    strict=False,
-)
 def test_p03_invoice_paid_reseta_contador_e_avanca_period(
     test_tenant, fake_stripe, test_app,
 ):

@@ -7,6 +7,7 @@ import { AppFooter } from "@/components/app-footer"
 import { Separator } from "@/components/ui/separator"
 import { TrialBanner } from "@/components/trial-banner"
 import { TrialExpiredOverlay } from "@/components/trial-expired-overlay"
+import { PaymentOverdueOverlay } from "@/components/payment-overdue-overlay"
 import { ChatWidget } from "@/components/chat-widget"
 import { ReadOnlyProvider, useReadOnly } from "@/contexts/read-only-context"
 import { useSettings } from "@/hooks/use-settings"
@@ -19,7 +20,7 @@ const TRIAL_EXEMPT_PATHS = [
 
 function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const { isReadOnly } = useReadOnly()
+  const { isReadOnly, reason } = useReadOnly()
   const { settings } = useSettings()
 
   const isExemptPage = TRIAL_EXEMPT_PATHS.some((p) =>
@@ -60,7 +61,12 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           >
             {children}
           </div>
-          {showOverlay && <TrialExpiredOverlay />}
+          {showOverlay &&
+            (reason === "payment_overdue" ? (
+              <PaymentOverdueOverlay />
+            ) : (
+              <TrialExpiredOverlay />
+            ))}
         </div>
         <AppFooter />
         <ChatWidget context="dashboard" currentPage={pathname || undefined} />

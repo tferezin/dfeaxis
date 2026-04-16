@@ -511,18 +511,23 @@ def test_t08_invoice_payment_failed_bloqueia_acesso(
     test_tenant, fake_sefaz, fake_stripe, test_app,
 ):
     """T08: tenant active recebe `invoice.payment_failed`, a assinatura no
-    Stripe vira past_due e o backend mapeia isso pra `subscription_status='expired'`
-    (ver services/billing/subscriptions._map_status). Polling volta a 403.
+    Stripe vira past_due e o backend mapeia isso pra `subscription_status='past_due'`.
 
-    Pega o bug de falha de cobrança não bloqueando acesso.
+    Comportamento de inadimplência:
+      - Se `current_period_end` ainda no futuro → acesso mantido (grace period)
+      - Se `current_period_end` já passou → 402 PAYMENT_OVERDUE
+
+    Este teste seta current_period_end no passado pra simular o cenário de
+    bloqueio pós-vencimento.
     """
-    # Estado inicial: active
+    past_period = datetime.now(timezone.utc) - timedelta(hours=2)
     _patch_tenant(
         test_tenant["tenant_id"],
         subscription_status="active",
         trial_active=False,
         trial_blocked_at=None,
         trial_blocked_reason=None,
+        current_period_end=past_period.isoformat(),
     )
     _delete_billing_events(test_tenant["tenant_id"])
 
@@ -547,9 +552,9 @@ def test_t08_invoice_payment_failed_bloqueia_acesso(
     assert result["status_code"] == 200, result
 
     tenant = _get_tenant(test_tenant["tenant_id"])
-    # past_due é mapeado pra "expired" no nosso enum (ver _map_status)
-    assert tenant["subscription_status"] == "expired", tenant["subscription_status"]
+    assert tenant["subscription_status"] == "past_due", tenant["subscription_status"]
 
+    # current_period_end no passado → bloqueado com 402 PAYMENT_OVERDUE
     trig = _trigger_polling(
         test_app, test_tenant["tenant_id"], test_tenant["cnpj"],
     )
@@ -565,13 +570,13 @@ def test_t08_invoice_payment_failed_bloqueia_acesso(
 def test_t09_invoice_paid_restaura_acesso(
     test_tenant, fake_sefaz, fake_stripe, test_app,
 ):
-    """T09: tenant expired (past_due) recebe `invoice.paid` com sub=active,
+    """T09: tenant past_due recebe `invoice.paid` com sub=active,
     volta a `subscription_status='active'` e o polling destrava.
     """
-    # Estado inicial: expired (como se T08 tivesse rodado)
+    # Estado inicial: past_due (como se T08 tivesse rodado)
     _patch_tenant(
         test_tenant["tenant_id"],
-        subscription_status="expired",
+        subscription_status="past_due",
         trial_active=False,
     )
     _delete_billing_events(test_tenant["tenant_id"])

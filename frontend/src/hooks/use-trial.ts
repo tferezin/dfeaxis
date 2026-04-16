@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { getSupabase } from "@/lib/supabase"
 
-export type SubscriptionStatus = "trial" | "active" | "cancelled" | "expired"
+export type SubscriptionStatus = "trial" | "active" | "cancelled" | "expired" | "past_due"
 export type TrialBlockedReason = "time" | "cap" | null
 
 interface TrialStatus {
@@ -14,6 +14,7 @@ interface TrialStatus {
   docsConsumidos: number
   trialCap: number
   trialBlockedReason: TrialBlockedReason
+  currentPeriodEnd: string | null
   loading: boolean
 }
 
@@ -26,6 +27,7 @@ export function useTrial(): TrialStatus {
     docsConsumidos: 0,
     trialCap: 500,
     trialBlockedReason: null,
+    currentPeriodEnd: null,
     loading: true,
   })
 
@@ -45,7 +47,7 @@ export function useTrial(): TrialStatus {
         const { data, error } = await sb
           .from("tenants")
           .select(
-            "trial_active, trial_expires_at, subscription_status, docs_consumidos_trial, trial_cap, trial_blocked_reason"
+            "trial_active, trial_expires_at, subscription_status, docs_consumidos_trial, trial_cap, trial_blocked_reason, current_period_end"
           )
           .eq("user_id", user.id)
           .single()
@@ -70,6 +72,7 @@ export function useTrial(): TrialStatus {
           docsConsumidos: data.docs_consumidos_trial ?? 0,
           trialCap: data.trial_cap ?? 500,
           trialBlockedReason: (data.trial_blocked_reason ?? null) as TrialBlockedReason,
+          currentPeriodEnd: data.current_period_end ?? null,
           loading: false,
         })
       } catch {

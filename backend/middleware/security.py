@@ -321,6 +321,11 @@ _TRIAL_BLOCKED_MESSAGE = (
     "Assine um plano para continuar ativo em nossa plataforma."
 )
 
+_PAYMENT_OVERDUE_MESSAGE = (
+    "Sua fatura está vencida. Regularize o pagamento para "
+    "reativar o acesso às funcionalidades da plataforma."
+)
+
 
 async def verify_trial_active(request: Request, auth: dict) -> None:
     """Check if the tenant's trial is still active.
@@ -343,7 +348,7 @@ async def verify_trial_active(request: Request, auth: dict) -> None:
     sb = get_supabase_client()
     result = sb.table("tenants").select(
         "subscription_status, trial_expires_at, trial_active, "
-        "trial_blocked_at, trial_blocked_reason"
+        "trial_blocked_at, trial_blocked_reason, current_period_end"
     ).eq("id", tenant_id).single().execute()
 
     if not result.data:
@@ -352,14 +357,33 @@ async def verify_trial_active(request: Request, auth: dict) -> None:
     data = result.data
     status = data.get("subscription_status")
 
-    # Hard block: subscription ended (expired, cancelled, past_due — todos
-    # mapeados pra 'expired' em subscriptions.py)
+    # Hard block: subscription fully ended
     if status in ("expired", "cancelled"):
         raise HTTPException(
             status_code=402,
             detail={
                 "message": _TRIAL_BLOCKED_MESSAGE,
                 "code": "TRIAL_EXPIRED",
+            },
+        )
+
+    # Past due: grace period until current_period_end, then block
+    if status == "past_due":
+        period_end = data.get("current_period_end")
+        now = datetime.now(timezone.utc)
+        if period_end:
+            period_dt = datetime.fromisoformat(
+                period_end.replace("Z", "+00:00")
+            )
+            if now < period_dt:
+                # Still within paid period — allow access
+                return
+        # Past the billing period or no period_end — block
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "message": _PAYMENT_OVERDUE_MESSAGE,
+                "code": "PAYMENT_OVERDUE",
             },
         )
 
