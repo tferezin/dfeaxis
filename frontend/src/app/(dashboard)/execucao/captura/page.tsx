@@ -84,7 +84,8 @@ export default function CapturaManualPage() {
     console.log("[DFeAxis] Arquivo:", file.name, "CNPJ:", testCnpj, "Tipos:", selectedTipos)
 
     const cleanCnpj = testCnpj.replace(/\D/g, "")
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || "https://dfeaxis-production.up.railway.app/api/v1"
+    const _raw = process.env.NEXT_PUBLIC_API_URL || "https://dfeaxis-production.up.railway.app"
+    const backendUrl = _raw.endsWith("/api/v1") ? _raw : `${_raw}/api/v1`
     console.log("[DFeAxis] Backend URL:", backendUrl)
 
     try {

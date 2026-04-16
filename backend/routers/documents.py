@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from db.supabase import get_supabase_client
 from middleware.lgpd import mask_cnpj
-from middleware.security import verify_api_key
+from middleware.security import verify_api_key, verify_api_key_with_trial
 from models.schemas import (
     ConfirmarResponse,
     DocumentoOut,
@@ -39,7 +39,7 @@ async def listar_documentos(
         True,
         description="Incluir resumos pendentes de manifestação (modo manual)",
     ),
-    auth: dict = Depends(verify_api_key),
+    auth: dict = Depends(verify_api_key_with_trial),
 ):
     """Lista documentos para um CNPJ/tipo.
 
@@ -115,7 +115,7 @@ async def listar_documentos(
 @router.post("/documentos/{chave}/confirmar", response_model=ConfirmarResponse)
 async def confirmar_documento(
     chave: str,
-    auth: dict = Depends(verify_api_key),
+    auth: dict = Depends(verify_api_key_with_trial),
 ):
     """Confirma entrega do documento e descarta o XML do banco.
 
@@ -215,7 +215,7 @@ async def confirmar_documento(
 )
 async def consulta_retroativa(
     body: RetroativoRequest,
-    auth: dict = Depends(verify_api_key),
+    auth: dict = Depends(verify_api_key_with_trial),
 ):
     """Inicia consulta retroativa de documentos em período específico.
 

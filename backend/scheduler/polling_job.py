@@ -405,6 +405,51 @@ def _poll_single_detailed(cert: dict, tipo: str, tenant_data: dict) -> dict:
 
         saved = total_docs_saved > 0
 
+        # Debita créditos do tenant (planos pagos usam créditos por doc)
+        if total_docs_saved > 0 and not is_trial:
+            try:
+                sb.rpc("debit_credits", {
+                    "p_tenant_id": tenant_id,
+                    "p_amount": total_docs_saved,
+                }).execute()
+            except Exception as e:
+                logger.warning(
+                    "debit_credits falhou tenant=%s amount=%d: %s",
+                    tenant_id, total_docs_saved, e,
+                )
+
+        # Auto-ciência: envia 210210 pra resumos NF-e capturados neste trigger
+        if (
+            tipo == "nfe"
+            and total_docs_saved > 0
+            and tenant_data.get("manifestacao_mode") == "auto_ciencia"
+        ):
+            try:
+                # Busca docs recém-salvos que são resumos pendentes de ciência
+                recent_docs = sb.table("documents").select(
+                    "chave_acesso"
+                ).eq("tenant_id", tenant_id).eq(
+                    "manifestacao_status", "pendente"
+                ).limit(total_docs_saved).execute()
+                if recent_docs.data:
+                    from dataclasses import dataclass
+
+                    @dataclass
+                    class _DocStub:
+                        chave: str
+                        schema: str = "resNFe"
+
+                    stubs = [_DocStub(chave=r["chave_acesso"]) for r in recent_docs.data]
+                    _auto_ciencia(
+                        stubs, cert, tenant_id,
+                        pfx_encrypted, pfx_iv, pfx_password, ambiente,
+                    )
+            except Exception as e:
+                logger.warning(
+                    "auto_ciencia falhou no trigger tenant=%s: %s",
+                    tenant_id, e,
+                )
+
         # Log único agregando o resultado de todos os batches
         sb.table("polling_log").insert({
             "tenant_id": tenant_id, "cnpj": cnpj, "tipo": tipo,

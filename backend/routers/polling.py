@@ -35,9 +35,11 @@ async def trigger_polling(
 
     cert = cert_result.data[0]
 
-    # Busca tenant data
+    # Busca tenant data — inclui campos de trial/billing pra enforcement
     tenant = sb.table("tenants").select(
-        "id, polling_mode, credits, sefaz_ambiente"
+        "id, polling_mode, credits, sefaz_ambiente, "
+        "subscription_status, trial_cap, docs_consumidos_trial, "
+        "trial_blocked_at, trial_blocked_reason, manifestacao_mode"
     ).eq("id", tenant_id).single().execute()
 
     total_docs = 0
