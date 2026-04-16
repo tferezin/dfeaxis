@@ -150,6 +150,38 @@ def fake_sefaz(monkeypatch) -> Iterator[Any]:
 
 
 # ---------------------------------------------------------------------------
+# fake_manifestacao
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope="function")
+def fake_manifestacao(monkeypatch) -> Iterator[Any]:
+    """Instancia FakeManifestacaoService e patcha em todos os call sites.
+
+    Call sites:
+      - services.manifestacao.manifestacao_service (instância global)
+      - scheduler.polling_job.manifestacao_service (alias do import)
+      - routers.manifestacao.manifestacao_service (alias do import)
+    """
+    from fakes.manifestacao_fake import FakeManifestacaoService  # type: ignore
+
+    fake = FakeManifestacaoService()
+
+    import services.manifestacao as manif_module  # noqa: WPS433
+    monkeypatch.setattr(manif_module, "manifestacao_service", fake)
+
+    import scheduler.polling_job as polling_module  # noqa: WPS433
+    monkeypatch.setattr(polling_module, "manifestacao_service", fake)
+
+    import routers.manifestacao as manif_router_module  # noqa: WPS433
+    monkeypatch.setattr(manif_router_module, "manifestacao_service", fake)
+
+    try:
+        yield fake
+    finally:
+        fake.clear()
+
+
+# ---------------------------------------------------------------------------
 # fake_stripe
 # ---------------------------------------------------------------------------
 
