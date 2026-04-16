@@ -76,9 +76,14 @@ def polling_job():
         if tenant_data.get("polling_mode") != "auto":
             continue
 
-        if tenant_data.get("credits", 0) <= 0:
+        # Credits check só se aplica a tenants que usam modelo de créditos
+        # (legado MercadoPago). Tenants com subscription ativa usam
+        # overage billing (InvoiceItem) e NÃO devem ser bloqueados por
+        # créditos zerados.
+        status = tenant_data.get("subscription_status")
+        if status not in ("active", "past_due") and tenant_data.get("credits", 0) <= 0:
             logger.info(
-                f"Tenant {tenant_id} sem créditos, pulando polling"
+                f"Tenant {tenant_id} sem créditos e sem subscription ativa, pulando polling"
             )
             continue
 
