@@ -283,6 +283,7 @@ export default function HistoricoNfePage() {
         .from('documents')
         .select('*, is_resumo, manifestacao_status')
         .eq('tipo', 'NFE')
+        .eq('is_resumo', false)  // Só docs com XML completo — resumos são transitórios
         .or(
           `and(data_emissao.gte.${startISO},data_emissao.lte.${endISO}),and(data_emissao.is.null,fetched_at.gte.${startISO},fetched_at.lte.${endISO})`
         )
@@ -475,35 +476,8 @@ export default function HistoricoNfePage() {
           </div>
         ) : (
           <>
-            {/* Pendente action banner — always visible when there are pendente docs */}
-            {(() => {
-              const pendenteCount = mappedData.filter((r) => r.status === "Pendente").length
-              return pendenteCount > 0 && selectedChaves.size === 0 ? (
-                <div className="flex items-center justify-between rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30 px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex size-2.5 rounded-full bg-amber-500" />
-                    <span className="text-sm font-medium text-amber-900 dark:text-amber-200">
-                      {pendenteCount} NF-e pendente{pendenteCount > 1 ? "s" : ""} de manifesto
-                    </span>
-                    <span className="text-xs text-amber-700 dark:text-amber-400">
-                      — selecione documentos na tabela para dar ciencia em lote
-                    </span>
-                  </div>
-                  <Button
-                    size="sm"
-                    className="gap-1.5"
-                    disabled={manifLoading}
-                    onClick={() => {
-                      const pendentes = mappedData.filter((r) => r.status === "Pendente")
-                      setSelectedChaves(new Set(pendentes.map((r) => r.chave)))
-                    }}
-                  >
-                    <CheckCircle2 className="size-3.5" />
-                    Selecionar Todas Pendentes
-                  </Button>
-                </div>
-              ) : null
-            })()}
+            {/* NF-e Recebidas mostra apenas docs com XML completo (is_resumo=false).
+               Ciência é automática e transparente — o cliente não precisa interagir. */}
 
             {/* Batch action bar */}
             {selectedChaves.size > 0 && (
