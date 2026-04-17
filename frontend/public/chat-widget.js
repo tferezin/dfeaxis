@@ -49,13 +49,13 @@
   /* Fica acima da sticky-bar da landing (~60px desktop, ~52px mobile).
      Desktop: 24px margem + 64px sticky-bar = 88px
      Mobile: ajustado via media query abaixo. */
-  bottom: 88px;
-  right: 24px;
+  bottom: 72px;
+  right: 32px;
   z-index: 9999;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 20px;
+  padding: 10px 18px;
   background: #0c4a30;
   color: #fff;
   border: none;
@@ -74,9 +74,9 @@
 }
 @media (max-width: 800px) {
   .dfeax-chat-btn {
-    /* Mobile portrait: sticky-bar empilha em 2 linhas + botão = ~110px.
-       Margem 16 + 110 = 126. Usamos 130 pra folga contra toolbars do iOS. */
-    bottom: 130px;
+    /* Mobile portrait: sticky-bar empilha em 2 linhas (~90px).
+       Fica logo acima. */
+    bottom: 100px;
     right: 16px;
     padding: 10px 16px;
     font-size: 13px;
@@ -90,9 +90,9 @@
 }
 .dfeax-chat-panel {
   position: fixed;
-  /* Fica acima da sticky-bar da landing (mesmo cálculo do botão) */
-  bottom: 88px;
-  right: 24px;
+  /* Fica acima da sticky-bar da landing (alinhado com o botão) */
+  bottom: 72px;
+  right: 32px;
   z-index: 9999;
   width: 380px;
   max-width: calc(100vw - 48px);
