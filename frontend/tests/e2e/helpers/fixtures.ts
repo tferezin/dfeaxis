@@ -8,9 +8,13 @@
  * are NEVER meant to run against production.
  */
 
-const SUPABASE_URL = "https://kmiooqyasvhglszcioow.supabase.co"
-const SR_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImttaW9vcXlhc3ZoZ2xzemNpb293Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3Mzc4OTI2OCwiZXhwIjoyMDg5MzY1MjY4fQ.2V6Tq4QrL599qb3qybTdfOcVTIguKC5NF7rpGPKVbh0"
+const SUPABASE_URL = process.env.SUPABASE_URL || "https://kmiooqyasvhglszcioow.supabase.co"
+const SR_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || (() => {
+  throw new Error(
+    "SUPABASE_SERVICE_ROLE_KEY env var is required for E2E tests. " +
+    "Set it in your shell or in frontend/.env.local"
+  )
+})()
 
 const REST = `${SUPABASE_URL}/rest/v1`
 const AUTH_ADMIN = `${SUPABASE_URL}/auth/v1/admin`

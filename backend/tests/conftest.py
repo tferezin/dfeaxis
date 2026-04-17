@@ -79,12 +79,12 @@ except ImportError:
 # ---------------------------------------------------------------------------
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL") or "https://kmiooqyasvhglszcioow.supabase.co"
-SUPABASE_SR_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or (
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
-    "eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImttaW9vcXlhc3ZoZ2xzemNpb293Iiwicm9sZSI6"
-    "InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3Mzc4OTI2OCwiZXhwIjoyMDg5MzY1MjY4fQ."
-    "2V6Tq4QrL599qb3qybTdfOcVTIguKC5NF7rpGPKVbh0"
-)
+SUPABASE_SR_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+if not SUPABASE_SR_KEY:
+    raise RuntimeError(
+        "SUPABASE_SERVICE_ROLE_KEY env var is required for tests. "
+        "Set it in .env or export it in your shell."
+    )
 
 _REST = f"{SUPABASE_URL}/rest/v1"
 _AUTH_ADMIN = f"{SUPABASE_URL}/auth/v1/admin"
