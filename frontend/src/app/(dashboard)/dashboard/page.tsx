@@ -320,6 +320,7 @@ export default function DashboardPage() {
       type AggregationRow = {
         tipo: string
         fetched_at: string
+        data_emissao: string | null
         valor_total: number | null
         xml_content: string | null
       }
@@ -338,7 +339,7 @@ export default function DashboardPage() {
         applyDateFilter(
           sb
             .from('documents')
-            .select('tipo, fetched_at, valor_total, xml_content')
+            .select('tipo, fetched_at, data_emissao, valor_total, xml_content')
         ) as unknown as Promise<{ data: AggregationRow[] | null }>,
       ])
 
