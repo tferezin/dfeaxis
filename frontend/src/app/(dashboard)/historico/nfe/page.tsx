@@ -547,17 +547,22 @@ export default function HistoricoNfePage() {
                       </TableCell>
                       <TableCell>
                         <div>
-                          {row.razaoSocialEmitente && (
-                            <p className="text-xs font-medium text-foreground truncate max-w-[180px]">
-                              {row.razaoSocialEmitente}
+                          {row.cnpjEmitente ? (
+                            <>
+                              {row.razaoSocialEmitente && (
+                                <p className="text-xs font-medium text-foreground truncate max-w-[180px]">
+                                  {row.razaoSocialEmitente}
+                                </p>
+                              )}
+                              <p className="font-mono text-xs text-muted-foreground">
+                                {row.cnpjEmitente}
+                              </p>
+                            </>
+                          ) : (
+                            <p className="text-xs italic text-muted-foreground">
+                              Resumo — aguardando ciência
                             </p>
                           )}
-                          <p className="font-mono text-xs text-muted-foreground">
-                            {row.cnpjEmitente || row.cnpj}
-                            {!row.cnpjEmitente && (
-                              <span className="ml-1 text-[10px] text-amber-600" title="CNPJ do certificado (emitente indisponivel)">(cert)</span>
-                            )}
-                          </p>
                         </div>
                       </TableCell>
                       <TableCell className="font-mono text-xs">{row.nsu}</TableCell>
