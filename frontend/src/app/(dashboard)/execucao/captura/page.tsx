@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import {
   Play,
   Loader2,
@@ -16,6 +16,9 @@ import {
   Download,
   Clock,
   Search,
+  ChevronDown,
+  ChevronRight,
+  Zap,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -30,11 +33,64 @@ const cteDocTypes = [
   { key: "nfse", label: "NFS-e", icon: Building2 },
 ]
 
+interface RegisteredCert {
+  id: string
+  cnpj: string
+  company_name: string
+}
+
 export default function CapturaManualPage() {
   const fileRef = useRef<HTMLInputElement>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [cnpj, setCnpj] = useState("")
   const [password, setPassword] = useState("")
+
+  // Registered certificates
+  const [registeredCerts, setRegisteredCerts] = useState<RegisteredCert[]>([])
+  const [selectedCertId, setSelectedCertId] = useState<string>("")
+  const [showUpload, setShowUpload] = useState(false)
+  const [certsLoading, setCertsLoading] = useState(true)
+
+  // "Capturar TODOS" state
+  const [captureAllStatus, setCaptureAllStatus] = useState<"idle" | "loading">("idle")
+  const [captureAllProgress, setCaptureAllProgress] = useState("")
+  const [captureAllResults, setCaptureAllResults] = useState<Array<{
+    cnpj: string
+    company_name: string
+    success: boolean
+    message: string
+  }>>([])
+
+  // Load registered certificates on mount
+  useEffect(() => {
+    async function loadCerts() {
+      try {
+        const sb = getSupabase()
+        const { data } = await sb
+          .from("certificates")
+          .select("id, cnpj, company_name")
+          .eq("is_active", true)
+        if (data && data.length > 0) {
+          setRegisteredCerts(data)
+          // Auto-select first cert
+          setSelectedCertId(data[0].id)
+          setCnpj(data[0].cnpj)
+        }
+      } finally {
+        setCertsLoading(false)
+      }
+    }
+    loadCerts()
+  }, [])
+
+  // When cert selection changes, update CNPJ
+  const handleCertSelect = (certId: string) => {
+    setSelectedCertId(certId)
+    const cert = registeredCerts.find((c) => c.id === certId)
+    if (cert) {
+      setCnpj(cert.cnpj)
+    }
+  }
 
   // CT-e / MDF-e / NFS-e state
   const [directTipos, setDirectTipos] = useState<Record<string, boolean>>({
@@ -108,13 +164,22 @@ export default function CapturaManualPage() {
     return session?.access_token ?? null
   }
 
+  const isUsingRegisteredCert = !!selectedCertId && !showUpload
+
   // --- Direct capture (CT-e, MDF-e, NFS-e) ---
   const handleDirectCapture = async () => {
-    const file = fileRef.current?.files?.[0]
-    if (!file || !cleanCnpj || !password) {
-      setDirectResult({ error: "Preencha todos os campos: certificado .pfx, CNPJ e senha." })
+    if (!isUsingRegisteredCert) {
+      // Upload flow: need file + cnpj + password
+      const file = fileRef.current?.files?.[0]
+      if (!file || !cleanCnpj || !password) {
+        setDirectResult({ error: "Preencha todos os campos: certificado .pfx, CNPJ e senha." })
+        return
+      }
+    } else if (!cleanCnpj) {
+      setDirectResult({ error: "Selecione um certificado cadastrado." })
       return
     }
+
     if (selectedDirectTipos.length === 0) {
       setDirectResult({ error: "Selecione pelo menos um tipo de documento." })
       return
@@ -132,28 +197,29 @@ export default function CapturaManualPage() {
         return
       }
 
-      // Step 1: Upload certificate
-      const uploadForm = new FormData()
-      uploadForm.append("pfx_file", file)
-      uploadForm.append("cnpj", cleanCnpj)
-      uploadForm.append("senha", password)
-      uploadForm.append("polling_mode", "manual")
+      // If uploading a new cert, upload first
+      if (!isUsingRegisteredCert) {
+        const file = fileRef.current?.files?.[0]!
+        const uploadForm = new FormData()
+        uploadForm.append("pfx_file", file)
+        uploadForm.append("cnpj", cleanCnpj)
+        uploadForm.append("senha", password)
+        uploadForm.append("polling_mode", "manual")
 
-      const uploadRes = await fetch(`${backendUrl}/certificates/upload`, {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${token}` },
-        body: uploadForm,
-      })
+        const uploadRes = await fetch(`${backendUrl}/certificates/upload`, {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${token}` },
+          body: uploadForm,
+        })
 
-      if (!uploadRes.ok) {
-        const uploadErr = await uploadRes.json().catch(() => ({}))
-        setDirectResult({ error: `Erro ao cadastrar certificado: ${uploadErr.detail || uploadRes.statusText}` })
-        return
+        if (!uploadRes.ok) {
+          const uploadErr = await uploadRes.json().catch(() => ({}))
+          setDirectResult({ error: `Erro ao cadastrar certificado: ${uploadErr.detail || uploadRes.statusText}` })
+          return
+        }
       }
 
-      const uploadData = await uploadRes.json()
-
-      // Step 2: Trigger polling
+      // Trigger polling (works for both registered and uploaded certs)
       const pollingRes = await fetch(`${backendUrl}/polling/trigger`, {
         method: "POST",
         headers: {
@@ -166,9 +232,8 @@ export default function CapturaManualPage() {
       if (!pollingRes.ok) {
         const pollingErr = await pollingRes.json().catch(() => ({}))
         setDirectResult({
-          certificate: { subject: `Certificado cadastrado (${uploadData.cnpj})`, valid_from: "", valid_until: String(uploadData.valid_until || "") },
           cnpj: cleanCnpj,
-          error: `Certificado cadastrado, mas erro na captura: ${pollingErr.detail || pollingRes.statusText}`,
+          error: `Erro na captura: ${pollingErr.detail || pollingRes.statusText}`,
         })
         return
       }
@@ -186,11 +251,6 @@ export default function CapturaManualPage() {
       }))
 
       setDirectResult({
-        certificate: {
-          subject: `Certificado cadastrado (${uploadData.cnpj})`,
-          valid_from: "",
-          valid_until: String(uploadData.valid_until || ""),
-        },
         cnpj: cleanCnpj,
         results,
         message: `${pollingData.docs_found || 0} documento(s) capturado(s) e salvo(s) no banco.`,
@@ -199,6 +259,94 @@ export default function CapturaManualPage() {
       setDirectResult({ error: `Erro: ${String(err)}` })
     } finally {
       setDirectStatus("idle")
+    }
+  }
+
+  // --- Capture ALL registered certs ---
+  const handleCaptureAll = async () => {
+    if (registeredCerts.length === 0) return
+
+    setCaptureAllStatus("loading")
+    setCaptureAllResults([])
+
+    const backendUrl = getBackendUrl()
+
+    try {
+      const token = await getAuthToken()
+      if (!token) {
+        setCaptureAllResults([{ cnpj: "", company_name: "", success: false, message: "Sessao expirada." }])
+        return
+      }
+
+      const allResults: typeof captureAllResults = []
+
+      for (let i = 0; i < registeredCerts.length; i++) {
+        const cert = registeredCerts[i]
+        setCaptureAllProgress(`Processando certificado ${i + 1}/${registeredCerts.length}: ${cert.company_name || cert.cnpj}...`)
+
+        try {
+          // Trigger CT-e/MDF-e/NFS-e
+          const triggerRes = await fetch(`${backendUrl}/polling/trigger`, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ cnpj: cert.cnpj, tipos: ["cte", "mdfe", "nfse"] }),
+          })
+
+          // Trigger NFe Etapa 1
+          const nfeRes = await fetch(`${backendUrl}/polling/nfe-resumos`, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ cnpj: cert.cnpj }),
+          })
+
+          const triggerOk = triggerRes.ok
+          const nfeOk = nfeRes.ok
+
+          let triggerDocs = 0
+          let nfeResumos = 0
+          if (triggerOk) {
+            const td = await triggerRes.json()
+            triggerDocs = td.docs_found || 0
+          }
+          if (nfeOk) {
+            const nd = await nfeRes.json()
+            nfeResumos = nd.resumos_found || 0
+          }
+
+          allResults.push({
+            cnpj: cert.cnpj,
+            company_name: cert.company_name || cert.cnpj,
+            success: triggerOk || nfeOk,
+            message: triggerOk && nfeOk
+              ? `CT-e/MDF-e/NFS-e: ${triggerDocs} doc(s) | NF-e: ${nfeResumos} resumo(s)`
+              : !triggerOk && !nfeOk
+                ? "Erro em ambas as capturas"
+                : !triggerOk
+                  ? `Erro CT-e/MDF-e/NFS-e | NF-e: ${nfeResumos} resumo(s)`
+                  : `CT-e/MDF-e/NFS-e: ${triggerDocs} doc(s) | Erro NF-e`,
+          })
+        } catch (err) {
+          allResults.push({
+            cnpj: cert.cnpj,
+            company_name: cert.company_name || cert.cnpj,
+            success: false,
+            message: `Erro: ${String(err)}`,
+          })
+        }
+
+        setCaptureAllResults([...allResults])
+      }
+    } catch (err) {
+      setCaptureAllResults([{ cnpj: "", company_name: "", success: false, message: `Erro: ${String(err)}` }])
+    } finally {
+      setCaptureAllStatus("idle")
+      setCaptureAllProgress("")
     }
   }
 
@@ -319,45 +467,162 @@ export default function CapturaManualPage() {
           <CardTitle className="text-base">Certificado A1</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* File input - styled */}
-          <div className="space-y-1.5">
-            <Label className="text-xs">Certificado digital (.pfx)</Label>
-            <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/50 hover:border-slate-400 dark:hover:border-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-              <Upload className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">
-                {selectedFile ? selectedFile.name : "Selecionar certificado .pfx"}
-              </span>
-              <input
-                type="file"
-                accept=".pfx,.p12"
-                ref={fileRef}
-                className="hidden"
-                onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
-              />
-            </label>
-          </div>
+          {/* Option 1: Registered certificates */}
+          {certsLoading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" />
+              Carregando certificados...
+            </div>
+          ) : registeredCerts.length > 0 ? (
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Certificado cadastrado</Label>
+                <select
+                  className="flex h-9 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30"
+                  value={selectedCertId}
+                  onChange={(e) => handleCertSelect(e.target.value)}
+                >
+                  {registeredCerts.map((cert) => (
+                    <option key={cert.id} value={cert.id}>
+                      {cert.company_name ? `${cert.company_name} — ${cert.cnpj}` : cert.cnpj}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-          {/* CNPJ + Senha */}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label className="text-xs">CNPJ</Label>
-              <Input
-                placeholder="00.000.000/0000-00"
-                className="text-sm"
-                value={cnpj}
-                onChange={(e) => setCnpj(e.target.value)}
-              />
+              {/* Auto-filled CNPJ (read-only) */}
+              <div className="space-y-1.5">
+                <Label className="text-xs">CNPJ</Label>
+                <Input
+                  placeholder="00.000.000/0000-00"
+                  className="text-sm bg-muted/50"
+                  value={cnpj}
+                  readOnly
+                />
+              </div>
+
+              {/* Capture ALL button */}
+              <div className="pt-1">
+                <Button
+                  variant="outline"
+                  className="gap-2 text-xs"
+                  disabled={captureAllStatus === "loading" || registeredCerts.length === 0}
+                  onClick={handleCaptureAll}
+                >
+                  {captureAllStatus === "loading" ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Zap className="size-3.5" />
+                  )}
+                  {captureAllStatus === "loading"
+                    ? captureAllProgress || "Processando..."
+                    : `Capturar TODOS os certificados (${registeredCerts.length})`}
+                </Button>
+              </div>
+
+              {/* Capture ALL results */}
+              {captureAllResults.length > 0 && (
+                <div className="space-y-2">
+                  {captureAllResults.map((r, i) => (
+                    <div
+                      key={i}
+                      className={`rounded-lg border p-3 ${
+                        r.success
+                          ? "border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30"
+                          : "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30"
+                      }`}
+                    >
+                      <p className={`text-xs font-medium ${
+                        r.success ? "text-emerald-800 dark:text-emerald-300" : "text-red-700 dark:text-red-300"
+                      }`}>
+                        {r.company_name}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{r.message}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Senha do certificado</Label>
-              <Input
-                type="password"
-                placeholder="Senha"
-                className="text-sm"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
+          ) : (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-3">
+              <p className="text-xs text-amber-800 dark:text-amber-300">
+                Nenhum certificado cadastrado. Use a secao abaixo para enviar um certificado .pfx.
+              </p>
             </div>
+          )}
+
+          {/* Option 2: Upload new certificate (collapsible) */}
+          <div className="border-t pt-3">
+            <button
+              type="button"
+              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              onClick={() => {
+                setShowUpload(!showUpload)
+                if (!showUpload) {
+                  // Switching to upload mode: clear registered cert selection
+                  setSelectedCertId("")
+                  setCnpj("")
+                } else {
+                  // Switching back: re-select first registered cert
+                  if (registeredCerts.length > 0) {
+                    setSelectedCertId(registeredCerts[0].id)
+                    setCnpj(registeredCerts[0].cnpj)
+                  }
+                }
+              }}
+            >
+              {showUpload ? (
+                <ChevronDown className="size-4" />
+              ) : (
+                <ChevronRight className="size-4" />
+              )}
+              Ou testar com certificado novo
+            </button>
+
+            {showUpload && (
+              <div className="mt-3 space-y-4">
+                {/* File input - styled */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Certificado digital (.pfx)</Label>
+                  <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/50 hover:border-slate-400 dark:hover:border-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                    <Upload className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">
+                      {selectedFile ? selectedFile.name : "Selecionar certificado .pfx"}
+                    </span>
+                    <input
+                      type="file"
+                      accept=".pfx,.p12"
+                      ref={fileRef}
+                      className="hidden"
+                      onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
+                    />
+                  </label>
+                </div>
+
+                {/* CNPJ + Senha */}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">CNPJ</Label>
+                    <Input
+                      placeholder="00.000.000/0000-00"
+                      className="text-sm"
+                      value={cnpj}
+                      onChange={(e) => setCnpj(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Senha do certificado</Label>
+                    <Input
+                      type="password"
+                      placeholder="Senha"
+                      className="text-sm"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
