@@ -15,7 +15,7 @@ import {
   ShieldCheck,
   Key,
   Settings,
-  CreditCard,
+  Receipt,
   ChevronDown,
   LogOut,
   Play,
@@ -91,7 +91,6 @@ const navigation: NavSection[] = [
       { title: "CT-e Recebidos", href: "/historico/cte", icon: Truck, badge: "SAP" },
       { title: "NFS-e Recebidas", href: "/historico/nfse", icon: Building2, badge: "ADN" },
       { title: "MDF-e Recebidos", href: "/historico/mdfe", icon: FileStack },
-      { title: "Manifestação", href: "/historico/manifestacao", icon: FileCheck },
     ],
   },
   {
@@ -112,7 +111,7 @@ const navigation: NavSection[] = [
   {
     label: "Financeiro",
     items: [
-      { title: "Créditos", href: "/financeiro/creditos", icon: CreditCard },
+      { title: "Assinatura", href: "/financeiro/creditos", icon: Receipt },
     ],
   },
   {
@@ -297,6 +296,15 @@ export function AppSidebar() {
                 >
                   <Play className="size-4" />
                   <span>Captura Manual</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={pathname === "/historico/manifestacao"}
+                  render={<Link href="/historico/manifestacao" />}
+                >
+                  <FileCheck className="size-4" />
+                  <span>Manifestação</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

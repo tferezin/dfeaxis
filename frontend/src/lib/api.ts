@@ -2,7 +2,7 @@ import { getSupabase } from './supabase'
 
 // NEXT_PUBLIC_API_URL = raiz do backend (sem /api/v1).
 // Tolera ambos os formatos pra não quebrar se alguém setar com /api/v1.
-const _RAW = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const _RAW = process.env.NEXT_PUBLIC_API_URL || 'https://dfeaxis-production.up.railway.app'
 const API_BASE = _RAW.endsWith('/api/v1') ? _RAW : `${_RAW}/api/v1`
 
 export async function apiFetch<T = unknown>(

@@ -65,7 +65,49 @@ export default function DashboardPage() {
   const [selectedCompetencia, setSelectedCompetencia] = useState<CompetenciaId>(
     currentCompetencia()
   )
-  const competenciaOptions = useMemo(() => buildCompetenciaOptions(11), [])
+  // Dynamic competencia options — fetched from actual document data
+  const [competenciaOptions, setCompetenciaOptions] = useState<
+    import("@/lib/competencia").CompetenciaRange[]
+  >([])
+
+  useEffect(() => {
+    async function fetchDistinctMonths() {
+      try {
+        const sb = getSupabase()
+        // Fetch all distinct year-months from documents table
+        const { data, error } = await sb
+          .from("documents")
+          .select("fetched_at")
+        if (error || !data) {
+          // Fallback to static list
+          setCompetenciaOptions(buildCompetenciaOptions(11))
+          return
+        }
+        // Collect unique YYYY-MM from fetched_at dates
+        const monthSet = new Set<string>()
+        for (const row of data) {
+          if (row.fetched_at) {
+            // fetched_at is UTC; convert to SP time (UTC-3) for correct month
+            const d = new Date(row.fetched_at)
+            const sp = new Date(d.getTime() - 3 * 60 * 60 * 1000)
+            const id = `${sp.getUTCFullYear()}-${String(sp.getUTCMonth() + 1).padStart(2, "0")}`
+            monthSet.add(id)
+          }
+        }
+        if (monthSet.size === 0) {
+          // No documents at all — show current month
+          setCompetenciaOptions([getCompetenciaRange(currentCompetencia())])
+          return
+        }
+        // Sort descending (newest first)
+        const sorted = Array.from(monthSet).sort((a, b) => b.localeCompare(a))
+        setCompetenciaOptions(sorted.map((id) => getCompetenciaRange(id)))
+      } catch {
+        setCompetenciaOptions(buildCompetenciaOptions(11))
+      }
+    }
+    fetchDistinctMonths()
+  }, [])
   const isAllCompetencia = selectedCompetencia === COMPETENCIA_TODOS
   const currentRange = useMemo(
     () => isAllCompetencia ? null : getCompetenciaRange(selectedCompetencia),
@@ -512,7 +554,7 @@ export default function DashboardPage() {
                       <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
                         <div
                           className={`h-full rounded-full transition-all ${barColor}`}
-                          style={{ width: `${barWidth}%` }}
+                          style={{ width: `${barWidth}%`, minWidth: used > 0 && barWidth < 4 ? "4px" : undefined }}
                         />
                       </div>
                       {over > 0 ? (
@@ -577,7 +619,10 @@ export default function DashboardPage() {
                         ? "bg-amber-500"
                         : "bg-emerald-500"
                   }`}
-                  style={{ width: `${Math.max(pctUso, excedenteDocs > 0 ? 100 : pctUso)}%` }}
+                  style={{
+                    width: `${Math.max(pctUso, excedenteDocs > 0 ? 100 : pctUso)}%`,
+                    minWidth: realDocsNaCompetencia > 0 && pctUso < 4 ? "4px" : undefined,
+                  }}
                 />
               </div>
               <div className="flex items-center justify-between text-xs">
