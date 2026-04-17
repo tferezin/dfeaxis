@@ -56,7 +56,7 @@ def _get_cert_and_password(tenant_id: str, cnpj: str) -> tuple:
 @router.get("/manifestacao/pendentes", response_model=list[DocumentoPendenteOut])
 async def listar_pendentes(
     cnpj: str = Query(..., min_length=14, max_length=14),
-    auth: dict = Depends(verify_jwt_with_trial),
+    auth: dict = Depends(verify_jwt_or_api_key),
 ):
     """Lista documentos NF-e pendentes de manifestação.
 

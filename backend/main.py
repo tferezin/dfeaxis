@@ -22,7 +22,7 @@ from middleware.security import (
     RateLimitMiddleware,
     request_id_ctx,
 )
-from routers import documents, certificates, polling, credits, api_keys, tenants, manifestacao, nfse, sap_drc, billing, chat
+from routers import documents, certificates, polling, credits, api_keys, tenants, manifestacao, nfse, sap_drc, billing, chat, admin
 from scheduler.polling_job import start_scheduler, stop_scheduler
 
 
@@ -91,11 +91,19 @@ async def lifespan(app: FastAPI):
     logger.info("DFeAxis shut down")
 
 
+# Em produção, desligamos Swagger/ReDoc/openapi.json para não expor o
+# schema da API (rotas, auth, modelos) a scanners automatizados. Em
+# dev/staging continuam abertos pra facilitar debug.
+_IS_PRODUCTION = os.getenv("ENVIRONMENT") == "production"
+
 app = FastAPI(
     title="DFeAxis API",
     description="Captura automática de documentos fiscais recebidos da SEFAZ para SAP DRC",
     version="0.1.0",
     lifespan=lifespan,
+    docs_url=None if _IS_PRODUCTION else "/docs",
+    redoc_url=None if _IS_PRODUCTION else "/redoc",
+    openapi_url=None if _IS_PRODUCTION else "/openapi.json",
 )
 
 # --- Middleware (order matters — outermost first) ---
@@ -206,12 +214,206 @@ app.include_router(nfse.router, prefix="/api/v1", tags=["NFS-e"])
 app.include_router(sap_drc.router, prefix="/sap-drc", tags=["SAP DRC Compatibility"])
 app.include_router(billing.router, prefix="/api/v1", tags=["Billing"])
 app.include_router(chat.router, prefix="/api/v1", tags=["Chat Bot"])
+app.include_router(admin.router, prefix="/api/v1", tags=["Admin"])
 
 
-@app.get("/health")
+# --- Health Check ---
+
+import asyncio
+from datetime import datetime, timezone
+from typing import Literal, Optional
+
+from pydantic import BaseModel
+
+
+class DependencyStatus(BaseModel):
+    name: str
+    status: Literal["ok", "degraded", "down", "not_configured", "skipped"]
+    latency_ms: Optional[int] = None
+    error: Optional[str] = None
+
+
+class HealthResponse(BaseModel):
+    status: Literal["ok", "degraded", "down"]
+    service: str
+    version: str
+    dependencies: list[DependencyStatus]
+    timestamp: str
+
+
+async def _check_supabase() -> DependencyStatus:
+    start = time.perf_counter()
+    try:
+        from db.supabase import get_supabase_client
+
+        def _run() -> None:
+            sb = get_supabase_client()
+            sb.table("tenants").select("id").limit(1).execute()
+
+        await asyncio.wait_for(asyncio.to_thread(_run), timeout=2.0)
+        latency_ms = int((time.perf_counter() - start) * 1000)
+        return DependencyStatus(name="supabase", status="ok", latency_ms=latency_ms)
+    except asyncio.TimeoutError:
+        latency_ms = int((time.perf_counter() - start) * 1000)
+        return DependencyStatus(
+            name="supabase",
+            status="down",
+            latency_ms=latency_ms,
+            error="Timeout > 2s",
+        )
+    except Exception as exc:
+        latency_ms = int((time.perf_counter() - start) * 1000)
+        return DependencyStatus(
+            name="supabase",
+            status="down",
+            latency_ms=latency_ms,
+            error=f"{type(exc).__name__}: {str(exc)[:200]}",
+        )
+
+
+async def _check_stripe() -> DependencyStatus:
+    from config import settings
+
+    if not settings.stripe_secret_key:
+        return DependencyStatus(name="stripe", status="not_configured")
+
+    start = time.perf_counter()
+    try:
+        from services.billing.stripe_client import get_stripe
+
+        def _run() -> None:
+            stripe = get_stripe()
+            stripe.Balance.retrieve()
+
+        await asyncio.wait_for(asyncio.to_thread(_run), timeout=2.0)
+        latency_ms = int((time.perf_counter() - start) * 1000)
+        return DependencyStatus(name="stripe", status="ok", latency_ms=latency_ms)
+    except asyncio.TimeoutError:
+        latency_ms = int((time.perf_counter() - start) * 1000)
+        return DependencyStatus(
+            name="stripe",
+            status="down",
+            latency_ms=latency_ms,
+            error="Timeout > 2s",
+        )
+    except Exception as exc:
+        latency_ms = int((time.perf_counter() - start) * 1000)
+        return DependencyStatus(
+            name="stripe",
+            status="down",
+            latency_ms=latency_ms,
+            error=f"{type(exc).__name__}: {str(exc)[:200]}",
+        )
+
+
+async def _check_resend() -> DependencyStatus:
+    from config import settings
+
+    if not settings.resend_api_key:
+        return DependencyStatus(name="resend", status="not_configured")
+
+    start = time.perf_counter()
+    try:
+        import httpx
+
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            resp = await client.get(
+                "https://api.resend.com/domains",
+                headers={"Authorization": f"Bearer {settings.resend_api_key}"},
+            )
+        latency_ms = int((time.perf_counter() - start) * 1000)
+        if resp.status_code == 200:
+            return DependencyStatus(
+                name="resend", status="ok", latency_ms=latency_ms
+            )
+        if resp.status_code == 401:
+            # Endpoint reachable but key invalid — infra up, config wrong.
+            return DependencyStatus(
+                name="resend",
+                status="degraded",
+                latency_ms=latency_ms,
+                error="Invalid API key",
+            )
+        return DependencyStatus(
+            name="resend",
+            status="degraded",
+            latency_ms=latency_ms,
+            error=f"HTTP {resp.status_code}",
+        )
+    except Exception as exc:
+        latency_ms = int((time.perf_counter() - start) * 1000)
+        return DependencyStatus(
+            name="resend",
+            status="down",
+            latency_ms=latency_ms,
+            error=f"{type(exc).__name__}: {str(exc)[:200]}",
+        )
+
+
+@app.get("/health", response_model=HealthResponse)
 async def health_check():
-    return {
-        "status": "ok",
-        "service": "dfeaxis",
-        "tagline": "Captura automática de documentos fiscais recebidos da SEFAZ para SAP DRC",
-    }
+    """Checa dependências críticas reais (Supabase, Stripe, Resend).
+
+    - 200 se tudo OK ou apenas deps não-críticas degradadas.
+    - 503 se alguma dep crítica (Supabase) está down ou se o timeout geral
+      de 5s for estourado.
+    - SEFAZ é marcado `skipped` por design (evita consumo indevido).
+    """
+    deps: list[DependencyStatus]
+    overall_timeout = False
+
+    try:
+        results = await asyncio.wait_for(
+            asyncio.gather(
+                _check_supabase(),
+                _check_stripe(),
+                _check_resend(),
+                return_exceptions=False,
+            ),
+            timeout=5.0,
+        )
+        deps = list(results)
+    except asyncio.TimeoutError:
+        overall_timeout = True
+        deps = [
+            DependencyStatus(
+                name="health_check",
+                status="down",
+                error="Overall timeout > 5s",
+            )
+        ]
+
+    # SEFAZ — skipped by design
+    deps.append(
+        DependencyStatus(
+            name="sefaz",
+            status="skipped",
+            error="Checked on-demand to avoid consumo indevido",
+        )
+    )
+
+    # Aggregation
+    critical_deps = [d for d in deps if d.name in ("supabase",)]
+    if overall_timeout or any(d.status == "down" for d in critical_deps):
+        overall: Literal["ok", "degraded", "down"] = "down"
+        status_code = 503
+    elif any(
+        d.status in ("down", "degraded")
+        for d in deps
+        if d.status != "skipped"
+    ):
+        overall = "degraded"
+        status_code = 200  # LB não faz failover em dep não-crítica
+    else:
+        overall = "ok"
+        status_code = 200
+
+    body = HealthResponse(
+        status=overall,
+        service="dfeaxis",
+        version="0.1.0",
+        dependencies=deps,
+        timestamp=datetime.now(timezone.utc).isoformat(),
+    )
+
+    return JSONResponse(content=body.model_dump(), status_code=status_code)

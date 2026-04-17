@@ -34,14 +34,22 @@ async def register_tenant(
 
     trial_expires = (datetime.now(timezone.utc) + timedelta(days=10)).isoformat()
 
+    # Trial: 500 docs OU 10 dias (o que vier primeiro). Campos-chave:
+    # - trial_cap=500 vem do DEFAULT da migration 007
+    # - docs_consumidos_trial começa em 0 (default da coluna)
+    # - trial_blocked_at começa null (seta via polling quando bate cap, via
+    #   email_job quando expira tempo, ou é limpo via webhook Stripe no upgrade)
+    #
+    # NÃO setamos `credits` nem `docs_included_mes` aqui porque durante o trial
+    # o único gate é o trial_cap. `docs_included_mes` só existe quando o tenant
+    # vira `active` via webhook Stripe — `subscriptions.sync_subscription_to_db`
+    # popula `plan`, `max_cnpjs` e `docs_included_mes` a partir do catálogo.
     insert_data = {
         "user_id": user_id,
         "company_name": body.company_name,
         "email": body.email,
-        "plan": "starter",
-        "credits": 100,  # créditos iniciais de teste
+        "plan": "starter",  # placeholder até Stripe confirmar upgrade
         "max_cnpjs": 1,
-        "docs_included_mes": 3000,
         "manifestacao_mode": "manual",
         "trial_expires_at": trial_expires,
         "trial_active": True,

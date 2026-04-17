@@ -6,6 +6,7 @@ import {
   Loader2,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   FileText,
   Truck,
   Building2,
@@ -84,7 +85,8 @@ export default function CapturaManualPage() {
     console.log("[DFeAxis] Arquivo:", file.name, "CNPJ:", testCnpj, "Tipos:", selectedTipos)
 
     const cleanCnpj = testCnpj.replace(/\D/g, "")
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || "https://dfeaxis-production.up.railway.app/api/v1"
+    const _raw = process.env.NEXT_PUBLIC_API_URL || "https://dfeaxis-production.up.railway.app"
+    const backendUrl = _raw.endsWith("/api/v1") ? _raw : `${_raw}/api/v1`
     console.log("[DFeAxis] Backend URL:", backendUrl)
 
     try {
@@ -233,6 +235,20 @@ export default function CapturaManualPage() {
 
   return (
     <div className="space-y-6">
+      {/* Warning banner */}
+      <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30 p-4">
+        <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-600 dark:text-amber-400" />
+        <div>
+          <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
+            Funcionalidade de teste / validacao
+          </p>
+          <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
+            Esta funcionalidade e apenas para testes durante a fase de validacao. Em producao, a captura deve ser disparada pelo seu ERP via API
+            (<code className="bg-amber-100 dark:bg-amber-900/50 px-1 py-0.5 rounded text-xs font-mono">POST /api/v1/polling/trigger</code>).
+          </p>
+        </div>
+      </div>
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Captura Manual</h1>

@@ -3,7 +3,7 @@
 import { createContext, useContext, type ReactNode } from "react"
 import { useTrial } from "@/hooks/use-trial"
 
-export type ReadOnlyReason = "time" | "cap" | null
+export type ReadOnlyReason = "time" | "cap" | "payment_overdue" | null
 
 interface ReadOnlyState {
   isReadOnly: boolean
@@ -42,11 +42,22 @@ export function ReadOnlyProvider({ children }: { children: ReactNode }) {
     trial.subscriptionStatus === "expired" ||
     (!trial.trialActive && trial.subscriptionStatus === "trial")
 
-  const isReadOnly = !trial.loading && (timeExpired || reason !== null)
+  // Payment overdue: past_due AND current_period_end is in the past
+  const periodEnd = (trial as any).currentPeriodEnd
+    ? new Date((trial as any).currentPeriodEnd)
+    : null
+  const paymentOverdue =
+    trial.subscriptionStatus === "past_due" &&
+    (!periodEnd || periodEnd.getTime() < Date.now())
+
+  const isReadOnly =
+    !trial.loading && (timeExpired || reason !== null || paymentOverdue)
 
   // If the backend didn't tell us why, infer from state.
   const effectiveReason: ReadOnlyReason = isReadOnly
-    ? reason ?? (timeExpired ? "time" : null)
+    ? paymentOverdue
+      ? "payment_overdue"
+      : reason ?? (timeExpired ? "time" : null)
     : null
 
   return (

@@ -1,6 +1,7 @@
 """Endpoints de documentos — integração SAP DRC."""
 
 import base64
+import logging
 import threading
 import uuid
 from datetime import datetime, timezone
@@ -10,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from db.supabase import get_supabase_client
 from middleware.lgpd import mask_cnpj
-from middleware.security import verify_api_key
+from middleware.security import verify_api_key, verify_api_key_with_trial
 from models.schemas import (
     ConfirmarResponse,
     DocumentoOut,
@@ -22,7 +23,10 @@ from models.schemas import (
     SefazStatusResponse,
 )
 from scheduler.polling_job import run_retroactive_job
+from services.billing.consumption import increment_consumption
 from services.sefaz_client import sefaz_client
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -36,7 +40,7 @@ async def listar_documentos(
         True,
         description="Incluir resumos pendentes de manifestação (modo manual)",
     ),
-    auth: dict = Depends(verify_api_key),
+    auth: dict = Depends(verify_api_key_with_trial),
 ):
     """Lista documentos para um CNPJ/tipo.
 
@@ -112,15 +116,23 @@ async def listar_documentos(
 @router.post("/documentos/{chave}/confirmar", response_model=ConfirmarResponse)
 async def confirmar_documento(
     chave: str,
-    auth: dict = Depends(verify_api_key),
+    auth: dict = Depends(verify_api_key_with_trial),
 ):
     """Confirma entrega do documento e descarta o XML do banco.
 
     O SAP DRC chama este endpoint após processar cada documento.
+
+    Este é o ponto onde o contador do trial avança. A captura em si não
+    conta — apenas quando o SAP confirma que recebeu e processou, marcamos
+    como consumido contra o trial_cap. Mesmo racional pro contador mensal
+    de planos pagos (docs_consumidos_mes).
     """
     sb = get_supabase_client()
     tenant_id = auth["tenant_id"]
 
+    # Transição atômica available → delivered.
+    # O filtro `status=available` garante idempotência: se o SAP chamar 2x
+    # pra mesma chave, a segunda chamada retorna 404 (não duplica contagem).
     result = sb.table("documents").update({
         "status": "delivered",
         "xml_content": None,
@@ -139,6 +151,16 @@ async def confirmar_documento(
             detail=f"Documento {chave} não encontrado ou já confirmado",
         )
 
+    # Incrementa contador de consumo (trial ou mensal). Graceful — contador
+    # nunca quebra a confirmação em si.
+    try:
+        increment_consumption(tenant_id, count=1)
+    except Exception as exc:  # noqa: BLE001 — contador nunca quebra confirmação
+        logger.warning(
+            "falha ao incrementar contador de consumo para tenant %s chave %s: %s",
+            tenant_id, chave, exc,
+        )
+
     return ConfirmarResponse(status="discarded")
 
 
@@ -149,7 +171,7 @@ async def confirmar_documento(
 )
 async def consulta_retroativa(
     body: RetroativoRequest,
-    auth: dict = Depends(verify_api_key),
+    auth: dict = Depends(verify_api_key_with_trial),
 ):
     """Inicia consulta retroativa de documentos em período específico.
 

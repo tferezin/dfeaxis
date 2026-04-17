@@ -270,14 +270,19 @@ class SefazClient:
                 for dz in doc_zips:
                     if hasattr(dz, '_value_1'):
                         b64_content = dz._value_1
-                        nsu = getattr(dz, 'NSU', '') or ''
+                        nsu_raw = getattr(dz, 'NSU', '') or ''
                         schema = getattr(dz, 'schema', '') or ''
                     elif isinstance(dz, dict):
                         b64_content = dz.get('_value_1', '')
-                        nsu = dz.get('NSU', '')
+                        nsu_raw = dz.get('NSU', '')
                         schema = dz.get('schema', '')
                     else:
                         continue
+                    # Normaliza NSU para 15 chars zero-padded. SEFAZ ocasionalmente
+                    # retorna sem padding, o que corrompia ordenação lexicográfica
+                    # no banco (text "1094" > "01820044") e gerava gaps fantasma
+                    # no nsu_controller.
+                    nsu = str(nsu_raw or '').strip().zfill(15)
                     if b64_content:
                         try:
                             xml_bytes = gzip.decompress(base64.b64decode(b64_content))
@@ -304,14 +309,15 @@ class SefazClient:
         # Extrai campos do retDistDFeInt
         cstat = self._find_text(root, ".//ns:cStat", nsmap) or "999"
         xmotivo = self._find_text(root, ".//ns:xMotivo", nsmap) or ""
-        ult_nsu = self._find_text(root, ".//ns:ultNSU", nsmap) or "000000000000000"
-        max_nsu = self._find_text(root, ".//ns:maxNSU", nsmap) or ult_nsu
+        ult_nsu = (self._find_text(root, ".//ns:ultNSU", nsmap) or "").strip().zfill(15) or "000000000000000"
+        max_nsu = (self._find_text(root, ".//ns:maxNSU", nsmap) or "").strip().zfill(15) or ult_nsu
 
         documents: list[SefazDocument] = []
 
         # Extrai documentos dos loteDistDFe/docZip
         for doc_zip in root.iter(f"{{{ns}}}docZip"):
-            nsu = doc_zip.get("NSU", "")
+            # Normaliza NSU pra 15 chars zero-padded (ver comentário acima)
+            nsu = str(doc_zip.get("NSU", "") or "").strip().zfill(15)
             schema = doc_zip.get("schema", "")
 
             # Conteúdo é base64 + gzip

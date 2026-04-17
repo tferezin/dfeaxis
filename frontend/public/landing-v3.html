@@ -525,7 +525,6 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
       <button class="cta-p" onclick="DFEAXIS_CONVERT('cta_hero',{value:50});window.location.href='/signup'">Criar conta — 10 dias grátis</button>
       <button class="cta-s" onclick="document.getElementById('features').scrollIntoView({behavior:'smooth'})">Ver como funciona</button>
     </div>
-    <a href="mailto:contato@dfeaxis.com.br" class="hero-tertiary">Prefere uma demonstração? Fale com um especialista <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg></a>
     <div style="margin-top:18px;display:flex;align-items:center;justify-content:center;gap:20px;flex-wrap:wrap">
       <span style="font-size:12px;font-weight:600;color:var(--tx2);display:flex;align-items:center;gap:6px">
         <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="var(--gr-m)" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
@@ -1005,7 +1004,7 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
   <div class="foot-in">
     <div class="foot-logo"><img src="/logo-dfeaxis.png" alt="DFeAxis" height="56" style="height:56px;object-fit:contain"></div>
     <div class="foot-links"><a href="/privacidade">Privacidade</a><a href="/termos">Termos</a><a href="/docs">API Docs</a><a href="mailto:contato@dfeaxis.com.br">Contato</a></div>
-    <div class="foot-note">&copy; 2026 DFeAxis &middot; Demonstração &mdash; nenhum dado fiscal real é processado</div>
+    <div class="foot-note">&copy; 2026 DFeAxis &middot; Captura automática de documentos fiscais</div>
 <p style="font-size:11.5px;color:var(--tx3);margin-top:16px;line-height:1.6">
   O DFeAxis monitora e distribui documentos fiscais <strong>recebidos</strong>
   de fornecedores e transportadoras (NF-e, CT-e, MDF-e). Desenvolvido para o
@@ -1105,7 +1104,9 @@ function openAuth(t) {
     <div style="font-size:13.5px;font-weight:600;color:#fff">Automatize a captura de NF-e, CT-e e MDF-e dos seus fornecedores</div>
     <div style="font-size:12px;color:rgba(255,255,255,.55);margin-top:2px">10 dias grátis · sem cartão · sem armazenamento de XMLs</div>
   </div>
-  <a href="/signup" style="background:#fff;color:var(--gr);padding:10px 22px;border-radius:8px;font-size:13.5px;font-weight:700;text-decoration:none;white-space:nowrap">Começar grátis →</a>
+  <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
+    <a href="/signup" style="background:#fff;color:var(--gr);padding:10px 22px;border-radius:8px;font-size:13.5px;font-weight:700;text-decoration:none;white-space:nowrap">Começar grátis →</a>
+  </div>
 </div>
 <!-- Chat widget (bot comercial) -->
 <script src="/chat-widget.js" defer></script>

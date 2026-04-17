@@ -157,10 +157,30 @@ def sanitize_text(text: str) -> str:
 # Response sanitizer middleware
 # ---------------------------------------------------------------------------
 
+# Rotas onde o sanitizer NÃO roda — clientes legítimos (SAP DRC, dashboard)
+# precisam do CNPJ real pra rotear documentos fiscais. Mascarar aqui quebra
+# a integração core. Rotas admin/auth/tenants continuam sanitizadas pra não
+# vazar PII em logs de erro / respostas de debug.
+_SANITIZE_WHITELIST_PREFIXES = (
+    "/api/v1/documentos",
+    "/api/v1/certificates",
+    "/api/v1/nfse",
+    "/api/v1/manifestacao",
+    "/sap-drc/",       # todo o layer SAP DRC compatibility
+    "/api/v1/sefaz/",  # status endpoints SEFAZ
+)
+
+
+def _is_sanitize_whitelisted(path: str) -> bool:
+    return any(path.startswith(prefix) for prefix in _SANITIZE_WHITELIST_PREFIXES)
+
+
 class ResponseSanitizerMiddleware(BaseHTTPMiddleware):
     """Scans JSON response bodies and masks accidentally leaked sensitive data.
 
     Only processes application/json responses.  Skips streaming responses.
+    Rotas de dados fiscais legítimos (ver _SANITIZE_WHITELIST_PREFIXES) são
+    puladas — CNPJs de emitente/destinatário devem passar raw para o cliente.
     """
 
     async def dispatch(self, request: Request, call_next) -> Response:
@@ -171,6 +191,11 @@ class ResponseSanitizerMiddleware(BaseHTTPMiddleware):
         if "application/json" not in content_type:
             return response
         if isinstance(response, StreamingResponse):
+            return response
+
+        # Skip whitelisted routes (data that must be returned unmasked —
+        # SAP DRC precisa do CNPJ real pra rotear documentos)
+        if _is_sanitize_whitelisted(request.url.path):
             return response
 
         # Read body

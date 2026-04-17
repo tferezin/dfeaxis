@@ -221,14 +221,32 @@ def _on_subscription_change(subscription: dict) -> str | None:
 
 
 def _on_invoice_paid(invoice: dict) -> str | None:
-    """Renewal payment succeeded — keep tenant active."""
+    """Renewal payment succeeded — keep tenant active and reset monthly counter.
+
+    Stripe manda invoice.paid tanto na compra inicial quanto em cada renewal.
+    Resetamos docs_consumidos_mes=0 em ambos os casos: no primeiro o campo já
+    é 0 (no-op), no renewal é o fix do bug onde o contador não zerava no ciclo
+    seguinte e o cliente ficava bloqueado mesmo tendo pago.
+    """
     subscription_id = invoice.get("subscription")
     if not subscription_id:
         return None
     stripe = get_stripe()
     sub = stripe.Subscription.retrieve(subscription_id)
     sync_subscription_to_db(sub)
-    return (sub.get("metadata") or {}).get("tenant_id")
+
+    tenant_id = (sub.get("metadata") or {}).get("tenant_id")
+    if tenant_id:
+        sb = get_supabase_client()
+        sb.table("tenants").update({"docs_consumidos_mes": 0}).eq(
+            "id", tenant_id
+        ).execute()
+        logger.info(
+            "Reset docs_consumidos_mes=0 for tenant %s (invoice.paid renewal)",
+            tenant_id,
+        )
+
+    return tenant_id
 
 
 def _on_invoice_failed(invoice: dict) -> str | None:

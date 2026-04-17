@@ -7,13 +7,14 @@ Mounted at /sap-drc prefix in main.py.
 """
 
 import logging
-import xml.etree.ElementTree as ET
+from lxml import etree
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
 from db.supabase import get_supabase_client
-from middleware.security import verify_api_key
+from middleware.security import verify_api_key_with_trial
+from services.billing.consumption import increment_consumption
 from models.sap_drc_schemas import (
     EventFragment,
     InboundInvoiceDeleteRequest,
@@ -42,7 +43,7 @@ UF_CODE_MAP = {
 }
 
 
-def _find_text(root: ET.Element, xpath: str) -> str:
+def _find_text(root: etree._Element, xpath: str) -> str:
     """Find text at xpath with NF-e namespace, return empty string if missing."""
     el = root.find(xpath, NS)
     return el.text.strip() if el is not None and el.text else ""
@@ -55,8 +56,8 @@ def parse_nfe_xml(xml_str: str) -> dict:
     Returns a dict with keys matching NotaFiscalFragment field names.
     """
     try:
-        root = ET.fromstring(xml_str)
-    except ET.ParseError:
+        root = etree.fromstring(xml_str)
+    except etree.XMLSyntaxError:
         return {}
 
     # Strip namespace prefix for tag comparison
@@ -140,8 +141,8 @@ def parse_nfe_xml(xml_str: str) -> dict:
 def _extract_chave_from_xml(xml_str: str) -> str:
     """Extract the chave de acesso (access key) from an NF-e XML string."""
     try:
-        root = ET.fromstring(xml_str)
-    except ET.ParseError:
+        root = etree.fromstring(xml_str)
+    except etree.XMLSyntaxError:
         return ""
 
     root_tag = root.tag.split("}")[-1] if "}" in root.tag else root.tag
@@ -165,8 +166,8 @@ def _extract_chave_from_xml(xml_str: str) -> str:
 def _extract_cnpj_dest_from_xml(xml_str: str) -> str:
     """Extract the CNPJ destinatario from an NF-e XML string."""
     try:
-        root = ET.fromstring(xml_str)
-    except ET.ParseError:
+        root = etree.fromstring(xml_str)
+    except etree.XMLSyntaxError:
         return ""
 
     # Try with namespace
@@ -195,7 +196,7 @@ async def health():
 )
 async def retrieve_inbound_invoices(
     body: InboundInvoiceRetrieveRequest,
-    auth: dict = Depends(verify_api_key),
+    auth: dict = Depends(verify_api_key_with_trial),
 ):
     """Retrieve inbound NF-e documents for the given CNPJs.
 
@@ -258,7 +259,7 @@ async def download_official_document(
     accessKey: str = Query(..., description="Chave de acesso (44 digits)"),
     eventSequence: str | None = Query(None),
     eventType: str | None = Query(None),
-    auth: dict = Depends(verify_api_key),
+    auth: dict = Depends(verify_api_key_with_trial),
 ):
     """Download the XML file of an official document.
 
@@ -291,7 +292,7 @@ async def download_official_document(
 @router.post("/v1/receiveOfficialDocument", status_code=202)
 async def receive_official_document(
     body: OfficialDocumentReceiveRequest,
-    auth: dict = Depends(verify_api_key),
+    auth: dict = Depends(verify_api_key_with_trial),
 ):
     """Receive an NF-e XML document (push model).
 
@@ -358,12 +359,14 @@ async def receive_official_document(
 @router.delete("/v1/deleteInboundInvoices", status_code=204)
 async def delete_inbound_invoices(
     body: InboundInvoiceDeleteRequest,
-    auth: dict = Depends(verify_api_key),
+    auth: dict = Depends(verify_api_key_with_trial),
 ):
     """Delete (confirm delivery of) inbound invoices by UUID list.
 
     Marks documents as 'delivered' and clears the XML content.
-    This is equivalent to the confirmar endpoint in our native API.
+    This is equivalent to the confirmar endpoint in our native API and is
+    the point where the trial/monthly counter advances (same racional do
+    /documentos/{chave}/confirmar nativo).
     """
     if not body.uuidList:
         raise HTTPException(status_code=400, detail="No UUID informed")
@@ -371,12 +374,36 @@ async def delete_inbound_invoices(
     sb = get_supabase_client()
     tenant_id = auth["tenant_id"]
 
+    # Transição atômica available → delivered por UUID. O filtro
+    # status=available garante idempotência: se o SAP chamar 2x com o mesmo
+    # UUID, a segunda chamada não conta nada (result.data vazio).
+    confirmed_count = 0
     for doc_uuid in body.uuidList:
-        sb.table("documents").update({
+        result = sb.table("documents").update({
             "status": "delivered",
             "xml_content": None,
             "delivered_at": datetime.now(timezone.utc).isoformat(),
-        }).eq("id", doc_uuid).eq("tenant_id", tenant_id).execute()
+        }).eq(
+            "id", doc_uuid,
+        ).eq(
+            "tenant_id", tenant_id,
+        ).eq(
+            "status", "available",
+        ).execute()
+
+        if result.data:
+            confirmed_count += 1
+
+    # Incrementa contador de consumo apenas pelos docs que de fato
+    # transicionaram. Graceful — contador nunca quebra a confirmação.
+    if confirmed_count > 0:
+        try:
+            increment_consumption(tenant_id, count=confirmed_count)
+        except Exception as exc:  # noqa: BLE001 — contador nunca quebra confirmação
+            logger.warning(
+                "falha ao incrementar contador de consumo (SAP DRC batch) para tenant %s: %s",
+                tenant_id, exc,
+            )
 
     return Response(status_code=204)
 
@@ -386,11 +413,13 @@ async def delete_official_document(
     accessKey: str = Query(..., description="Chave de acesso"),
     eventSequence: str | None = Query(None),
     eventType: str | None = Query(None),
-    auth: dict = Depends(verify_api_key),
+    auth: dict = Depends(verify_api_key_with_trial),
 ):
     """Delete the XML of an official document by access key.
 
-    Marks the document as 'delivered' and clears XML content.
+    Marks the document as 'delivered' and clears XML content. Avança o
+    contador de consumo (trial ou mensal) exatamente como o endpoint
+    nativo /documentos/{chave}/confirmar.
     """
     if not accessKey:
         raise HTTPException(status_code=400, detail="Invalid accessKey")
@@ -398,6 +427,8 @@ async def delete_official_document(
     sb = get_supabase_client()
     tenant_id = auth["tenant_id"]
 
+    # Filtro status=available garante idempotência: chamada repetida retorna
+    # 404 em vez de contar 2x o mesmo documento.
     result = (
         sb.table("documents")
         .update({
@@ -407,10 +438,21 @@ async def delete_official_document(
         })
         .eq("tenant_id", tenant_id)
         .eq("chave_acesso", accessKey)
+        .eq("status", "available")
         .execute()
     )
 
     if not result.data:
         raise HTTPException(status_code=404, detail="Document not found")
+
+    # Incrementa contador de consumo. Graceful — contador nunca quebra
+    # a confirmação em si.
+    try:
+        increment_consumption(tenant_id, count=1)
+    except Exception as exc:  # noqa: BLE001 — contador nunca quebra confirmação
+        logger.warning(
+            "falha ao incrementar contador de consumo (SAP DRC single) para tenant %s chave %s: %s",
+            tenant_id, accessKey, exc,
+        )
 
     return Response(status_code=204)

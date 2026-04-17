@@ -68,13 +68,13 @@ interface NfeRow {
 
 const statusConfig: Record<NfeStatus, { label: string; description: string; className: string }> = {
   Pendente: {
-    label: "Pendente",
-    description: "Resumo detectado, aguardando ciência",
+    label: "Pendente Manifesto",
+    description: "Resumo detectado, aguardando ciencia",
     className: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
   },
   Ciencia: {
     label: "Ciencia",
-    description: "Ciência enviada, aguardando XML completo",
+    description: "Ciencia enviada, aguardando XML completo",
     className: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
   },
   Disponivel: {
@@ -84,7 +84,7 @@ const statusConfig: Record<NfeStatus, { label: string; description: string; clas
   },
   Entregue: {
     label: "Entregue",
-    description: "SAP já baixou e confirmou",
+    description: "SAP ja baixou e confirmou",
     className: "bg-gray-100 text-gray-600 dark:bg-gray-800/50 dark:text-gray-400",
   },
   Cancelada: {
@@ -349,15 +349,32 @@ export default function HistoricoNfePage() {
       expired: "Cancelada",
     }
 
-    const mappedData = realData.map((doc, i) => ({
-      id: i,
-      chave: doc.chave_acesso || "",
-      cnpj: doc.cnpj || "",
-      status: statusMap[doc.status] || (doc.is_resumo ? "Pendente" : "Disponivel"),
-      nsu: doc.nsu || "",
-      fetchedAt: doc.fetched_at ? new Date(doc.fetched_at).toLocaleString("pt-BR") : "",
-      manifestacao: doc.manifestacao_status || "",
-    }))
+    const manifestacaoToStatus: Record<string, NfeStatus> = {
+      pendente: "Pendente",
+      ciencia: "Ciencia",
+      confirmada: "Disponivel",
+    }
+
+    const mappedData = realData.map((doc, i) => {
+      // Prioritize manifestacao_status for NF-e lifecycle
+      let status: NfeStatus
+      if (doc.manifestacao_status && manifestacaoToStatus[doc.manifestacao_status]) {
+        status = manifestacaoToStatus[doc.manifestacao_status]
+      } else {
+        status = statusMap[doc.status] || (doc.is_resumo ? "Pendente" : "Disponivel")
+      }
+      return {
+        id: i,
+        chave: doc.chave_acesso || "",
+        cnpj: doc.cnpj || "",
+        cnpjEmitente: doc.cnpj_emitente || null,
+        razaoSocialEmitente: doc.razao_social_emitente || null,
+        status,
+        nsu: doc.nsu || "",
+        fetchedAt: doc.fetched_at ? new Date(doc.fetched_at).toLocaleString("pt-BR") : "",
+        manifestacao: doc.manifestacao_status || "",
+      }
+    })
 
     const filteredReal = mappedData.filter((row) => {
       if (statusFilter !== "Todos" && row.status !== statusFilter) return false
@@ -396,7 +413,8 @@ export default function HistoricoNfePage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="Todos">Todos</SelectItem>
-                <SelectItem value="Pendente">Pendente</SelectItem>
+                <SelectItem value="Pendente">Pendente Manifesto</SelectItem>
+                <SelectItem value="Ciencia">Ciencia</SelectItem>
                 <SelectItem value="Disponivel">Disponivel</SelectItem>
                 <SelectItem value="Entregue">Entregue</SelectItem>
                 <SelectItem value="Cancelada">Cancelada</SelectItem>
@@ -432,16 +450,46 @@ export default function HistoricoNfePage() {
           </div>
         ) : (
           <>
+            {/* Pendente action banner — always visible when there are pendente docs */}
+            {(() => {
+              const pendenteCount = mappedData.filter((r) => r.status === "Pendente").length
+              return pendenteCount > 0 && selectedChaves.size === 0 ? (
+                <div className="flex items-center justify-between rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30 px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex size-2.5 rounded-full bg-amber-500" />
+                    <span className="text-sm font-medium text-amber-900 dark:text-amber-200">
+                      {pendenteCount} NF-e pendente{pendenteCount > 1 ? "s" : ""} de manifesto
+                    </span>
+                    <span className="text-xs text-amber-700 dark:text-amber-400">
+                      — selecione documentos na tabela para dar ciencia em lote
+                    </span>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="gap-1.5"
+                    disabled={manifLoading}
+                    onClick={() => {
+                      const pendentes = mappedData.filter((r) => r.status === "Pendente")
+                      setSelectedChaves(new Set(pendentes.map((r) => r.chave)))
+                    }}
+                  >
+                    <CheckCircle2 className="size-3.5" />
+                    Selecionar Todas Pendentes
+                  </Button>
+                </div>
+              ) : null
+            })()}
+
             {/* Batch action bar */}
             {selectedChaves.size > 0 && (
               <div className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2.5">
                 <span className="text-sm font-medium">{selectedChaves.size} selecionada(s)</span>
                 <Button size="sm" className="h-7 gap-1.5 text-xs" disabled={manifLoading} onClick={handleBatchCiencia}>
                   <CheckCircle2 className="size-3.5" />
-                  {manifLoading ? "Enviando..." : `Dar Ciência em Lote (${selectedChaves.size})`}
+                  {manifLoading ? "Enviando..." : `Dar Ciencia em Lote (${selectedChaves.size})`}
                 </Button>
                 <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setSelectedChaves(new Set())}>
-                  Limpar seleção
+                  Limpar selecao
                 </Button>
               </div>
             )}
@@ -473,7 +521,7 @@ export default function HistoricoNfePage() {
                       />
                     </TableHead>
                     <TableHead>Chave de Acesso</TableHead>
-                    <TableHead>CNPJ</TableHead>
+                    <TableHead>Fornecedor</TableHead>
                     <TableHead>NSU</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Manifestação</TableHead>
@@ -497,7 +545,21 @@ export default function HistoricoNfePage() {
                       <TableCell className="max-w-[220px] truncate font-mono text-xs">
                         {row.chave}
                       </TableCell>
-                      <TableCell className="font-mono text-xs">{row.cnpj}</TableCell>
+                      <TableCell>
+                        <div>
+                          {row.razaoSocialEmitente && (
+                            <p className="text-xs font-medium text-foreground truncate max-w-[180px]">
+                              {row.razaoSocialEmitente}
+                            </p>
+                          )}
+                          <p className="font-mono text-xs text-muted-foreground">
+                            {row.cnpjEmitente || row.cnpj}
+                            {!row.cnpjEmitente && (
+                              <span className="ml-1 text-[10px] text-amber-600" title="CNPJ do certificado (emitente indisponivel)">(cert)</span>
+                            )}
+                          </p>
+                        </div>
+                      </TableCell>
                       <TableCell className="font-mono text-xs">{row.nsu}</TableCell>
                       <TableCell>
                         <StatusBadge status={row.status} />

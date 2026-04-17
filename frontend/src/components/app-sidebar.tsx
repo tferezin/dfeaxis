@@ -10,6 +10,7 @@ import {
   Truck,
   Building2,
   FileStack,
+  FileCheck,
   Building,
   ShieldCheck,
   Key,
@@ -20,6 +21,7 @@ import {
   Play,
   ScrollText,
   Rocket,
+  Shield,
 } from "lucide-react"
 
 import { supabase } from "@/lib/supabase"
@@ -89,6 +91,7 @@ const navigation: NavSection[] = [
       { title: "CT-e Recebidos", href: "/historico/cte", icon: Truck, badge: "SAP" },
       { title: "NFS-e Recebidas", href: "/historico/nfse", icon: Building2, badge: "ADN" },
       { title: "MDF-e Recebidos", href: "/historico/mdfe", icon: FileStack },
+      { title: "Manifestação", href: "/historico/manifestacao", icon: FileCheck },
     ],
   },
   {
@@ -233,9 +236,22 @@ function UserFooter() {
   )
 }
 
+const ADMIN_EMAILS = ["ferezinth@hotmail.com", "ferezaeai@gmail.com"]
+
 export function AppSidebar() {
   const pathname = usePathname()
   const { settings } = useSettings()
+  const [isAdmin, setIsAdmin] = React.useState(false)
+
+  React.useEffect(() => {
+    if (supabase) {
+      supabase.auth.getUser().then(({ data }) => {
+        if (data.user && ADMIN_EMAILS.includes(data.user.email ?? "")) {
+          setIsAdmin(true)
+        }
+      })
+    }
+  }, [])
 
   return (
     <Sidebar collapsible="icon">
@@ -286,6 +302,26 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {/* Admin — only visible for admin users */}
+        {isAdmin && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Administração</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    isActive={pathname?.startsWith("/admin")}
+                    render={<Link href="/admin" />}
+                  >
+                    <Shield className="size-4" />
+                    <span>Admin</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       <UserFooter />

@@ -117,13 +117,18 @@ def sync_subscription_to_db(stripe_subscription: dict) -> None:
 
 
 def _map_status(stripe_status: str | None) -> str:
-    """Maps Stripe subscription.status → our subscription_status enum."""
+    """Maps Stripe subscription.status → our subscription_status enum.
+
+    past_due / unpaid → 'past_due' (not 'expired'). The middleware checks
+    current_period_end to decide whether to grant a grace period (access
+    until end of paid cycle) or block with PAYMENT_OVERDUE.
+    """
     if not stripe_status:
         return "expired"
     if stripe_status in ACTIVE_STATUSES:
         return "active"
     if stripe_status in PAST_DUE_STATUSES:
-        return "expired"  # treat as no-access; user fixes via portal
+        return "past_due"
     if stripe_status in ENDED_STATUSES:
         return "cancelled"
     return "expired"  # incomplete, paused, etc — no access
