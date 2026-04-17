@@ -425,11 +425,13 @@ def _poll_single_detailed(cert: dict, tipo: str, tenant_data: dict) -> dict:
         #             tenant_id, total_docs_saved, e,
         #         )
 
-        # Auto-ciência: envia 210210 pra resumos NF-e capturados neste trigger
+        # Auto-ciência: envia 210210 pra resumos NF-e capturados neste trigger.
+        # Ciência é obrigatória pelo protocolo SEFAZ — dispara sempre para NFe,
+        # a menos que o tenant opte explicitamente por 'manual_only'.
         if (
             tipo == "nfe"
             and total_docs_saved > 0
-            and tenant_data.get("manifestacao_mode") == "auto_ciencia"
+            and tenant_data.get("manifestacao_mode") != "manual_only"
         ):
             try:
                 # Busca docs recém-salvos que são resumos pendentes de ciência
@@ -663,8 +665,9 @@ def _poll_single(cert: dict, tipo: str, tenant_data: dict) -> int:
                 row, on_conflict="tenant_id,chave_acesso"
             ).execute()
 
-        # Se modo auto_ciencia e há resumos NF-e, envia Ciência automaticamente
-        if tipo == "nfe" and tenant_data.get("manifestacao_mode") == "auto_ciencia":
+        # Ciência é obrigatória pelo protocolo SEFAZ — dispara sempre para NFe,
+        # a menos que o tenant opte explicitamente por 'manual_only'.
+        if tipo == "nfe" and tenant_data.get("manifestacao_mode") != "manual_only":
             _auto_ciencia(
                 docs_to_save,
                 cert, tenant_id, pfx_encrypted, pfx_iv, pfx_password,

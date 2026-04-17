@@ -694,10 +694,10 @@ export default function DashboardPage() {
                 { label: "Autorizadas", value: "R$ 2.847.320,45", amount: 2847320, color: "text-emerald-600", bgColor: "bg-emerald-500" },
                 { label: "Canceladas", value: "R$ 63.250,00", amount: 63250, color: "text-gray-500", bgColor: "bg-gray-400" },
               ] : [
-                ...(realNfeTotal > 0 ? [{ label: `NF-e (${realCounts.nfe})`, value: fmt(realNfeTotal), amount: realNfeTotal, color: "text-blue-600", bgColor: "bg-blue-500" }] : []),
-                ...(realCteTotal > 0 ? [{ label: `CT-e (${realCounts.cte})`, value: fmt(realCteTotal), amount: realCteTotal, color: "text-violet-600", bgColor: "bg-violet-500" }] : []),
-                ...(realMdfeTotal > 0 ? [{ label: `MDF-e (${realCounts.mdfe})`, value: fmt(realMdfeTotal), amount: realMdfeTotal, color: "text-emerald-600", bgColor: "bg-emerald-500" }] : []),
-                ...(realNfseTotal > 0 ? [{ label: `NFS-e (${realCounts.nfse})`, value: fmt(realNfseTotal), amount: realNfseTotal, color: "text-amber-600", bgColor: "bg-amber-500" }] : []),
+                ...(realCounts.nfe > 0 ? [{ label: `NF-e (${realCounts.nfe})`, value: realNfeTotal > 0 ? fmt(realNfeTotal) : "valor pendente", amount: realNfeTotal, color: "text-blue-600", bgColor: "bg-blue-500" }] : []),
+                ...(realCounts.cte > 0 ? [{ label: `CT-e (${realCounts.cte})`, value: realCteTotal > 0 ? fmt(realCteTotal) : "valor pendente", amount: realCteTotal, color: "text-violet-600", bgColor: "bg-violet-500" }] : []),
+                ...(realCounts.mdfe > 0 ? [{ label: `MDF-e (${realCounts.mdfe})`, value: realMdfeTotal > 0 ? fmt(realMdfeTotal) : "valor pendente", amount: realMdfeTotal, color: "text-emerald-600", bgColor: "bg-emerald-500" }] : []),
+                ...(realCounts.nfse > 0 ? [{ label: `NFS-e (${realCounts.nfse})`, value: realNfseTotal > 0 ? fmt(realNfseTotal) : "valor pendente", amount: realNfseTotal, color: "text-amber-600", bgColor: "bg-amber-500" }] : []),
               ]}
             />
           )
