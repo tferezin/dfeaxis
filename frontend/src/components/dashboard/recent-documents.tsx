@@ -150,6 +150,8 @@ interface RealDocument {
   numero_documento?: string | null
   data_emissao?: string | null
   valor_total?: number | null
+  is_resumo?: boolean | null
+  manifestacao_status?: string | null
 }
 
 const tipoLabels: Record<string, string> = { NFE: "NF-e", CTE: "CT-e", MDFE: "MDF-e", NFSE: "NFS-e" }
@@ -219,18 +221,40 @@ export function RecentDocuments({ empty = false, documents }: { empty?: boolean;
               <TableRow key={i} className="group cursor-pointer">
                 <TableCell className="pl-4">
                   <div>
-                    <p className="font-medium text-foreground text-sm">
-                      {doc.razao_social_emitente || "—"}
-                    </p>
-                    <p className="font-mono text-xs text-muted-foreground">
-                      {formatCnpj(doc.cnpj_emitente)}
-                    </p>
+                    {doc.razao_social_emitente ? (
+                      <>
+                        <p className="font-medium text-foreground text-sm">
+                          {doc.razao_social_emitente}
+                        </p>
+                        <p className="font-mono text-xs text-muted-foreground">
+                          {formatCnpj(doc.cnpj_emitente)}
+                        </p>
+                      </>
+                    ) : doc.is_resumo ? (
+                      <p className="text-xs italic text-muted-foreground">
+                        {doc.manifestacao_status === "ciencia" || doc.manifestacao_status === "confirmada"
+                          ? "Aguardando XML completo"
+                          : `Resumo ${tipoLabels[doc.tipo] || doc.tipo}`}
+                      </p>
+                    ) : (
+                      <>
+                        <p className="font-medium text-foreground text-sm">—</p>
+                        <p className="font-mono text-xs text-muted-foreground">
+                          {formatCnpj(doc.cnpj_emitente)}
+                        </p>
+                      </>
+                    )}
                   </div>
                 </TableCell>
                 <TableCell className="text-muted-foreground text-sm">
                   {doc.data_emissao
                     ? new Date(doc.data_emissao).toLocaleDateString("pt-BR")
-                    : new Date(doc.fetched_at).toLocaleDateString("pt-BR")}
+                    : (
+                      <span>
+                        {new Date(doc.fetched_at).toLocaleDateString("pt-BR")}
+                        <span className="text-xs text-muted-foreground/70 ml-1">(captura)</span>
+                      </span>
+                    )}
                 </TableCell>
                 <TableCell>
                   <span className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold", tipoColors[doc.tipo] || "bg-gray-50 text-gray-700")}>
@@ -238,7 +262,7 @@ export function RecentDocuments({ empty = false, documents }: { empty?: boolean;
                   </span>
                 </TableCell>
                 <TableCell className="font-mono text-xs text-muted-foreground">
-                  {doc.numero_documento || "—"}
+                  {doc.numero_documento || (doc.is_resumo ? <span className="italic">resumo</span> : "—")}
                 </TableCell>
                 <TableCell className="font-mono text-xs text-muted-foreground">
                   {doc.nsu}
@@ -247,12 +271,39 @@ export function RecentDocuments({ empty = false, documents }: { empty?: boolean;
                   {formatValor(doc.valor_total)}
                 </TableCell>
                 <TableCell className="pr-4 text-right">
-                  <span className={cn(
-                    "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset",
-                    doc.status === "available" ? statusStyles.Disponivel : doc.status === "delivered" ? statusStyles.Entregue : statusStyles.Pendente
-                  )}>
-                    {doc.status === "available" ? "Disponível" : doc.status === "delivered" ? "Entregue" : doc.status}
-                  </span>
+                  {(() => {
+                    let label: string
+                    let style: string
+                    if (doc.status === "delivered") {
+                      label = "Entregue"
+                      style = statusStyles.Entregue
+                    } else if (doc.status === "expired") {
+                      label = "Cancelada"
+                      style = statusStyles.Cancelada
+                    } else if (doc.is_resumo) {
+                      if (doc.manifestacao_status === "ciencia" || doc.manifestacao_status === "confirmada") {
+                        label = "Ciência Enviada"
+                        style = "bg-blue-50 text-blue-700 ring-blue-600/20"
+                      } else {
+                        label = "Aguardando Ciência"
+                        style = statusStyles.Pendente
+                      }
+                    } else if (doc.status === "available") {
+                      label = "Disponível"
+                      style = statusStyles.Disponivel
+                    } else {
+                      label = doc.status
+                      style = statusStyles.Pendente
+                    }
+                    return (
+                      <span className={cn(
+                        "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset",
+                        style
+                      )}>
+                        {label}
+                      </span>
+                    )
+                  })()}
                 </TableCell>
               </TableRow>
             ))}

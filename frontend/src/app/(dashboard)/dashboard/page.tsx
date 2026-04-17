@@ -169,6 +169,8 @@ export default function DashboardPage() {
     numero_documento?: string | null
     data_emissao?: string | null
     valor_total?: number | null
+    is_resumo?: boolean | null
+    manifestacao_status?: string | null
   }>>([])
   const [realNfeTotal, setRealNfeTotal] = useState(0)
   const [realCteTotal, setRealCteTotal] = useState(0)
@@ -316,6 +318,8 @@ export default function DashboardPage() {
         numero_documento?: string | null
         data_emissao?: string | null
         valor_total?: number | null
+        is_resumo?: boolean | null
+        manifestacao_status?: string | null
       }
       type AggregationRow = {
         tipo: string
@@ -331,7 +335,8 @@ export default function DashboardPage() {
             .from('documents')
             .select(
               'tipo, chave_acesso, cnpj, nsu, status, fetched_at, xml_content, ' +
-              'cnpj_emitente, razao_social_emitente, numero_documento, data_emissao, valor_total'
+              'cnpj_emitente, razao_social_emitente, numero_documento, data_emissao, valor_total, ' +
+              'is_resumo, manifestacao_status'
             )
         )
           .order('fetched_at', { ascending: false })
@@ -694,10 +699,10 @@ export default function DashboardPage() {
                 { label: "Autorizadas", value: "R$ 2.847.320,45", amount: 2847320, color: "text-emerald-600", bgColor: "bg-emerald-500" },
                 { label: "Canceladas", value: "R$ 63.250,00", amount: 63250, color: "text-gray-500", bgColor: "bg-gray-400" },
               ] : [
-                ...(realCounts.nfe > 0 ? [{ label: `NF-e (${realCounts.nfe})`, value: realNfeTotal > 0 ? fmt(realNfeTotal) : "valor pendente", amount: realNfeTotal, color: "text-blue-600", bgColor: "bg-blue-500" }] : []),
-                ...(realCounts.cte > 0 ? [{ label: `CT-e (${realCounts.cte})`, value: realCteTotal > 0 ? fmt(realCteTotal) : "valor pendente", amount: realCteTotal, color: "text-violet-600", bgColor: "bg-violet-500" }] : []),
-                ...(realCounts.mdfe > 0 ? [{ label: `MDF-e (${realCounts.mdfe})`, value: realMdfeTotal > 0 ? fmt(realMdfeTotal) : "valor pendente", amount: realMdfeTotal, color: "text-emerald-600", bgColor: "bg-emerald-500" }] : []),
-                ...(realCounts.nfse > 0 ? [{ label: `NFS-e (${realCounts.nfse})`, value: realNfseTotal > 0 ? fmt(realNfseTotal) : "valor pendente", amount: realNfseTotal, color: "text-amber-600", bgColor: "bg-amber-500" }] : []),
+                ...(realCounts.nfe > 0 ? [{ label: `NF-e (${realCounts.nfe})`, value: realNfeTotal > 0 ? fmt(realNfeTotal) : "aguardando XML", amount: realNfeTotal, color: "text-blue-600", bgColor: "bg-blue-500", hideBar: realNfeTotal === 0 }] : []),
+                ...(realCounts.cte > 0 ? [{ label: `CT-e (${realCounts.cte})`, value: realCteTotal > 0 ? fmt(realCteTotal) : "aguardando XML", amount: realCteTotal, color: "text-violet-600", bgColor: "bg-violet-500", hideBar: realCteTotal === 0 }] : []),
+                ...(realCounts.mdfe > 0 ? [{ label: `MDF-e (${realCounts.mdfe})`, value: realMdfeTotal > 0 ? fmt(realMdfeTotal) : "aguardando XML", amount: realMdfeTotal, color: "text-emerald-600", bgColor: "bg-emerald-500", hideBar: realMdfeTotal === 0 }] : []),
+                ...(realCounts.nfse > 0 ? [{ label: `NFS-e (${realCounts.nfse})`, value: realNfseTotal > 0 ? fmt(realNfseTotal) : "aguardando XML", amount: realNfseTotal, color: "text-amber-600", bgColor: "bg-amber-500", hideBar: realNfseTotal === 0 }] : []),
               ]}
             />
           )
