@@ -702,7 +702,7 @@ export default function DashboardPage() {
             />
           )
         })()}
-        <VolumeChart empty={false} realData={showMock ? undefined : realVolumeData} />
+        <VolumeChart empty={false} realData={showMock ? undefined : realVolumeData} competenciaId={isAllCompetencia ? undefined : selectedCompetencia} />
       </div>
 
       {/* Recent documents */}

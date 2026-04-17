@@ -190,9 +190,9 @@ export function RecentDocuments({ empty = false, documents }: { empty?: boolean;
               Últimos documentos fiscais recebidos
             </CardDescription>
           </div>
-          <button className="text-sm font-medium text-primary hover:underline">
-            Ver todos
-          </button>
+          <a href="/historico/nfe" className="text-sm font-medium text-primary hover:underline">
+            Ver histórico completo
+          </a>
         </div>
       </CardHeader>
       <CardContent className="px-0">
