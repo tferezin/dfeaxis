@@ -477,8 +477,8 @@ test.describe("SPOT: Landing page pública", () => {
     await page.goto("/")
     await page.waitForLoadState("domcontentloaded")
     await page.waitForTimeout(2000)
-    // Procura qualquer link ou botão que leve ao signup/trial
-    const cta = page.locator("a[href*='signup'], a[href*='login'], button").filter({ hasText: /cadastr|começar|trial|grátis|testar|criar|entrar/i }).first()
+    // Landing usa <button onclick="...href='/signup'"> e <a href="/signup">
+    const cta = page.locator("button, a").filter({ hasText: /Começar|Criar conta|grátis|testar/i }).first()
     await expect(cta).toBeVisible({ timeout: 10_000 })
   })
 })
