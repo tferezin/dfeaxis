@@ -15,9 +15,9 @@
       "Manifestação manual ou automática",
       "API REST + SAP DRC"
     ],
-    "stripe_product_id": "prod_UJmKtC3sNlftdF",
-    "price_id_monthly": "price_1TL8mFRt1dC9HqXtio9ptFI5",
-    "price_id_yearly": "price_1TL8mFRt1dC9HqXtWq0YZahH"
+    "stripe_product_id": "prod_ULupjAeGMOdLYx",
+    "price_id_monthly": "price_1TNCzaRvDG4W63Hg8s7Z3xeR",
+    "price_id_yearly": "price_1TNCzaRvDG4W63Hg7t4nfftG"
   },
   {
     "key": "business",
@@ -35,9 +35,9 @@
       "Manifestação manual ou automática",
       "API REST + SAP DRC"
     ],
-    "stripe_product_id": "prod_UJmKspZe6WePhT",
-    "price_id_monthly": "price_1TL8mGRt1dC9HqXt2rVwjqmb",
-    "price_id_yearly": "price_1TL8mHRt1dC9HqXtQbpCUrjF"
+    "stripe_product_id": "prod_ULupw8KIamoFoV",
+    "price_id_monthly": "price_1TNCzaRvDG4W63HgGa37TNEg",
+    "price_id_yearly": "price_1TNCzaRvDG4W63Hg7NtkuTb2"
   },
   {
     "key": "enterprise",
@@ -51,13 +51,13 @@
     "features": [
       "Até 50 CNPJs",
       "20.000 docs/mês inclusos",
-      "NF-e + CT-e + MDF-e + NFS-e",
+      "Todos os tipos de documento",
       "Manifestação manual ou automática",
       "API REST + SAP DRC",
       "Questionário de segurança incluso"
     ],
-    "stripe_product_id": "prod_UJmKhElT5mCf9j",
-    "price_id_monthly": "price_1TL8mIRt1dC9HqXtqn3SkQcI",
-    "price_id_yearly": "price_1TL8mIRt1dC9HqXtJ7gdsf4J"
+    "stripe_product_id": "prod_ULupFgxD7CICRq",
+    "price_id_monthly": "price_1TNCzbRvDG4W63Hg39JJJY1T",
+    "price_id_yearly": "price_1TNCzaRvDG4W63HgFKy1eSys"
   }
 ]
