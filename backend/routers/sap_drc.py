@@ -7,13 +7,14 @@ Mounted at /sap-drc prefix in main.py.
 """
 
 import logging
-import xml.etree.ElementTree as ET
+from lxml import etree
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
 from db.supabase import get_supabase_client
 from middleware.security import verify_api_key_with_trial
+from services.billing.consumption import increment_consumption
 from models.sap_drc_schemas import (
     EventFragment,
     InboundInvoiceDeleteRequest,
@@ -42,7 +43,7 @@ UF_CODE_MAP = {
 }
 
 
-def _find_text(root: ET.Element, xpath: str) -> str:
+def _find_text(root: etree._Element, xpath: str) -> str:
     """Find text at xpath with NF-e namespace, return empty string if missing."""
     el = root.find(xpath, NS)
     return el.text.strip() if el is not None and el.text else ""
@@ -55,8 +56,8 @@ def parse_nfe_xml(xml_str: str) -> dict:
     Returns a dict with keys matching NotaFiscalFragment field names.
     """
     try:
-        root = ET.fromstring(xml_str)
-    except ET.ParseError:
+        root = etree.fromstring(xml_str)
+    except etree.XMLSyntaxError:
         return {}
 
     # Strip namespace prefix for tag comparison
@@ -140,8 +141,8 @@ def parse_nfe_xml(xml_str: str) -> dict:
 def _extract_chave_from_xml(xml_str: str) -> str:
     """Extract the chave de acesso (access key) from an NF-e XML string."""
     try:
-        root = ET.fromstring(xml_str)
-    except ET.ParseError:
+        root = etree.fromstring(xml_str)
+    except etree.XMLSyntaxError:
         return ""
 
     root_tag = root.tag.split("}")[-1] if "}" in root.tag else root.tag
@@ -165,8 +166,8 @@ def _extract_chave_from_xml(xml_str: str) -> str:
 def _extract_cnpj_dest_from_xml(xml_str: str) -> str:
     """Extract the CNPJ destinatario from an NF-e XML string."""
     try:
-        root = ET.fromstring(xml_str)
-    except ET.ParseError:
+        root = etree.fromstring(xml_str)
+    except etree.XMLSyntaxError:
         return ""
 
     # Try with namespace
@@ -397,45 +398,7 @@ async def delete_inbound_invoices(
     # transicionaram. Graceful — contador nunca quebra a confirmação.
     if confirmed_count > 0:
         try:
-            tenant_row = sb.table("tenants").select(
-                "subscription_status, trial_cap, docs_consumidos_trial"
-            ).eq("id", tenant_id).single().execute()
-            tenant_data = tenant_row.data or {}
-            sub_status = tenant_data.get("subscription_status")
-
-            if sub_status == "trial":
-                rpc_res = sb.rpc("increment_trial_docs", {
-                    "p_tenant_id": tenant_id,
-                    "p_count": confirmed_count,
-                }).execute()
-
-                new_count = 0
-                if rpc_res.data is not None:
-                    if isinstance(rpc_res.data, int):
-                        new_count = rpc_res.data
-                    elif isinstance(rpc_res.data, list) and rpc_res.data:
-                        first = rpc_res.data[0]
-                        if isinstance(first, dict):
-                            new_count = int(next(iter(first.values()), 0) or 0)
-                        else:
-                            new_count = int(first or 0)
-
-                trial_cap = int(tenant_data.get("trial_cap") or 500)
-                if new_count >= trial_cap:
-                    sb.table("tenants").update({
-                        "trial_blocked_at": datetime.now(timezone.utc).isoformat(),
-                        "trial_blocked_reason": "cap",
-                    }).eq("id", tenant_id).execute()
-                    logger.info(
-                        "tenant %s atingiu trial_cap=%d (confirmados=%d) via SAP DRC deleteInboundInvoices",
-                        tenant_id, trial_cap, new_count,
-                    )
-
-            elif sub_status == "active":
-                sb.rpc("increment_monthly_docs", {
-                    "p_tenant_id": tenant_id,
-                    "p_count": confirmed_count,
-                }).execute()
+            increment_consumption(tenant_id, count=confirmed_count)
         except Exception as exc:  # noqa: BLE001 — contador nunca quebra confirmação
             logger.warning(
                 "falha ao incrementar contador de consumo (SAP DRC batch) para tenant %s: %s",
@@ -485,45 +448,7 @@ async def delete_official_document(
     # Incrementa contador de consumo. Graceful — contador nunca quebra
     # a confirmação em si.
     try:
-        tenant_row = sb.table("tenants").select(
-            "subscription_status, trial_cap, docs_consumidos_trial"
-        ).eq("id", tenant_id).single().execute()
-        tenant_data = tenant_row.data or {}
-        sub_status = tenant_data.get("subscription_status")
-
-        if sub_status == "trial":
-            rpc_res = sb.rpc("increment_trial_docs", {
-                "p_tenant_id": tenant_id,
-                "p_count": 1,
-            }).execute()
-
-            new_count = 0
-            if rpc_res.data is not None:
-                if isinstance(rpc_res.data, int):
-                    new_count = rpc_res.data
-                elif isinstance(rpc_res.data, list) and rpc_res.data:
-                    first = rpc_res.data[0]
-                    if isinstance(first, dict):
-                        new_count = int(next(iter(first.values()), 0) or 0)
-                    else:
-                        new_count = int(first or 0)
-
-            trial_cap = int(tenant_data.get("trial_cap") or 500)
-            if new_count >= trial_cap:
-                sb.table("tenants").update({
-                    "trial_blocked_at": datetime.now(timezone.utc).isoformat(),
-                    "trial_blocked_reason": "cap",
-                }).eq("id", tenant_id).execute()
-                logger.info(
-                    "tenant %s atingiu trial_cap=%d (confirmados=%d) via SAP DRC deleteOfficialDocument",
-                    tenant_id, trial_cap, new_count,
-                )
-
-        elif sub_status == "active":
-            sb.rpc("increment_monthly_docs", {
-                "p_tenant_id": tenant_id,
-                "p_count": 1,
-            }).execute()
+        increment_consumption(tenant_id, count=1)
     except Exception as exc:  # noqa: BLE001 — contador nunca quebra confirmação
         logger.warning(
             "falha ao incrementar contador de consumo (SAP DRC single) para tenant %s chave %s: %s",

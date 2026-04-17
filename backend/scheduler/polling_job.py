@@ -410,18 +410,20 @@ def _poll_single_detailed(cert: dict, tipo: str, tenant_data: dict) -> dict:
 
         saved = total_docs_saved > 0
 
-        # Debita créditos do tenant (planos pagos usam créditos por doc)
-        if total_docs_saved > 0 and not is_trial:
-            try:
-                sb.rpc("debit_credits", {
-                    "p_tenant_id": tenant_id,
-                    "p_amount": total_docs_saved,
-                }).execute()
-            except Exception as e:
-                logger.warning(
-                    "debit_credits falhou tenant=%s amount=%d: %s",
-                    tenant_id, total_docs_saved, e,
-                )
+        # Legacy credits model — disabled for Stripe subscription tenants.
+        # Stripe subscription + overage billing replaced the per-doc credit
+        # debit model. Kept commented for reference.
+        # if total_docs_saved > 0 and not is_trial:
+        #     try:
+        #         sb.rpc("debit_credits", {
+        #             "p_tenant_id": tenant_id,
+        #             "p_amount": total_docs_saved,
+        #         }).execute()
+        #     except Exception as e:
+        #         logger.warning(
+        #             "debit_credits falhou tenant=%s amount=%d: %s",
+        #             tenant_id, total_docs_saved, e,
+        #         )
 
         # Auto-ciência: envia 210210 pra resumos NF-e capturados neste trigger
         if (
@@ -610,18 +612,22 @@ def _poll_single(cert: dict, tipo: str, tenant_data: dict) -> int:
             except Exception:
                 effective_cursor = response.ult_nsu
 
-        # Debit credits atomically via RPC (apenas pelos docs efetivamente salvos)
-        try:
-            result = sb.rpc("debit_credits", {
-                "p_tenant_id": tenant_id,
-                "p_amount": -effective_count,
-                "p_description": f"Polling {tipo.upper()} CNPJ {mask_cnpj(cnpj)}: {effective_count} docs",
-            }).execute()
-        except Exception as credit_err:
-            logger.warning(
-                f"Tenant {tenant_id} insufficient credits for {effective_count} docs: {credit_err}"
-            )
-            return 0
+        # Legacy credits model — disabled for Stripe subscription tenants.
+        # Stripe subscription + overage billing replaced the per-doc credit
+        # debit model. Only debit if tenant uses legacy credits (no subscription).
+        status = tenant_data.get("subscription_status")
+        if status not in ("active", "past_due", "trial"):
+            try:
+                result = sb.rpc("debit_credits", {
+                    "p_tenant_id": tenant_id,
+                    "p_amount": -effective_count,
+                    "p_description": f"Polling {tipo.upper()} CNPJ {mask_cnpj(cnpj)}: {effective_count} docs",
+                }).execute()
+            except Exception as credit_err:
+                logger.warning(
+                    f"Tenant {tenant_id} insufficient credits for {effective_count} docs: {credit_err}"
+                )
+                return 0
 
         # Classifica e salva documentos
         # resNFe/resCTe = resumo (precisa manifestação para NF-e)
@@ -759,18 +765,22 @@ def _poll_nfse(cert: dict, tenant_data: dict) -> int:
         if docs_found == 0:
             return 0
 
-        # Debit credits atomically via RPC
-        try:
-            sb.rpc("debit_credits", {
-                "p_tenant_id": tenant_id,
-                "p_amount": -docs_found,
-                "p_description": f"Polling NFSE CNPJ {mask_cnpj(cnpj)}: {docs_found} docs",
-            }).execute()
-        except Exception as credit_err:
-            logger.warning(
-                f"Tenant {tenant_id} insufficient credits for {docs_found} NFS-e docs: {credit_err}"
-            )
-            return 0
+        # Legacy credits model — disabled for Stripe subscription tenants.
+        # Stripe subscription + overage billing replaced the per-doc credit
+        # debit model. Only debit if tenant uses legacy credits (no subscription).
+        status = tenant_data.get("subscription_status")
+        if status not in ("active", "past_due", "trial"):
+            try:
+                sb.rpc("debit_credits", {
+                    "p_tenant_id": tenant_id,
+                    "p_amount": -docs_found,
+                    "p_description": f"Polling NFSE CNPJ {mask_cnpj(cnpj)}: {docs_found} docs",
+                }).execute()
+            except Exception as credit_err:
+                logger.warning(
+                    f"Tenant {tenant_id} insufficient credits for {docs_found} NFS-e docs: {credit_err}"
+                )
+                return 0
 
         # Salva documentos. NFSe precisa de 2 campos extra (codigo_municipio,
         # codigo_servico) que não estão no DocumentMetadata padrão — adicionamos
