@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- Background circle -->
+  <circle cx="16" cy="16" r="15" fill="#0c4a30"/>
+  <!-- Concentric arcs (signal/radar motif) -->
+  <path d="M16 4a12 12 0 0 1 0 24" fill="none" stroke="#e5f3ec" stroke-width="1.2" opacity="0.3"/>
+  <path d="M16 6.5a9.5 9.5 0 0 1 0 19" fill="none" stroke="#e5f3ec" stroke-width="1.2" opacity="0.4"/>
+  <path d="M16 9a7 7 0 0 1 0 14" fill="none" stroke="#e5f3ec" stroke-width="1.2" opacity="0.5"/>
+  <path d="M16 11.5a4.5 4.5 0 0 1 0 9" fill="none" stroke="#e5f3ec" stroke-width="1.2" opacity="0.6"/>
+  <!-- Document icon -->
+  <rect x="9" y="10" width="10" height="12" rx="1.5" fill="#e5f3ec"/>
+  <path d="M15 10v3.5h3.5" fill="none" stroke="#0c4a30" stroke-width="0.8"/>
+  <line x1="11.5" y1="15" x2="16.5" y2="15" stroke="#0c4a30" stroke-width="0.7" opacity="0.5"/>
+  <line x1="11.5" y1="17" x2="15" y2="17" stroke="#0c4a30" stroke-width="0.7" opacity="0.5"/>
+  <line x1="11.5" y1="19" x2="16" y2="19" stroke="#0c4a30" stroke-width="0.7" opacity="0.5"/>
+</svg>
