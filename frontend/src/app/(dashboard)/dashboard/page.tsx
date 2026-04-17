@@ -74,21 +74,20 @@ export default function DashboardPage() {
     async function fetchDistinctMonths() {
       try {
         const sb = getSupabase()
-        // Fetch all distinct year-months from documents table
+        // Fetch data_emissao (preferred) and fetched_at (fallback) for month list
         const { data, error } = await sb
           .from("documents")
-          .select("fetched_at")
+          .select("data_emissao, fetched_at")
         if (error || !data) {
-          // Fallback to static list
           setCompetenciaOptions(buildCompetenciaOptions(11))
           return
         }
-        // Collect unique YYYY-MM from fetched_at dates
+        // Collect unique YYYY-MM from data_emissao (emission date, not capture)
         const monthSet = new Set<string>()
         for (const row of data) {
-          if (row.fetched_at) {
-            // fetched_at is UTC; convert to SP time (UTC-3) for correct month
-            const d = new Date(row.fetched_at)
+          const dateStr = row.data_emissao || row.fetched_at
+          if (dateStr) {
+            const d = new Date(dateStr)
             const sp = new Date(d.getTime() - 3 * 60 * 60 * 1000)
             const id = `${sp.getUTCFullYear()}-${String(sp.getUTCMonth() + 1).padStart(2, "0")}`
             monthSet.add(id)
@@ -234,11 +233,14 @@ export default function DashboardPage() {
     try {
       const sb = getSupabase()
 
-      // Helper to apply optional date range filter
-      // When "Todos" is selected (currentRange === null), no date filter is applied
-      function applyDateFilter<T extends { gte: (col: string, val: string) => T; lte: (col: string, val: string) => T }>(query: T): T {
+      // Helper to apply optional date range filter based on data_emissao
+      // (emission date, not capture date — matches fiscal competency period).
+      // Falls back to fetched_at for docs without data_emissao populated.
+      // When "Todos" is selected (currentRange === null), no date filter is applied.
+      function applyDateFilter<T extends { gte: (col: string, val: string) => T; lte: (col: string, val: string) => T; or: (filter: string) => T }>(query: T): T {
         if (currentRange) {
-          return query.gte('fetched_at', currentRange.start).lte('fetched_at', currentRange.end)
+          // Use data_emissao when available, fallback to fetched_at for old docs
+          return query.or(`and(data_emissao.gte.${currentRange.start},data_emissao.lte.${currentRange.end}),and(data_emissao.is.null,fetched_at.gte.${currentRange.start},fetched_at.lte.${currentRange.end})`)
         }
         return query
       }
@@ -368,7 +370,8 @@ export default function DashboardPage() {
       // Volume chart agrupado por dia sobre TODOS os documents da competência
       const byDay: Record<string, { nfe: number; cte: number; mdfe: number; nfse: number }> = {}
       for (const doc of aggregationRows) {
-        const day = new Date(doc.fetched_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
+        const dateStr = doc.data_emissao || doc.fetched_at
+        const day = new Date(dateStr).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
         if (!byDay[day]) byDay[day] = { nfe: 0, cte: 0, mdfe: 0, nfse: 0 }
         const key = doc.tipo.toLowerCase() as "nfe" | "cte" | "mdfe" | "nfse"
         if (key in byDay[day]) byDay[day][key]++
