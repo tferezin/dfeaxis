@@ -542,7 +542,12 @@ export default function DashboardPage() {
             />
             {(() => {
               const isActivePlan = subscriptionStatus === "active"
-              const used = isActivePlan ? docsConsumidosMes : trialDocsConsumidos
+              // Use real doc count from current competencia (more accurate than
+              // docs_consumidos_mes which only tracks the billing cycle)
+              const realTotal = realCounts.nfe + realCounts.cte + realCounts.mdfe + realCounts.nfse
+              const used = isActivePlan
+                ? (realTotal > 0 ? realTotal : docsConsumidosMes)
+                : (realTotal > 0 ? realTotal : trialDocsConsumidos)
               const limit = isActivePlan ? docsIncludedMes : trialCap
               const pct = limit > 0 ? Math.round((used / limit) * 100) : 0
               const over = Math.max(0, used - limit)
