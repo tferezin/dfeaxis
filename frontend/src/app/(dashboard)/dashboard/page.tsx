@@ -99,9 +99,18 @@ export default function DashboardPage() {
           setCompetenciaOptions([getCompetenciaRange(currentCompetencia())])
           return
         }
-        // Sort descending (newest first)
+        // Sort descending (newest first), limit to 12 most recent
         const sorted = Array.from(monthSet).sort((a, b) => b.localeCompare(a))
-        setCompetenciaOptions(sorted.map((id) => getCompetenciaRange(id)))
+        const recent = sorted.slice(0, 12)
+        const older = sorted.slice(12)
+        const options = recent.map((id) => getCompetenciaRange(id))
+        // If there are older months, add them as a separate group
+        if (older.length > 0) {
+          for (const id of older) {
+            options.push({ ...getCompetenciaRange(id), _older: true } as any)
+          }
+        }
+        setCompetenciaOptions(options)
       } catch {
         setCompetenciaOptions(buildCompetenciaOptions(11))
       }
@@ -449,7 +458,15 @@ export default function DashboardPage() {
               className="absolute inset-0 cursor-pointer opacity-0"
             >
               <option value={COMPETENCIA_TODOS}>Todos</option>
-              {competenciaOptions.map((opt) => (
+              {competenciaOptions.filter((o: any) => !o._older).map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.shortLabel}
+                </option>
+              ))}
+              {competenciaOptions.some((o: any) => o._older) && (
+                <option disabled>── Período anterior ──</option>
+              )}
+              {competenciaOptions.filter((o: any) => o._older).map((opt) => (
                 <option key={opt.id} value={opt.id}>
                   {opt.shortLabel}
                 </option>
