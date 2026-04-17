@@ -9,6 +9,7 @@ interface FinancialItem {
   amount: number
   color: string
   bgColor: string
+  hideBar?: boolean
 }
 
 interface FinancialCardProps {
@@ -56,16 +57,18 @@ export function FinancialCard({
                   <div className={cn("h-2.5 w-2.5 rounded-full", item.bgColor)} />
                   <span className="text-muted-foreground">{item.label}</span>
                 </div>
-                <span className="font-semibold tabular-nums">{item.value}</span>
+                <span className={cn("font-semibold tabular-nums", item.hideBar && "text-muted-foreground text-xs italic font-normal")}>{item.value}</span>
               </div>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                <div
-                  className={cn("h-full rounded-full transition-all", item.bgColor)}
-                  style={{
-                    width: `${maxAmount > 0 ? (item.amount / maxAmount) * 100 : 0}%`,
-                  }}
-                />
-              </div>
+              {!item.hideBar && (
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={cn("h-full rounded-full transition-all", item.bgColor)}
+                    style={{
+                      width: `${maxAmount > 0 ? (item.amount / maxAmount) * 100 : 0}%`,
+                    }}
+                  />
+                </div>
+              )}
             </div>
           ))}
         </div>
