@@ -2,15 +2,36 @@
 
 import asyncio
 import json
+import logging
+import time
+from datetime import datetime, timedelta, timezone
 from typing import AsyncGenerator
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
 from db.supabase import get_supabase_client
+from middleware.lgpd import mask_cnpj
 from middleware.security import verify_jwt_or_api_key, verify_jwt_with_trial
-from models.schemas import PollingTriggerRequest, PollingTriggerResponse, PollingTipoResult
-from scheduler.polling_job import _poll_single_detailed
+from models.schemas import (
+    NfeCnpjRequest,
+    NfeResumosResponse,
+    NfeXmlCompletoResponse,
+    PollingTipoResult,
+    PollingTriggerRequest,
+    PollingTriggerResponse,
+)
+from scheduler.polling_job import (
+    _build_document_row,
+    _get_pfx_password,
+    _normalize_pfx_blob,
+    _poll_single_detailed,
+)
+from services.manifestacao import manifestacao_service
+from services.nsu_controller import nsu_controller
+from services.sefaz_client import sefaz_client
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -85,6 +106,426 @@ async def trigger_polling(
         tipos=body.tipos,
         docs_found=total_docs,
         results=[PollingTipoResult(**r) for r in results],
+    )
+
+
+@router.post("/polling/nfe-resumos", response_model=NfeResumosResponse)
+async def nfe_resumos(
+    body: NfeCnpjRequest,
+    auth: dict = Depends(verify_jwt_or_api_key),
+):
+    """Etapa 1 manual: busca resumos NFe na SEFAZ e envia ciencia automatica.
+
+    Reutiliza a logica de nfe_polling_job._poll_resumos_for_cert mas para um
+    unico CNPJ on-demand.
+    """
+    sb = get_supabase_client()
+    tenant_id = auth["tenant_id"]
+
+    # Busca certificado
+    cert_result = sb.table("certificates").select("*").eq(
+        "tenant_id", tenant_id
+    ).eq("cnpj", body.cnpj).eq("is_active", True).execute()
+
+    if not cert_result.data:
+        raise HTTPException(status_code=404, detail="CNPJ nao encontrado ou certificado inativo")
+
+    cert = cert_result.data[0]
+
+    # Busca tenant data
+    tenant_res = sb.table("tenants").select(
+        "id, polling_mode, manifestacao_mode, credits, sefaz_ambiente, "
+        "subscription_status, docs_consumidos_trial, trial_cap, "
+        "trial_blocked_at, trial_blocked_reason"
+    ).eq("id", tenant_id).single().execute()
+
+    if not tenant_res.data:
+        raise HTTPException(status_code=404, detail="Tenant nao encontrado")
+
+    tenant_data = tenant_res.data
+    ambiente = tenant_data.get("sefaz_ambiente", "2")
+
+    pfx_password = _get_pfx_password(cert["id"], tenant_id)
+    if not pfx_password:
+        raise HTTPException(status_code=400, detail="Senha do certificado nao encontrada")
+
+    pfx_encrypted, pfx_iv = _normalize_pfx_blob(
+        cert["pfx_encrypted"], cert["pfx_iv"]
+    )
+
+    # Get current NSU cursor
+    try:
+        ult_nsu = nsu_controller.get_cursor(cert["id"], "nfe", ambiente)
+    except Exception:
+        ult_nsu = cert.get("last_nsu_nfe", "000000000000000")
+
+    # Call SEFAZ DistDFe
+    try:
+        response = sefaz_client.consultar_distribuicao(
+            cnpj=body.cnpj,
+            tipo="nfe",
+            ult_nsu=ult_nsu,
+            pfx_encrypted=pfx_encrypted,
+            pfx_iv=pfx_iv,
+            tenant_id=tenant_id,
+            pfx_password=pfx_password,
+            ambiente=ambiente,
+        )
+    except Exception as exc:
+        logger.error(
+            "nfe-resumos: SEFAZ call failed cnpj=%s: %s",
+            mask_cnpj(body.cnpj), exc,
+        )
+        raise HTTPException(
+            status_code=502,
+            detail=f"Erro na consulta SEFAZ: {type(exc).__name__}: {exc}",
+        )
+
+    docs = list(response.documents)
+    results = []
+    resumos_found = 0
+    ciencia_sent = 0
+    completos_found = 0
+
+    for doc in docs:
+        is_resumo = doc.schema.startswith("res")
+
+        if is_resumo:
+            resumos_found += 1
+            # Enqueue + send ciencia
+            try:
+                sb.table("nfe_ciencia_queue").upsert(
+                    {
+                        "tenant_id": tenant_id,
+                        "certificate_id": cert["id"],
+                        "cnpj": body.cnpj,
+                        "chave_acesso": doc.chave,
+                        "nsu": doc.nsu,
+                    },
+                    on_conflict="tenant_id,chave_acesso",
+                ).execute()
+            except Exception as exc:
+                results.append({
+                    "chave": doc.chave,
+                    "nsu": doc.nsu,
+                    "tipo": "resumo",
+                    "status": "error",
+                    "detail": f"Falha ao enfileirar: {exc}",
+                })
+                continue
+
+            # Send ciencia unless manual_only
+            if tenant_data.get("manifestacao_mode") == "manual_only":
+                results.append({
+                    "chave": doc.chave,
+                    "nsu": doc.nsu,
+                    "tipo": "resumo",
+                    "status": "enqueued",
+                    "detail": "Enfileirado (manifestacao_mode=manual_only, ciencia nao enviada)",
+                })
+                continue
+
+            try:
+                manif_result = manifestacao_service.enviar_evento(
+                    chave_acesso=doc.chave,
+                    cnpj=body.cnpj,
+                    tipo_evento="210210",
+                    pfx_encrypted=pfx_encrypted,
+                    pfx_iv=pfx_iv,
+                    tenant_id=tenant_id,
+                    pfx_password=pfx_password,
+                    ambiente=ambiente,
+                )
+
+                # Audit event
+                sb.table("manifestacao_events").insert({
+                    "tenant_id": tenant_id,
+                    "document_id": None,
+                    "chave_acesso": doc.chave,
+                    "tipo_evento": "210210",
+                    "cstat": manif_result.cstat,
+                    "xmotivo": manif_result.xmotivo,
+                    "protocolo": manif_result.protocolo,
+                    "latency_ms": manif_result.latency_ms,
+                    "source": "nfe-resumos-manual",
+                }).execute()
+
+                if manif_result.success:
+                    sb.table("nfe_ciencia_queue").update({
+                        "ciencia_enviada": True,
+                        "ciencia_enviada_at": datetime.now(timezone.utc).isoformat(),
+                        "ciencia_cstat": manif_result.cstat,
+                    }).eq("tenant_id", tenant_id).eq(
+                        "chave_acesso", doc.chave,
+                    ).execute()
+
+                    ciencia_sent += 1
+                    results.append({
+                        "chave": doc.chave,
+                        "nsu": doc.nsu,
+                        "tipo": "resumo",
+                        "status": "ciencia_ok",
+                        "cstat": manif_result.cstat,
+                        "xmotivo": manif_result.xmotivo,
+                    })
+                else:
+                    sb.table("nfe_ciencia_queue").update({
+                        "ciencia_cstat": manif_result.cstat,
+                        "ultimo_erro": f"ciencia falhou: cstat={manif_result.cstat} {manif_result.xmotivo}",
+                        "tentativas": 1,
+                    }).eq("tenant_id", tenant_id).eq(
+                        "chave_acesso", doc.chave,
+                    ).execute()
+
+                    results.append({
+                        "chave": doc.chave,
+                        "nsu": doc.nsu,
+                        "tipo": "resumo",
+                        "status": "ciencia_failed",
+                        "cstat": manif_result.cstat,
+                        "xmotivo": manif_result.xmotivo,
+                    })
+            except Exception as exc:
+                results.append({
+                    "chave": doc.chave,
+                    "nsu": doc.nsu,
+                    "tipo": "resumo",
+                    "status": "error",
+                    "detail": f"Ciencia exception: {type(exc).__name__}: {exc}",
+                })
+
+            time.sleep(0.5)
+        else:
+            # procNFe (full XML already available)
+            completos_found += 1
+            row = _build_document_row(
+                tenant_id=tenant_id,
+                cnpj=body.cnpj,
+                doc=doc,
+                is_resumo=False,
+                doc_status="available",
+                manif_status="ciencia",
+            )
+            if row is not None:
+                sb.table("documents").upsert(
+                    row, on_conflict="tenant_id,chave_acesso"
+                ).execute()
+                results.append({
+                    "chave": doc.chave,
+                    "nsu": doc.nsu,
+                    "tipo": "procNFe",
+                    "status": "saved",
+                })
+            else:
+                results.append({
+                    "chave": doc.chave,
+                    "nsu": doc.nsu,
+                    "tipo": "evento",
+                    "status": "skipped",
+                    "detail": "Evento SEFAZ, nao documento fiscal",
+                })
+
+    # Advance NSU cursor
+    if docs:
+        nsu_controller.update_cursor(
+            cert["id"], "nfe", ambiente, response.ult_nsu,
+            response.max_nsu or response.ult_nsu,
+        )
+        nsu_controller.update_last_nsu(cert["id"], "nfe", response.ult_nsu)
+
+    # Log
+    sb.table("polling_log").insert({
+        "tenant_id": tenant_id,
+        "cnpj": body.cnpj,
+        "tipo": "nfe",
+        "triggered_by": "nfe-resumos-manual",
+        "status": "success" if response.cstat in ("137", "138") else "error",
+        "docs_found": len(docs),
+        "ult_nsu": response.ult_nsu,
+        "latency_ms": response.latency_ms,
+        "error_message": response.xmotivo if response.cstat not in ("137", "138") else None,
+    }).execute()
+
+    return NfeResumosResponse(
+        resumos_found=resumos_found,
+        ciencia_sent=ciencia_sent,
+        completos_found=completos_found,
+        results=results,
+    )
+
+
+@router.post("/polling/nfe-xml-completo", response_model=NfeXmlCompletoResponse)
+async def nfe_xml_completo(
+    body: NfeCnpjRequest,
+    auth: dict = Depends(verify_jwt_or_api_key),
+):
+    """Etapa 2 manual: busca XMLs completos para resumos ja com ciencia enviada.
+
+    Processa apenas as entradas na nfe_ciencia_queue deste CNPJ onde
+    ciencia_enviada=true e xml_fetched=false.
+    """
+    sb = get_supabase_client()
+    tenant_id = auth["tenant_id"]
+
+    # Busca certificado
+    cert_result = sb.table("certificates").select("*").eq(
+        "tenant_id", tenant_id
+    ).eq("cnpj", body.cnpj).eq("is_active", True).execute()
+
+    if not cert_result.data:
+        raise HTTPException(status_code=404, detail="CNPJ nao encontrado ou certificado inativo")
+
+    cert = cert_result.data[0]
+
+    # Busca tenant data
+    tenant_res = sb.table("tenants").select(
+        "id, sefaz_ambiente"
+    ).eq("id", tenant_id).single().execute()
+
+    if not tenant_res.data:
+        raise HTTPException(status_code=404, detail="Tenant nao encontrado")
+
+    ambiente = tenant_res.data.get("sefaz_ambiente", "2")
+
+    pfx_password = _get_pfx_password(cert["id"], tenant_id)
+    if not pfx_password:
+        raise HTTPException(status_code=400, detail="Senha do certificado nao encontrada")
+
+    pfx_encrypted, pfx_iv = _normalize_pfx_blob(
+        cert["pfx_encrypted"], cert["pfx_iv"]
+    )
+
+    # Fetch pending queue entries for this CNPJ
+    queue_result = sb.table("nfe_ciencia_queue").select("*").eq(
+        "tenant_id", tenant_id,
+    ).eq(
+        "cnpj", body.cnpj,
+    ).eq(
+        "ciencia_enviada", True,
+    ).eq(
+        "xml_fetched", False,
+    ).execute()
+
+    if not queue_result.data:
+        return NfeXmlCompletoResponse(
+            xml_found=0, saved=0, still_pending=0,
+            results=[{"status": "empty", "detail": "Nenhuma entrada pendente na fila de ciencia para este CNPJ"}],
+        )
+
+    entries = queue_result.data
+    pending_chaves = {e["chave_acesso"]: e for e in entries}
+
+    # Call SEFAZ DistDFe from the lowest pending NSU
+    min_nsu = min(
+        (e["nsu"] for e in entries),
+        key=lambda n: int(n) if n else 0,
+    )
+
+    try:
+        response = sefaz_client.consultar_distribuicao(
+            cnpj=body.cnpj,
+            tipo="nfe",
+            ult_nsu=min_nsu,
+            pfx_encrypted=pfx_encrypted,
+            pfx_iv=pfx_iv,
+            tenant_id=tenant_id,
+            pfx_password=pfx_password,
+            ambiente=ambiente,
+        )
+    except Exception as exc:
+        logger.error(
+            "nfe-xml-completo: SEFAZ call failed cnpj=%s: %s",
+            mask_cnpj(body.cnpj), exc,
+        )
+        raise HTTPException(
+            status_code=502,
+            detail=f"Erro na consulta SEFAZ: {type(exc).__name__}: {exc}",
+        )
+
+    # Index full XML docs by chave
+    full_docs_by_chave: dict[str, object] = {}
+    for doc in response.documents:
+        if not doc.schema.startswith("res") and doc.chave in pending_chaves:
+            full_docs_by_chave[doc.chave] = doc
+
+    results = []
+    saved = 0
+    still_pending = 0
+
+    for chave, entry in pending_chaves.items():
+        if chave in full_docs_by_chave:
+            full_doc = full_docs_by_chave[chave]
+            row = _build_document_row(
+                tenant_id=tenant_id,
+                cnpj=body.cnpj,
+                doc=full_doc,
+                is_resumo=False,
+                doc_status="available",
+                manif_status="ciencia",
+            )
+            if row is not None:
+                now = datetime.now(timezone.utc)
+                row["manifestacao_at"] = now.isoformat()
+                row["manifestacao_deadline"] = (
+                    now + timedelta(days=180)
+                ).isoformat()
+
+                sb.table("documents").upsert(
+                    row, on_conflict="tenant_id,chave_acesso"
+                ).execute()
+
+                sb.table("nfe_ciencia_queue").update({
+                    "xml_fetched": True,
+                    "xml_fetched_at": now.isoformat(),
+                }).eq("id", entry["id"]).execute()
+
+                saved += 1
+                results.append({
+                    "chave": chave,
+                    "nsu": full_doc.nsu,
+                    "status": "saved",
+                })
+            else:
+                sb.table("nfe_ciencia_queue").update({
+                    "xml_fetched": True,
+                    "xml_fetched_at": datetime.now(timezone.utc).isoformat(),
+                    "ultimo_erro": "XML era evento SEFAZ, nao documento fiscal",
+                }).eq("id", entry["id"]).execute()
+                results.append({
+                    "chave": chave,
+                    "status": "skipped",
+                    "detail": "Evento SEFAZ, nao documento fiscal",
+                })
+        else:
+            still_pending += 1
+            new_tentativas = entry.get("tentativas", 0) + 1
+            sb.table("nfe_ciencia_queue").update({
+                "tentativas": new_tentativas,
+                "ultimo_erro": "procNFe nao encontrado na resposta SEFAZ",
+            }).eq("id", entry["id"]).execute()
+            results.append({
+                "chave": chave,
+                "status": "pending",
+                "tentativas": new_tentativas,
+                "detail": "XML ainda nao disponivel na SEFAZ",
+            })
+
+    # Log
+    sb.table("polling_log").insert({
+        "tenant_id": tenant_id,
+        "cnpj": body.cnpj,
+        "tipo": "nfe",
+        "triggered_by": "nfe-xml-completo-manual",
+        "status": "success",
+        "docs_found": saved,
+        "latency_ms": response.latency_ms,
+    }).execute()
+
+    return NfeXmlCompletoResponse(
+        xml_found=len(full_docs_by_chave),
+        saved=saved,
+        still_pending=still_pending,
+        results=results,
     )
 
 
