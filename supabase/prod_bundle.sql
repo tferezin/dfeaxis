@@ -192,12 +192,13 @@ $$ LANGUAGE plpgsql;
 
 -- 1. Campo no tenant para modo de manifestação
 ALTER TABLE tenants
-  ADD COLUMN manifestacao_mode TEXT DEFAULT 'manual'
-    CHECK (manifestacao_mode IN ('auto_ciencia', 'manual'));
+  ADD COLUMN manifestacao_mode TEXT DEFAULT 'auto_ciencia'
+    CHECK (manifestacao_mode IN ('auto_ciencia', 'manual', 'manual_only'));
 
 COMMENT ON COLUMN tenants.manifestacao_mode IS
-  'auto_ciencia: envia Ciência (210210) automaticamente ao detectar resumo. '
-  'manual: aguarda ação explícita do cliente para manifestar.';
+  'auto_ciencia (default): envia Ciência (210210) automaticamente ao detectar resumo. '
+  'manual: legado, equivale a auto_ciencia (ciência é obrigatória SEFAZ). '
+  'manual_only: desabilita ciência automática — cliente envia manualmente.';
 
 -- 2. Novos campos na tabela documents para rastrear manifestação
 ALTER TABLE documents

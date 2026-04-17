@@ -275,12 +275,21 @@ export default function HistoricoNfePage() {
     setRealLoading(true)
     try {
       const sb = getSupabase()
-      const { data, error } = await sb
+      // Build date range for filtering: start of dateFrom to end of dateTo (BRT, UTC-3)
+      const startISO = `${dateFrom}T00:00:00-03:00`
+      const endISO = `${dateTo}T23:59:59-03:00`
+
+      let query = sb
         .from('documents')
         .select('*')
         .eq('tipo', 'NFE')
+        .or(
+          `and(data_emissao.gte.${startISO},data_emissao.lte.${endISO}),and(data_emissao.is.null,fetched_at.gte.${startISO},fetched_at.lte.${endISO})`
+        )
         .order('fetched_at', { ascending: false })
-        .limit(100)
+        .limit(200)
+
+      const { data, error } = await query
 
       if (!error && data) {
         setRealData(data)
@@ -290,7 +299,7 @@ export default function HistoricoNfePage() {
     } finally {
       setRealLoading(false)
     }
-  }, [])
+  }, [dateFrom, dateTo])
 
   useEffect(() => {
     if (!settings.showMockData) {
@@ -405,6 +414,14 @@ export default function HistoricoNfePage() {
 
         {/* Filters */}
         <div className="flex flex-wrap items-end gap-3 rounded-lg border p-4">
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-muted-foreground">De</span>
+            <Input type="date" className="w-[150px]" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-muted-foreground">Até</span>
+            <Input type="date" className="w-[150px]" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+          </div>
           <div className="flex flex-col gap-1.5">
             <span className="text-xs font-medium text-muted-foreground">Status</span>
             <Select value={statusFilter} onValueChange={(v) => { if (v) { setStatusFilter(v); setCurrentPage(1) } }}>
