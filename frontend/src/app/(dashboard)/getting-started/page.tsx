@@ -294,7 +294,7 @@ const rfcConfig = `*------------------------------------------------------------
 *    Tipo conexão:   G (HTTP Connection to External Server)
 *
 * 2. Aba "Technical Settings":
-*    Host:           dfeaxis-production.up.railway.app
+*    Host:           api.dfeaxis.com.br
 *    Port:           443
 *    Path Prefix:    (deixar vazio)
 *
@@ -688,10 +688,10 @@ export default function GettingStartedPage() {
           <div className="rounded-lg border p-4">
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm font-medium">Exemplo — Buscar CT-e</p>
-              <CopyButton text={`curl -s "https://dfeaxis-production.up.railway.app/api/v1/documentos?cnpj=SEU_CNPJ&tipo=cte" -H "X-API-Key: SUA_API_KEY"`} />
+              <CopyButton text={`curl -s "https://api.dfeaxis.com.br/api/v1/documentos?cnpj=SEU_CNPJ&tipo=cte" -H "X-API-Key: SUA_API_KEY"`} />
             </div>
             <pre className="text-xs font-mono bg-zinc-950 text-zinc-100 rounded-lg p-4 overflow-x-auto">
-{`curl -s "https://dfeaxis-production.up.railway.app/api/v1/documentos?cnpj=SEU_CNPJ&tipo=cte" \\
+{`curl -s "https://api.dfeaxis.com.br/api/v1/documentos?cnpj=SEU_CNPJ&tipo=cte" \\
   -H "X-API-Key: SUA_API_KEY"
 
 # Resposta:
@@ -715,10 +715,10 @@ export default function GettingStartedPage() {
           <div className="rounded-lg border p-4">
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm font-medium">Exemplo — Confirmar recebimento</p>
-              <CopyButton text={`curl -s -X POST "https://dfeaxis-production.up.railway.app/api/v1/documentos/CHAVE_44_DIGITOS/confirmar" -H "X-API-Key: SUA_API_KEY"`} />
+              <CopyButton text={`curl -s -X POST "https://api.dfeaxis.com.br/api/v1/documentos/CHAVE_44_DIGITOS/confirmar" -H "X-API-Key: SUA_API_KEY"`} />
             </div>
             <pre className="text-xs font-mono bg-zinc-950 text-zinc-100 rounded-lg p-4 overflow-x-auto">
-{`curl -s -X POST "https://dfeaxis-production.up.railway.app/api/v1/documentos/CHAVE_44_DIGITOS/confirmar" \\
+{`curl -s -X POST "https://api.dfeaxis.com.br/api/v1/documentos/CHAVE_44_DIGITOS/confirmar" \\
   -H "X-API-Key: SUA_API_KEY"
 
 # Resposta:

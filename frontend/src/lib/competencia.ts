@@ -158,3 +158,6 @@ export function buildCompetenciaOptions(monthsBack = 11): CompetenciaRange[] {
 
   return out
 }
+
+/** Sentinela para a opção "Todos" no dropdown de competência */
+export const COMPETENCIA_TODOS: CompetenciaId = "ALL"

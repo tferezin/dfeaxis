@@ -10,6 +10,7 @@ import {
   CalendarDays,
   ChevronDown,
   Loader2,
+  Gauge,
 } from "lucide-react"
 import { StatCard } from "@/components/dashboard/stat-card"
 import { FinancialCard } from "@/components/dashboard/financial-card"
@@ -29,6 +30,7 @@ import {
   currentCompetencia,
   getCompetenciaRange,
   formatCompetenciaLabel,
+  COMPETENCIA_TODOS,
   type CompetenciaId,
 } from "@/lib/competencia"
 
@@ -51,9 +53,10 @@ interface ActivityEntry {
 export default function DashboardPage() {
   const { settings } = useSettings()
   const showMock = settings.showMockData
-  const { trialActive, subscriptionStatus } = useTrial()
+  const { trialActive, subscriptionStatus, docsConsumidos: trialDocsConsumidos, trialCap } = useTrial()
   const showTrialCounter = subscriptionStatus !== "active" && trialActive
   const showUsageCard = subscriptionStatus === "active"
+  const isTrial = subscriptionStatus === "trial"
 
   // Competência (mês calendário) selecionada — default = mês atual.
   // O filtro é aplicado em TODAS as queries do dashboard (stats, documentos
@@ -63,13 +66,19 @@ export default function DashboardPage() {
     currentCompetencia()
   )
   const competenciaOptions = useMemo(() => buildCompetenciaOptions(11), [])
+  const isAllCompetencia = selectedCompetencia === COMPETENCIA_TODOS
   const currentRange = useMemo(
-    () => getCompetenciaRange(selectedCompetencia),
-    [selectedCompetencia]
+    () => isAllCompetencia ? null : getCompetenciaRange(selectedCompetencia),
+    [selectedCompetencia, isAllCompetencia]
   )
 
-  // Monthly usage only loads when subscription is active (decoupled from trial state)
-  const { docsConsumidosMes, docsIncludedMes, stripePriceId } = useMonthlyUsage(showUsageCard)
+  // Ambiente filter — documents don't have an ambiente column, so when
+  // Producao is selected we show an empty state (no prod docs exist yet).
+  const sefazAmbiente = settings.sefazAmbiente // "1" = prod, "2" = hom
+  const isProd = sefazAmbiente === "1"
+
+  // Monthly usage — always load so "Uso do mês" card works for both trial and active
+  const { docsConsumidosMes, docsIncludedMes, stripePriceId } = useMonthlyUsage(true)
 
   // Plans (used to resolve overage rate for the current subscription).
   const [plansList, setPlansList] = useState<Plan[]>([])
@@ -97,7 +106,7 @@ export default function DashboardPage() {
   const [realCompanyName, setRealCompanyName] = useState("")
   const [realCounts, setRealCounts] = useState<DashboardCounts>({ nfe: 0, cte: 0, mdfe: 0, nfse: 0 })
   const [realActivity, setRealActivity] = useState<ActivityEntry[]>([])
-  const [realCredits, setRealCredits] = useState<number | null>(null)
+  // realCredits removed — legacy MercadoPago system replaced by Stripe plan usage
   const [realDocuments, setRealDocuments] = useState<Array<{
     tipo: string
     chave_acesso: string
@@ -144,38 +153,59 @@ export default function DashboardPage() {
   }
 
   const loadRealData = useCallback(async () => {
+    // When Producao is selected, documents don't have an ambiente column
+    // so we show empty state — skip all queries.
+    if (isProd) {
+      setRealCounts({ nfe: 0, cte: 0, mdfe: 0, nfse: 0 })
+      setRealDocsNaCompetencia(0)
+      setRealDocuments([])
+      setRealNfeTotal(0)
+      setRealCteTotal(0)
+      setRealMdfeTotal(0)
+      setRealNfseTotal(0)
+      setRealVolumeData([])
+      setRealActivity([])
+      // Still load company name & CNPJ count (atemporal)
+      const sb = getSupabase()
+      const { data: certData } = await sb
+        .from('certificates')
+        .select('cnpj, company_name')
+        .eq('is_active', true)
+      setRealCnpjCount(certData?.length ?? 0)
+      if (certData && certData.length > 0 && certData[0].company_name) {
+        const name = certData[0].company_name.split(':')[0].trim()
+        setRealCompanyName(name)
+      }
+      return
+    }
+
     setRealLoading(true)
     try {
       const sb = getSupabase()
-      // Range da competência selecionada (ISO UTC cobrindo o mês SP inteiro)
-      const { start, end } = currentRange
 
-      // Counts por tipo — SOMENTE documentos capturados na competência
+      // Helper to apply optional date range filter
+      // When "Todos" is selected (currentRange === null), no date filter is applied
+      function applyDateFilter<T extends { gte: (col: string, val: string) => T; lte: (col: string, val: string) => T }>(query: T): T {
+        if (currentRange) {
+          return query.gte('fetched_at', currentRange.start).lte('fetched_at', currentRange.end)
+        }
+        return query
+      }
+
+      // Counts por tipo — documentos capturados na competência (ou todos se "Todos")
       const [nfeRes, cteRes, mdfeRes, nfseRes] = await Promise.all([
-        sb
-          .from('documents')
-          .select('id', { count: 'exact', head: true })
-          .eq('tipo', 'NFE')
-          .gte('fetched_at', start)
-          .lte('fetched_at', end),
-        sb
-          .from('documents')
-          .select('id', { count: 'exact', head: true })
-          .eq('tipo', 'CTE')
-          .gte('fetched_at', start)
-          .lte('fetched_at', end),
-        sb
-          .from('documents')
-          .select('id', { count: 'exact', head: true })
-          .eq('tipo', 'MDFE')
-          .gte('fetched_at', start)
-          .lte('fetched_at', end),
-        sb
-          .from('documents')
-          .select('id', { count: 'exact', head: true })
-          .eq('tipo', 'NFSE')
-          .gte('fetched_at', start)
-          .lte('fetched_at', end),
+        applyDateFilter(
+          sb.from('documents').select('id', { count: 'exact', head: true }).eq('tipo', 'NFE')
+        ),
+        applyDateFilter(
+          sb.from('documents').select('id', { count: 'exact', head: true }).eq('tipo', 'CTE')
+        ),
+        applyDateFilter(
+          sb.from('documents').select('id', { count: 'exact', head: true }).eq('tipo', 'MDFE')
+        ),
+        applyDateFilter(
+          sb.from('documents').select('id', { count: 'exact', head: true }).eq('tipo', 'NFSE')
+        ),
       ])
 
       // CNPJs + nome da empresa (atemporal — não depende de competência)
@@ -242,21 +272,21 @@ export default function DashboardPage() {
       }
 
       const [displayRes, aggregationRes] = await Promise.all([
-        sb
-          .from('documents')
-          .select(
-            'tipo, chave_acesso, cnpj, nsu, status, fetched_at, xml_content, ' +
-            'cnpj_emitente, razao_social_emitente, numero_documento, data_emissao, valor_total'
-          )
-          .gte('fetched_at', start)
-          .lte('fetched_at', end)
+        applyDateFilter(
+          sb
+            .from('documents')
+            .select(
+              'tipo, chave_acesso, cnpj, nsu, status, fetched_at, xml_content, ' +
+              'cnpj_emitente, razao_social_emitente, numero_documento, data_emissao, valor_total'
+            )
+        )
           .order('fetched_at', { ascending: false })
           .limit(20) as unknown as Promise<{ data: RecentDocRow[] | null }>,
-        sb
-          .from('documents')
-          .select('tipo, fetched_at, valor_total, xml_content')
-          .gte('fetched_at', start)
-          .lte('fetched_at', end) as unknown as Promise<{ data: AggregationRow[] | null }>,
+        applyDateFilter(
+          sb
+            .from('documents')
+            .select('tipo, fetched_at, valor_total, xml_content')
+        ) as unknown as Promise<{ data: AggregationRow[] | null }>,
       ])
 
       const displayDocs = displayRes.data ?? []
@@ -311,27 +341,20 @@ export default function DashboardPage() {
 
       if (activityData) setRealActivity(activityData)
 
-      // Créditos do tenant (atemporal)
-      const { data: tenantData } = await sb
-        .from('tenants')
-        .select('credits')
-        .limit(1)
-        .single()
-
-      if (tenantData) setRealCredits(tenantData.credits)
+      // Legacy credits query removed — billing now uses Stripe plan limits
     } catch (e) {
       console.error("[DFeAxis] Error loading dashboard data:", e)
     } finally {
       setRealLoading(false)
     }
-  }, [currentRange])
+  }, [currentRange, isProd])
 
   useEffect(() => {
     if (!settings.showMockData) loadRealData()
-  }, [settings.showMockData, loadRealData])
+  }, [settings.showMockData, loadRealData, sefazAmbiente])
 
   // Label da competência atual pra exibir no dashboard
-  const periodoAtual = currentRange.shortLabel
+  const periodoAtual = isAllCompetencia ? "Todos" : currentRange!.shortLabel
 
   const nfeValue = showMock ? "1.247" : realCounts.nfe.toLocaleString("pt-BR")
   const cteValue = showMock ? "384" : realCounts.cte.toLocaleString("pt-BR")
@@ -373,6 +396,7 @@ export default function DashboardPage() {
           >
             <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
             <span>{periodoAtual}</span>
+            <ChevronDown className="h-3 w-3 text-muted-foreground" />
             <select
               id="competencia-select"
               aria-label="Selecionar competência mensal"
@@ -382,6 +406,7 @@ export default function DashboardPage() {
               }
               className="absolute inset-0 cursor-pointer opacity-0"
             >
+              <option value={COMPETENCIA_TODOS}>Todos</option>
               {competenciaOptions.map((opt) => (
                 <option key={opt.id} value={opt.id}>
                   {opt.shortLabel}
@@ -397,6 +422,20 @@ export default function DashboardPage() {
 
       {/* Pendentes panel (quando aplicável) */}
       <PendentesPanel />
+
+      {/* Empty state for Producao — documents don't have an ambiente column */}
+      {isProd && !showMock && (
+        <Card size="sm">
+          <CardContent className="py-8 text-center">
+            <p className="text-sm font-medium text-muted-foreground">
+              Nenhum documento capturado em produção
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Alterne para Homologação para visualizar os documentos capturados durante os testes.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Stat cards — all in one row */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
@@ -442,13 +481,58 @@ export default function DashboardPage() {
               period="Certificados ativos"
               color="text-slate-600"
             />
-            <StatCard
-              title="Créditos"
-              value={realCredits?.toLocaleString("pt-BR") ?? "—"}
-              icon={<Receipt className="h-4 w-4" />}
-              period="Saldo atual"
-              color="text-emerald-600"
-            />
+            {(() => {
+              const isActivePlan = subscriptionStatus === "active"
+              const used = isActivePlan ? docsConsumidosMes : trialDocsConsumidos
+              const limit = isActivePlan ? docsIncludedMes : trialCap
+              const pct = limit > 0 ? Math.round((used / limit) * 100) : 0
+              const over = Math.max(0, used - limit)
+              const overageRate = isActivePlan ? overageCentsPerDoc : 0
+              const overCostBRL = over > 0 && overageRate > 0
+                ? (over * overageRate / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                : null
+              const barColor = over > 0
+                ? "bg-red-500"
+                : pct >= 80
+                  ? "bg-amber-500"
+                  : "bg-emerald-500"
+              const barWidth = Math.min(100, Math.max(pct, over > 0 ? 100 : pct))
+
+              return (
+                <Card className="relative overflow-hidden transition-shadow hover:shadow-md col-span-2 sm:col-span-1">
+                  <CardContent className="pt-1">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-indigo-600"><Gauge className="h-4 w-4" /></span>
+                        <p className="text-sm font-medium text-muted-foreground">Uso do Plano</p>
+                      </div>
+                      <p className="text-2xl font-bold tracking-tight">
+                        {used.toLocaleString("pt-BR")} <span className="text-base font-normal text-muted-foreground">/ {limit.toLocaleString("pt-BR")}</span>
+                      </p>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                        <div
+                          className={`h-full rounded-full transition-all ${barColor}`}
+                          style={{ width: `${barWidth}%` }}
+                        />
+                      </div>
+                      {over > 0 ? (
+                        <p className="text-xs font-semibold text-red-600">
+                          {over.toLocaleString("pt-BR")} documentos excedentes
+                          {overCostBRL && ` · ~R$ ${overCostBRL}`}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">
+                          {isTrial
+                            ? `${used} de ${limit} documentos (trial)`
+                            : "documentos este mês"
+                          }
+                        </p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })()}
           </>
         )}
       </div>
@@ -462,9 +546,12 @@ export default function DashboardPage() {
           contra o trial cap (500 docs) quando aplicável. */}
       {(() => {
         const isActive = subscriptionStatus === "active"
+        // For active subscriptions use docs_included_mes from Stripe plan;
+        // for trial use actual trialCap from tenant. Fallback to trialCap
+        // if docsIncludedMes hasn't been set yet (migration gap).
         const limiteTotal = isActive
-          ? docsIncludedMes
-          : 500 // trial cap fixo
+          ? (docsIncludedMes > 0 ? docsIncludedMes : 3000) // default plan limit fallback
+          : trialCap
         const pctUso = limiteTotal > 0
           ? Math.min(100, Math.round((realDocsNaCompetencia / limiteTotal) * 100))
           : 0
@@ -485,9 +572,9 @@ export default function DashboardPage() {
                 <div
                   className={`h-full rounded-full transition-all ${
                     excedenteDocs > 0
-                      ? "bg-amber-500"
-                      : pctUso >= 90
-                        ? "bg-amber-400"
+                      ? "bg-red-500"
+                      : pctUso >= 80
+                        ? "bg-amber-500"
                         : "bg-emerald-500"
                   }`}
                   style={{ width: `${Math.max(pctUso, excedenteDocs > 0 ? 100 : pctUso)}%` }}
@@ -501,7 +588,7 @@ export default function DashboardPage() {
                 </span>
                 {excedenteDocs > 0 ? (
                   isActive ? (
-                    <span className="font-semibold text-amber-600">
+                    <span className="font-semibold text-red-600">
                       Excedente previsto: {excedenteDocs.toLocaleString("pt-BR")} docs · R$ {excedenteBRL}
                     </span>
                   ) : (

@@ -46,11 +46,23 @@ interface MdfeRow {
   emissao: string
 }
 
-const statusConfig: Record<MdfeStatus, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
-  Autorizado: { label: "Autorizado", variant: "default" },
-  Encerrado: { label: "Encerrado", variant: "secondary" },
-  Cancelado: { label: "Cancelado", variant: "destructive" },
-  Pendente: { label: "Pendente", variant: "outline" },
+const statusConfig: Record<MdfeStatus, { label: string; className: string }> = {
+  Autorizado: {
+    label: "Disponivel",
+    className: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+  },
+  Encerrado: {
+    label: "Entregue",
+    className: "bg-gray-100 text-gray-600 dark:bg-gray-800/50 dark:text-gray-400",
+  },
+  Cancelado: {
+    label: "Cancelado",
+    className: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+  },
+  Pendente: {
+    label: "Pendente",
+    className: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
+  },
 }
 
 const UFS = ["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"]
@@ -138,6 +150,8 @@ export default function HistoricoMdfePage() {
       id: i,
       chave: doc.chave_acesso || "",
       cnpj: doc.cnpj || "",
+      cnpjEmitente: doc.cnpj_emitente || null,
+      razaoSocialEmitente: doc.razao_social_emitente || null,
       status: statusMap[doc.status] || (doc.is_resumo ? "Pendente" : "Autorizado"),
       nsu: doc.nsu || "",
       fetchedAt: doc.fetched_at ? new Date(doc.fetched_at).toLocaleString("pt-BR") : "",
@@ -232,7 +246,7 @@ export default function HistoricoMdfePage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Chave de Acesso</TableHead>
-                    <TableHead>CNPJ</TableHead>
+                    <TableHead>Fornecedor</TableHead>
                     <TableHead>NSU</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Capturado em</TableHead>
@@ -245,12 +259,28 @@ export default function HistoricoMdfePage() {
                       <TableCell className="max-w-[220px] truncate font-mono text-xs">
                         {row.chave}
                       </TableCell>
-                      <TableCell className="font-mono text-xs">{row.cnpj}</TableCell>
+                      <TableCell>
+                        <div>
+                          {row.razaoSocialEmitente && (
+                            <p className="text-xs font-medium text-foreground truncate max-w-[180px]">
+                              {row.razaoSocialEmitente}
+                            </p>
+                          )}
+                          <p className="font-mono text-xs text-muted-foreground">
+                            {row.cnpjEmitente || row.cnpj}
+                            {!row.cnpjEmitente && (
+                              <span className="ml-1 text-[10px] text-amber-600" title="CNPJ do certificado (emitente indisponivel)">(cert)</span>
+                            )}
+                          </p>
+                        </div>
+                      </TableCell>
                       <TableCell className="font-mono text-xs">{row.nsu}</TableCell>
                       <TableCell>
-                        <Badge variant={statusConfig[row.status].variant}>
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusConfig[row.status].className}`}
+                        >
                           {statusConfig[row.status].label}
-                        </Badge>
+                        </span>
                       </TableCell>
                       <TableCell className="text-xs">{row.fetchedAt}</TableCell>
                       <TableCell>
@@ -450,9 +480,11 @@ export default function HistoricoMdfePage() {
                 <TableCell className="text-center font-medium">{row.ufDescarregamento}</TableCell>
                 <TableCell>{row.emissao}</TableCell>
                 <TableCell>
-                  <Badge variant={statusConfig[row.status].variant}>
+                  <span
+                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusConfig[row.status].className}`}
+                  >
                     {statusConfig[row.status].label}
-                  </Badge>
+                  </span>
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1">
