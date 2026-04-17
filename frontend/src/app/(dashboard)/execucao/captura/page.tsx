@@ -362,7 +362,7 @@ export default function CapturaManualPage() {
         </CardContent>
       </Card>
 
-      {/* CT-e / MDF-e / NFS-e - Direct capture */}
+      {/* CT-e / MDF-e / NFS-e - Direct capture (AFTER NF-e section) */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">CT-e / MDF-e / NFS-e — Captura direta</CardTitle>
@@ -486,12 +486,13 @@ export default function CapturaManualPage() {
           </p>
         </CardHeader>
         <CardContent className="space-y-5">
+          <div className="grid gap-6 md:grid-cols-2">
           {/* Step 1 */}
           <div className="space-y-3">
             <div>
-              <p className="text-sm font-medium">Etapa 1: Buscar resumos e enviar ciencia</p>
+              <p className="text-sm font-medium">Etapa 1: Buscar resumos e enviar ciência</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Consulta a SEFAZ para obter resumos de NF-e pendentes e envia ciencia automaticamente.
+                Consulta a SEFAZ para obter resumos de NF-e pendentes e envia ciência automaticamente.
               </p>
             </div>
             <Button
@@ -565,14 +566,6 @@ export default function CapturaManualPage() {
                 )}
               </div>
             )}
-          </div>
-
-          {/* Wait notice */}
-          <div className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30 p-3">
-            <Clock className="size-4 text-blue-500 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-            <p className="text-xs text-blue-700 dark:text-blue-300">
-              Aguarde <strong>30-60 minutos</strong> entre a Etapa 1 e a Etapa 2 para a SEFAZ processar a ciencia.
-            </p>
           </div>
 
           {/* Step 2 */}
@@ -657,6 +650,15 @@ export default function CapturaManualPage() {
                 )}
               </div>
             )}
+          </div>
+          </div>{/* close grid */}
+
+          {/* Wait notice */}
+          <div className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30 p-3">
+            <Clock className="size-4 text-blue-500 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-blue-700 dark:text-blue-300">
+              Aguarde <strong>30-60 minutos</strong> entre a Etapa 1 e a Etapa 2 para a SEFAZ processar a ciência.
+            </p>
           </div>
         </CardContent>
       </Card>
