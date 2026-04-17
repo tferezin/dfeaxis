@@ -47,6 +47,34 @@ async def trigger_polling(
     for tipo in body.tipos:
         if tipo not in ("nfe", "cte", "mdfe", "nfse"):
             continue
+
+        # NFe uses background polling v2 (resumo → ciência → wait → XML).
+        # The trigger endpoint does NOT call SEFAZ for NFe; instead it
+        # returns the count of already-available docs captured by the
+        # background jobs (poll_nfe_resumos + fetch_nfe_xml_completo).
+        if tipo == "nfe":
+            docs_available = sb.table("documents").select(
+                "id", count="exact", head=True,
+            ).eq("tenant_id", tenant_id).eq(
+                "tipo", "NFE",
+            ).eq("status", "available").execute()
+            nfe_count = docs_available.count or 0
+            result = {
+                "tipo": "NFE",
+                "status": "background",
+                "cstat": "138" if nfe_count > 0 else "137",
+                "xmotivo": (
+                    f"NFe capturadas via polling automatico. "
+                    f"{nfe_count} documentos disponiveis."
+                ),
+                "docs_found": nfe_count,
+                "latency_ms": 0,
+                "saved_to_db": nfe_count > 0,
+            }
+            results.append(result)
+            total_docs += nfe_count
+            continue
+
         result = _poll_single_detailed(cert, tipo, tenant.data)
         results.append(result)
         total_docs += result["docs_found"]

@@ -6,6 +6,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.interval import IntervalTrigger
 from fastapi import HTTPException
 
 from db.supabase import get_supabase_client
@@ -1376,8 +1377,44 @@ def start_scheduler() -> BackgroundScheduler:
     except Exception as exc:  # noqa: BLE001
         logger.warning("Não foi possível agendar pfx_cleanup_job: %s", exc)
 
+    # NFe Polling v2: two background jobs for the 2-step SEFAZ flow
+    # (resumo → ciência → wait → XML completo)
+    try:
+        from scheduler.nfe_polling_job import poll_nfe_resumos, fetch_nfe_xml_completo
+
+        # Job 1: Poll NFe resumos + send ciência (every 60 min)
+        scheduler.add_job(
+            poll_nfe_resumos,
+            trigger=IntervalTrigger(minutes=60),
+            id="nfe_poll_resumos",
+            name="NFe: busca resumos + envia ciência",
+            replace_existing=True,
+        )
+
+        # Job 2: Fetch NFe XML completo (every 60 min, offset 30 min from Job 1)
+        scheduler.add_job(
+            fetch_nfe_xml_completo,
+            trigger=IntervalTrigger(
+                minutes=60,
+                start_date=datetime.now() + timedelta(minutes=30),
+            ),
+            id="nfe_fetch_xml",
+            name="NFe: busca XML completo",
+            replace_existing=True,
+        )
+
+        logger.info(
+            "nfe_polling_job v2 agendado: resumos a cada 60min, "
+            "XML completo a cada 60min (offset 30min)"
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Não foi possível agendar nfe_polling_job v2: %s", exc)
+
     scheduler.start()
-    logger.info("Scheduler iniciado: SEM polling automático SEFAZ. Jobs ativos: trial_emails, monthly_overage, manifestacao_alerts, pfx_cleanup.")
+    logger.info(
+        "Scheduler iniciado. Jobs ativos: trial_emails, monthly_overage, "
+        "manifestacao_alerts, pfx_cleanup, nfe_poll_resumos, nfe_fetch_xml."
+    )
     return scheduler
 
 
