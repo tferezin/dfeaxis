@@ -98,7 +98,7 @@ const navigation: NavSection[] = [
     items: [
       { title: "Certificados A1", href: "/cadastros/certificados", icon: ShieldCheck },
       { title: "Empresas / CNPJs", href: "/cadastros/empresas", icon: Building },
-      { title: "API Keys", href: "/cadastros/api-keys", icon: Key },
+      { title: "Chave da API", href: "/cadastros/api-keys", icon: Key },
       { title: "Configurações", href: "/cadastros/configuracoes", icon: Settings },
     ],
   },

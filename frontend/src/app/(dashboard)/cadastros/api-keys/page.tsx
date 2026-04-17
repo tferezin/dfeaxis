@@ -154,9 +154,9 @@ export default function ApiKeysPage() {
     <div className="flex flex-col gap-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">API Keys</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Chave de Acesso da API</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Gerencie as chaves de acesso para integração SAP DRC com a API do DFeAxis.
+          Sua chave única de integração com o DFeAxis. Use no header <code className="text-xs bg-muted px-1 rounded">X-API-Key</code> de todas as chamadas.
         </p>
       </div>
 
@@ -248,7 +248,7 @@ export default function ApiKeysPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Shield className="size-5" />
-            Chaves de Acesso
+            Sua Chave de Acesso
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
