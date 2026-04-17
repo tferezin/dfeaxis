@@ -476,9 +476,9 @@ test.describe("SPOT: Landing page pública", () => {
   test("landing tem CTA de signup", async ({ page }) => {
     await page.goto("/")
     await page.waitForLoadState("domcontentloaded")
-    await page.waitForTimeout(2000)
-    // Landing usa <button onclick="...href='/signup'"> e <a href="/signup">
-    const cta = page.locator("button, a").filter({ hasText: /Começar|Criar conta|grátis|testar/i }).first()
+    await page.waitForTimeout(3000)
+    // Landing usa classes .btn-fill, .cta-p, .cta-s — procura qualquer elemento clicável com texto de CTA
+    const cta = page.locator(".btn-fill, .cta-p, .cta-s, .plan-btn, [onclick*='signup']").first()
     await expect(cta).toBeVisible({ timeout: 10_000 })
   })
 })
