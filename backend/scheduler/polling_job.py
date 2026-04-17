@@ -348,16 +348,24 @@ def _poll_single_detailed(cert: dict, tipo: str, tenant_data: dict) -> dict:
                     batch_idx, remaining, batch_size,
                 )
 
-            # Salva os docs do batch truncado
-            saved_in_batch = 0
-            last_saved_nsu: str | None = None
+            # Separa docs completos de resumos NFe
+            completos = []
+            resumos_nfe = []
             for doc in batch_docs:
                 is_resumo = doc.schema.startswith("res")
                 is_nfe = tipo == "nfe"
                 if is_resumo and is_nfe:
-                    manif_status = "pendente"
-                    doc_status = "pending_manifestacao"
-                elif is_resumo:
+                    resumos_nfe.append(doc)
+                else:
+                    completos.append(doc)
+
+            # 1) Salva docs completos imediatamente (procNFe, procCTe, procMDFe, resCTe, etc.)
+            saved_in_batch = 0
+            last_saved_nsu: str | None = None
+            for doc in completos:
+                is_resumo = doc.schema.startswith("res")
+                is_nfe = tipo == "nfe"
+                if is_resumo:
                     manif_status = "nao_aplicavel"
                     doc_status = "available"
                 else:
@@ -373,13 +381,212 @@ def _poll_single_detailed(cert: dict, tipo: str, tenant_data: dict) -> dict:
                     manif_status=manif_status,
                 )
                 if row is None:
-                    # Era evento SEFAZ (procEventoNFe/CTe/...), não doc fiscal
                     continue
                 sb.table("documents").upsert(
                     row, on_conflict="tenant_id,chave_acesso"
                 ).execute()
                 saved_in_batch += 1
                 last_saved_nsu = doc.nsu or last_saved_nsu
+
+            # 2) E2E flow for NFe resumos: ciência inline → second poll → save full XML
+            if resumos_nfe and tenant_data.get("manifestacao_mode") != "manual_only":
+                ciencia_ok_chaves: list[str] = []
+                ciencia_failed_resumos: list = []
+
+                for doc in resumos_nfe:
+                    try:
+                        result = manifestacao_service.enviar_evento(
+                            chave_acesso=doc.chave,
+                            cnpj=cnpj,
+                            tipo_evento="210210",
+                            pfx_encrypted=pfx_encrypted,
+                            pfx_iv=pfx_iv,
+                            tenant_id=tenant_id,
+                            pfx_password=pfx_password,
+                            ambiente=ambiente,
+                        )
+
+                        # Audit event — doc not yet in DB, so document_id=None
+                        sb.table("manifestacao_events").insert({
+                            "tenant_id": tenant_id,
+                            "document_id": None,
+                            "chave_acesso": doc.chave,
+                            "tipo_evento": "210210",
+                            "cstat": result.cstat,
+                            "xmotivo": result.xmotivo,
+                            "protocolo": result.protocolo,
+                            "latency_ms": result.latency_ms,
+                            "source": "auto_capture",
+                        }).execute()
+
+                        if result.success:
+                            ciencia_ok_chaves.append(doc.chave)
+                            logger.info(
+                                "E2E ciência OK chave=%s cstat=%s",
+                                doc.chave, result.cstat,
+                            )
+                        else:
+                            ciencia_failed_resumos.append(doc)
+                            logger.warning(
+                                "E2E ciência FALHA chave=%s cstat=%s xmotivo=%s",
+                                doc.chave, result.cstat, result.xmotivo,
+                            )
+                        # Small delay between ciência calls to avoid SEFAZ rate-limiting
+                        time.sleep(0.5)
+                    except Exception as e:
+                        logger.error("E2E ciência erro chave=%s: %s", doc.chave, e)
+                        ciencia_failed_resumos.append(doc)
+
+                # Save ciência-failed resumos as fallback (incomplete, but at least in DB)
+                for doc in ciencia_failed_resumos:
+                    row = _build_document_row(
+                        tenant_id=tenant_id,
+                        cnpj=cnpj,
+                        doc=doc,
+                        is_resumo=True,
+                        doc_status="pending_manifestacao",
+                        manif_status="pendente",
+                    )
+                    if row is None:
+                        continue
+                    sb.table("documents").upsert(
+                        row, on_conflict="tenant_id,chave_acesso"
+                    ).execute()
+                    saved_in_batch += 1
+                    last_saved_nsu = doc.nsu or last_saved_nsu
+
+                # Second polling round: SEFAZ should now return procNFe for ciência'd docs
+                if ciencia_ok_chaves:
+                    # Brief wait for SEFAZ to process ciência and make procNFe available
+                    time.sleep(2)
+
+                    try:
+                        response2 = sefaz_client.consultar_distribuicao(
+                            cnpj=cnpj, tipo=tipo, ult_nsu=ult_nsu,
+                            pfx_encrypted=pfx_encrypted, pfx_iv=pfx_iv,
+                            tenant_id=tenant_id, pfx_password=pfx_password,
+                            ambiente=ambiente,
+                        )
+                        total_latency_ms += response2.latency_ms
+
+                        # Index procNFe docs by chave for quick lookup
+                        full_xml_by_chave: dict[str, object] = {}
+                        for d2 in response2.documents:
+                            if not d2.schema.startswith("res") and d2.chave in ciencia_ok_chaves:
+                                full_xml_by_chave[d2.chave] = d2
+
+                        # Update cursor from second response if it advanced further
+                        if response2.ult_nsu > last_response_ult_nsu:
+                            last_response_ult_nsu = response2.ult_nsu
+                        if response2.max_nsu > last_response_max_nsu:
+                            last_response_max_nsu = response2.max_nsu
+
+                        resolved_chaves: set[str] = set()
+
+                        # Save full XML docs found in second round
+                        for chave, full_doc in full_xml_by_chave.items():
+                            row = _build_document_row(
+                                tenant_id=tenant_id,
+                                cnpj=cnpj,
+                                doc=full_doc,
+                                is_resumo=False,
+                                doc_status="available",
+                                manif_status="ciencia",
+                            )
+                            if row is None:
+                                continue
+                            now = datetime.now(timezone.utc)
+                            row["manifestacao_at"] = now.isoformat()
+                            row["manifestacao_deadline"] = (now + timedelta(days=180)).isoformat()
+                            sb.table("documents").upsert(
+                                row, on_conflict="tenant_id,chave_acesso"
+                            ).execute()
+                            saved_in_batch += 1
+                            last_saved_nsu = full_doc.nsu or last_saved_nsu
+                            resolved_chaves.add(chave)
+                            logger.info("E2E full XML saved chave=%s nsu=%s", chave, full_doc.nsu)
+
+                        # Fallback: resumos whose ciência succeeded but procNFe not yet available
+                        unresolved_chaves = set(ciencia_ok_chaves) - resolved_chaves
+                        if unresolved_chaves:
+                            logger.info(
+                                "E2E: %d resumos com ciência OK mas sem procNFe ainda (SEFAZ delay), "
+                                "salvando como resumo com ciencia status",
+                                len(unresolved_chaves),
+                            )
+                            # Find the original resumo docs for unresolved chaves
+                            resumo_by_chave = {d.chave: d for d in resumos_nfe}
+                            for chave in unresolved_chaves:
+                                rdoc = resumo_by_chave.get(chave)
+                                if not rdoc:
+                                    continue
+                                now = datetime.now(timezone.utc)
+                                row = _build_document_row(
+                                    tenant_id=tenant_id,
+                                    cnpj=cnpj,
+                                    doc=rdoc,
+                                    is_resumo=True,
+                                    doc_status="pending_manifestacao",
+                                    manif_status="ciencia",
+                                )
+                                if row is None:
+                                    continue
+                                row["manifestacao_at"] = now.isoformat()
+                                row["manifestacao_deadline"] = (now + timedelta(days=180)).isoformat()
+                                sb.table("documents").upsert(
+                                    row, on_conflict="tenant_id,chave_acesso"
+                                ).execute()
+                                saved_in_batch += 1
+                                last_saved_nsu = rdoc.nsu or last_saved_nsu
+
+                    except Exception as e2:
+                        logger.warning(
+                            "E2E second poll failed tenant=%s: %s — saving resumos as fallback",
+                            tenant_id, e2,
+                        )
+                        # Fallback: save all ciência'd resumos as incomplete
+                        resumo_by_chave = {d.chave: d for d in resumos_nfe}
+                        for chave in ciencia_ok_chaves:
+                            rdoc = resumo_by_chave.get(chave)
+                            if not rdoc:
+                                continue
+                            now = datetime.now(timezone.utc)
+                            row = _build_document_row(
+                                tenant_id=tenant_id,
+                                cnpj=cnpj,
+                                doc=rdoc,
+                                is_resumo=True,
+                                doc_status="pending_manifestacao",
+                                manif_status="ciencia",
+                            )
+                            if row is None:
+                                continue
+                            row["manifestacao_at"] = now.isoformat()
+                            row["manifestacao_deadline"] = (now + timedelta(days=180)).isoformat()
+                            sb.table("documents").upsert(
+                                row, on_conflict="tenant_id,chave_acesso"
+                            ).execute()
+                            saved_in_batch += 1
+                            last_saved_nsu = rdoc.nsu or last_saved_nsu
+
+            elif resumos_nfe:
+                # manual_only mode: save resumos without ciência (old behavior)
+                for doc in resumos_nfe:
+                    row = _build_document_row(
+                        tenant_id=tenant_id,
+                        cnpj=cnpj,
+                        doc=doc,
+                        is_resumo=True,
+                        doc_status="pending_manifestacao",
+                        manif_status="pendente",
+                    )
+                    if row is None:
+                        continue
+                    sb.table("documents").upsert(
+                        row, on_conflict="tenant_id,chave_acesso"
+                    ).execute()
+                    saved_in_batch += 1
+                    last_saved_nsu = doc.nsu or last_saved_nsu
 
             total_docs_saved += saved_in_batch
 
@@ -425,39 +632,8 @@ def _poll_single_detailed(cert: dict, tipo: str, tenant_data: dict) -> dict:
         #             tenant_id, total_docs_saved, e,
         #         )
 
-        # Auto-ciência: envia 210210 pra resumos NF-e capturados neste trigger.
-        # Ciência é obrigatória pelo protocolo SEFAZ — dispara sempre para NFe,
-        # a menos que o tenant opte explicitamente por 'manual_only'.
-        if (
-            tipo == "nfe"
-            and total_docs_saved > 0
-            and tenant_data.get("manifestacao_mode") != "manual_only"
-        ):
-            try:
-                # Busca docs recém-salvos que são resumos pendentes de ciência
-                recent_docs = sb.table("documents").select(
-                    "chave_acesso"
-                ).eq("tenant_id", tenant_id).eq(
-                    "manifestacao_status", "pendente"
-                ).limit(total_docs_saved).execute()
-                if recent_docs.data:
-                    from dataclasses import dataclass
-
-                    @dataclass
-                    class _DocStub:
-                        chave: str
-                        schema: str = "resNFe"
-
-                    stubs = [_DocStub(chave=r["chave_acesso"]) for r in recent_docs.data]
-                    _auto_ciencia(
-                        stubs, cert, tenant_id,
-                        pfx_encrypted, pfx_iv, pfx_password, ambiente,
-                    )
-            except Exception as e:
-                logger.warning(
-                    "auto_ciencia falhou no trigger tenant=%s: %s",
-                    tenant_id, e,
-                )
+        # Auto-ciência is now INLINE within the batch loop (E2E flow).
+        # No post-processing needed — ciência happens before saving.
 
         # Log único agregando o resultado de todos os batches
         sb.table("polling_log").insert({
@@ -631,22 +807,28 @@ def _poll_single(cert: dict, tipo: str, tenant_data: dict) -> int:
                 )
                 return 0
 
-        # Classifica e salva documentos
-        # resNFe/resCTe = resumo (precisa manifestação para NF-e)
-        # procNFe/procCTe/procMDFe = XML completo
+        # Classifica e salva documentos — E2E flow for NFe resumos
+        # resNFe = resumo NFe → inline ciência + second poll
+        # resCTe = resumo CT-e → salva direto (sem manifestação)
+        # procNFe/procCTe/procMDFe = XML completo → salva direto
+        completos = []
+        resumos_nfe = []
         for doc in docs_to_save:
             is_resumo = doc.schema.startswith("res")
             is_nfe = tipo == "nfe"
-
             if is_resumo and is_nfe:
-                manif_status = "pendente"
-                doc_status = "pending_manifestacao"
-            elif is_resumo:
-                # CT-e/MDF-e resumos — não requer manifestação
+                resumos_nfe.append(doc)
+            else:
+                completos.append(doc)
+
+        # Save complete docs immediately
+        for doc in completos:
+            is_resumo = doc.schema.startswith("res")
+            is_nfe = tipo == "nfe"
+            if is_resumo:
                 manif_status = "nao_aplicavel"
                 doc_status = "available"
             else:
-                # XML completo
                 manif_status = "nao_aplicavel" if not is_nfe else None
                 doc_status = "available"
 
@@ -659,20 +841,127 @@ def _poll_single(cert: dict, tipo: str, tenant_data: dict) -> int:
                 manif_status=manif_status,
             )
             if row is None:
-                # Evento SEFAZ (manifestação, cancelamento, etc.) — skip
                 continue
             sb.table("documents").upsert(
                 row, on_conflict="tenant_id,chave_acesso"
             ).execute()
 
-        # Ciência é obrigatória pelo protocolo SEFAZ — dispara sempre para NFe,
-        # a menos que o tenant opte explicitamente por 'manual_only'.
-        if tipo == "nfe" and tenant_data.get("manifestacao_mode") != "manual_only":
-            _auto_ciencia(
-                docs_to_save,
-                cert, tenant_id, pfx_encrypted, pfx_iv, pfx_password,
-                ambiente=ambiente,
-            )
+        # E2E flow for NFe resumos: inline ciência → second poll → save full XML
+        if resumos_nfe and tenant_data.get("manifestacao_mode") != "manual_only":
+            ciencia_ok_chaves: list[str] = []
+            ciencia_failed_resumos: list = []
+
+            for doc in resumos_nfe:
+                try:
+                    result = manifestacao_service.enviar_evento(
+                        chave_acesso=doc.chave,
+                        cnpj=cnpj,
+                        tipo_evento="210210",
+                        pfx_encrypted=pfx_encrypted,
+                        pfx_iv=pfx_iv,
+                        tenant_id=tenant_id,
+                        pfx_password=pfx_password,
+                        ambiente=ambiente,
+                    )
+                    sb.table("manifestacao_events").insert({
+                        "tenant_id": tenant_id,
+                        "document_id": None,
+                        "chave_acesso": doc.chave,
+                        "tipo_evento": "210210",
+                        "cstat": result.cstat,
+                        "xmotivo": result.xmotivo,
+                        "protocolo": result.protocolo,
+                        "latency_ms": result.latency_ms,
+                        "source": "auto_capture",
+                    }).execute()
+                    if result.success:
+                        ciencia_ok_chaves.append(doc.chave)
+                    else:
+                        ciencia_failed_resumos.append(doc)
+                    time.sleep(0.5)
+                except Exception as e:
+                    logger.error("E2E ciência erro chave=%s: %s", doc.chave, e)
+                    ciencia_failed_resumos.append(doc)
+
+            # Save ciência-failed resumos as fallback
+            for doc in ciencia_failed_resumos:
+                row = _build_document_row(
+                    tenant_id=tenant_id, cnpj=cnpj, doc=doc,
+                    is_resumo=True, doc_status="pending_manifestacao", manif_status="pendente",
+                )
+                if row is not None:
+                    sb.table("documents").upsert(row, on_conflict="tenant_id,chave_acesso").execute()
+
+            # Second polling round for full XML
+            if ciencia_ok_chaves:
+                time.sleep(2)
+                try:
+                    response2 = sefaz_client.consultar_distribuicao(
+                        cnpj=cnpj, tipo=tipo, ult_nsu=ult_nsu,
+                        pfx_encrypted=pfx_encrypted, pfx_iv=pfx_iv,
+                        tenant_id=tenant_id, pfx_password=pfx_password,
+                        ambiente=ambiente,
+                    )
+                    full_xml_by_chave = {
+                        d2.chave: d2 for d2 in response2.documents
+                        if not d2.schema.startswith("res") and d2.chave in ciencia_ok_chaves
+                    }
+                    resolved_chaves: set[str] = set()
+                    for chave, full_doc in full_xml_by_chave.items():
+                        row = _build_document_row(
+                            tenant_id=tenant_id, cnpj=cnpj, doc=full_doc,
+                            is_resumo=False, doc_status="available", manif_status="ciencia",
+                        )
+                        if row is None:
+                            continue
+                        now = datetime.now(timezone.utc)
+                        row["manifestacao_at"] = now.isoformat()
+                        row["manifestacao_deadline"] = (now + timedelta(days=180)).isoformat()
+                        sb.table("documents").upsert(row, on_conflict="tenant_id,chave_acesso").execute()
+                        resolved_chaves.add(chave)
+                    # Fallback for unresolved
+                    resumo_by_chave = {d.chave: d for d in resumos_nfe}
+                    for chave in set(ciencia_ok_chaves) - resolved_chaves:
+                        rdoc = resumo_by_chave.get(chave)
+                        if not rdoc:
+                            continue
+                        now = datetime.now(timezone.utc)
+                        row = _build_document_row(
+                            tenant_id=tenant_id, cnpj=cnpj, doc=rdoc,
+                            is_resumo=True, doc_status="pending_manifestacao", manif_status="ciencia",
+                        )
+                        if row is None:
+                            continue
+                        row["manifestacao_at"] = now.isoformat()
+                        row["manifestacao_deadline"] = (now + timedelta(days=180)).isoformat()
+                        sb.table("documents").upsert(row, on_conflict="tenant_id,chave_acesso").execute()
+                except Exception as e2:
+                    logger.warning("E2E second poll failed (scheduler) tenant=%s: %s", tenant_id, e2)
+                    resumo_by_chave = {d.chave: d for d in resumos_nfe}
+                    for chave in ciencia_ok_chaves:
+                        rdoc = resumo_by_chave.get(chave)
+                        if not rdoc:
+                            continue
+                        now = datetime.now(timezone.utc)
+                        row = _build_document_row(
+                            tenant_id=tenant_id, cnpj=cnpj, doc=rdoc,
+                            is_resumo=True, doc_status="pending_manifestacao", manif_status="ciencia",
+                        )
+                        if row is None:
+                            continue
+                        row["manifestacao_at"] = now.isoformat()
+                        row["manifestacao_deadline"] = (now + timedelta(days=180)).isoformat()
+                        sb.table("documents").upsert(row, on_conflict="tenant_id,chave_acesso").execute()
+
+        elif resumos_nfe:
+            # manual_only mode: save resumos without ciência
+            for doc in resumos_nfe:
+                row = _build_document_row(
+                    tenant_id=tenant_id, cnpj=cnpj, doc=doc,
+                    is_resumo=True, doc_status="pending_manifestacao", manif_status="pendente",
+                )
+                if row is not None:
+                    sb.table("documents").upsert(row, on_conflict="tenant_id,chave_acesso").execute()
 
         # Atualiza cursor no nsu_state (por ambiente). max_nsu vem do response
         # e é o verdadeiro "topo" conhecido na SEFAZ — serve para calcular pendentes.
