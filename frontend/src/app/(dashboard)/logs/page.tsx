@@ -90,8 +90,15 @@ export default function LogsCaptura() {
   const [statusFilter, setStatusFilter] = useState("Todos")
   const [tipoFilter, setTipoFilter] = useState("Todos")
   const [cnpjFilter, setCnpjFilter] = useState("Todos")
-  const [dateFrom, setDateFrom] = useState("2026-03-01")
-  const [dateTo, setDateTo] = useState("2026-03-17")
+  // Dynamic defaults: 1st of current month to today
+  const [dateFrom, setDateFrom] = useState(() => {
+    const now = new Date()
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`
+  })
+  const [dateTo, setDateTo] = useState(() => {
+    const now = new Date()
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
+  })
   const itemsPerPage = 10
 
   const [realLogs, setRealLogs] = useState<LogRow[]>([])
@@ -109,11 +116,17 @@ export default function LogsCaptura() {
     setRealLoading(true)
     try {
       const sb = getSupabase()
+      // Build date range: start of dateFrom to end of dateTo (inclusive)
+      const startISO = `${dateFrom}T00:00:00.000Z`
+      const endISO = `${dateTo}T23:59:59.999Z`
+
       const { data, error } = await sb
         .from('polling_log')
         .select('id, tipo, cnpj, status, docs_found, latency_ms, error_message, created_at, triggered_by')
+        .gte('created_at', startISO)
+        .lte('created_at', endISO)
         .order('created_at', { ascending: false })
-        .limit(100)
+        .limit(200)
 
       if (!error && data) {
         const mapped: LogRow[] = data.map((row: any, i: number) => ({
@@ -140,7 +153,7 @@ export default function LogsCaptura() {
     } finally {
       setRealLoading(false)
     }
-  }, [])
+  }, [dateFrom, dateTo])
 
   useEffect(() => {
     if (!settings.showMockData) loadRealData()
@@ -282,7 +295,7 @@ export default function LogsCaptura() {
           </select>
         </div>
 
-        <Button variant="default" className="gap-1.5" onClick={!showMock ? loadRealData : undefined} disabled={!showMock && realLoading}>
+        <Button variant="default" className="gap-1.5" onClick={!showMock ? () => { loadRealData(); setCurrentPage(1) } : undefined} disabled={!showMock && realLoading}>
           <Filter className="size-3.5" />
           Filtrar
         </Button>
