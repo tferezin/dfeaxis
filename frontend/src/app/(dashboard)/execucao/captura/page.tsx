@@ -123,6 +123,12 @@ export default function CapturaManualPage() {
     resumos_found?: number
     ciencia_sent?: number
     completos_found?: number
+    sefaz_cstat?: string
+    sefaz_xmotivo?: string
+    ult_nsu_used?: string
+    ult_nsu_returned?: string
+    max_nsu?: string
+    total_docs_in_response?: number
     results?: Array<{
       chave?: string
       nsu?: string
@@ -782,7 +788,7 @@ export default function CapturaManualPage() {
                   </div>
                 ) : (
                   <>
-                    <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-3 space-y-1">
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-3 space-y-2">
                       <div className="flex gap-4 text-xs flex-wrap">
                         <span className="text-amber-800 dark:text-amber-300">
                           <strong>{nfeStep1Result.resumos_found ?? 0}</strong> resumo(s) encontrado(s)
@@ -795,6 +801,15 @@ export default function CapturaManualPage() {
                             <strong>{nfeStep1Result.completos_found}</strong> XML(s) completo(s) ja disponivel(is)
                           </span>
                         )}
+                      </div>
+                      {/* SEFAZ diagnostic */}
+                      <div className="border-t border-amber-200 dark:border-amber-700 pt-1.5 space-y-0.5">
+                        <p className="text-[10px] font-mono text-amber-700 dark:text-amber-400">
+                          SEFAZ cStat: <strong>{nfeStep1Result.sefaz_cstat ?? "?"}</strong> — {nfeStep1Result.sefaz_xmotivo ?? "sem resposta"}
+                        </p>
+                        <p className="text-[10px] font-mono text-amber-700/70 dark:text-amber-400/70">
+                          NSU enviado: {nfeStep1Result.ult_nsu_used ?? "?"} | NSU retornado: {nfeStep1Result.ult_nsu_returned ?? "?"} | maxNSU: {nfeStep1Result.max_nsu ?? "?"} | docs na resposta: {nfeStep1Result.total_docs_in_response ?? 0}
+                        </p>
                       </div>
                     </div>
                     {nfeStep1Result.results?.map((r, i) => (

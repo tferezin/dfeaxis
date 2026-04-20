@@ -200,6 +200,13 @@ class NfeResumosResponse(BaseModel):
     ciencia_sent: int = 0
     completos_found: int = 0
     results: list[dict] = []
+    # Diagnostic fields — SEFAZ raw response
+    sefaz_cstat: str | None = None
+    sefaz_xmotivo: str | None = None
+    ult_nsu_used: str | None = None
+    ult_nsu_returned: str | None = None
+    max_nsu: str | None = None
+    total_docs_in_response: int | None = None
 
 
 class NfeXmlCompletoResponse(BaseModel):

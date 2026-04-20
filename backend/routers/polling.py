@@ -354,6 +354,12 @@ async def nfe_resumos(
         ciencia_sent=ciencia_sent,
         completos_found=completos_found,
         results=results,
+        sefaz_cstat=response.cstat,
+        sefaz_xmotivo=response.xmotivo,
+        ult_nsu_used=ult_nsu,
+        ult_nsu_returned=response.ult_nsu,
+        max_nsu=response.max_nsu,
+        total_docs_in_response=len(docs),
     )
 
 
