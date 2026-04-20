@@ -116,6 +116,7 @@ export default function CapturaManualPage() {
   } | null>(null)
 
   // NF-e 2-step state
+  const [nfeResetNsu, setNfeResetNsu] = useState(false)
   const [nfeStep1Status, setNfeStep1Status] = useState<"idle" | "loading">("idle")
   const [nfeStep2Status, setNfeStep2Status] = useState<"idle" | "loading">("idle")
   const [nfeStep1Result, setNfeStep1Result] = useState<{
@@ -380,7 +381,7 @@ export default function CapturaManualPage() {
           "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ cnpj: cleanCnpj }),
+        body: JSON.stringify({ cnpj: cleanCnpj, force_reset_nsu: nfeResetNsu }),
       })
 
       if (!res.ok) {
@@ -766,6 +767,15 @@ export default function CapturaManualPage() {
                 Consulta a SEFAZ para obter resumos de NF-e pendentes e envia ciência automaticamente.
               </p>
             </div>
+            <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+              <input
+                type="checkbox"
+                checked={nfeResetNsu}
+                onChange={(e) => setNfeResetNsu(e.target.checked)}
+                className="rounded"
+              />
+              Resetar cursor (buscar desde o inicio)
+            </label>
             <Button
               className="gap-2 bg-amber-600 hover:bg-amber-700 text-white"
               disabled={nfeStep1Status === "loading" || !cleanCnpj}

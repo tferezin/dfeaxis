@@ -153,11 +153,17 @@ async def nfe_resumos(
         cert["pfx_encrypted"], cert["pfx_iv"]
     )
 
-    # Get current NSU cursor
-    try:
-        ult_nsu = nsu_controller.get_cursor(cert["id"], "nfe", ambiente)
-    except Exception:
-        ult_nsu = cert.get("last_nsu_nfe", "000000000000000")
+    # Get current NSU cursor (optionally reset)
+    if body.force_reset_nsu:
+        ult_nsu = "000000000000000"
+        nsu_controller.update_cursor(cert["id"], "nfe", ambiente, ult_nsu)
+        nsu_controller.update_last_nsu(cert["id"], "nfe", ult_nsu)
+        logger.info("nfe-resumos: NSU resetado para %s (force_reset_nsu=true)", ult_nsu)
+    else:
+        try:
+            ult_nsu = nsu_controller.get_cursor(cert["id"], "nfe", ambiente)
+        except Exception:
+            ult_nsu = cert.get("last_nsu_nfe", "000000000000000")
 
     # Call SEFAZ DistDFe
     try:

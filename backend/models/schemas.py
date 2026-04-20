@@ -193,6 +193,7 @@ class PollingTriggerResponse(BaseModel):
 
 class NfeCnpjRequest(BaseModel):
     cnpj: CnpjStr
+    force_reset_nsu: bool = False
 
 
 class NfeResumosResponse(BaseModel):
