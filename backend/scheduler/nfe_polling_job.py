@@ -352,7 +352,7 @@ def _enqueue_and_ciencia(
             "xmotivo": result.xmotivo,
             "protocolo": result.protocolo,
             "latency_ms": result.latency_ms,
-            "source": "nfe_poll_resumos",
+            "source": "auto_capture",
         }).execute()
 
         if result.success:

@@ -257,7 +257,7 @@ async def nfe_resumos(
                     "xmotivo": manif_result.xmotivo,
                     "protocolo": manif_result.protocolo,
                     "latency_ms": manif_result.latency_ms,
-                    "source": "nfe-resumos-manual",
+                    "source": "dashboard",
                 }).execute()
 
                 if manif_result.success:
@@ -449,7 +449,7 @@ async def nfe_retry_ciencia(
                 "xmotivo": manif_result.xmotivo,
                 "protocolo": manif_result.protocolo,
                 "latency_ms": manif_result.latency_ms,
-                "source": "nfe-retry-ciencia-manual",
+                "source": "dashboard",
             }).execute()
 
             if manif_result.success:

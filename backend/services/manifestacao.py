@@ -16,8 +16,6 @@ from typing import Optional
 
 import requests
 from lxml import etree
-from zeep import Client as ZeepClient
-from zeep.transports import Transport
 
 from services.cert_manager import decrypt_pfx, temp_cert_files
 from services.circuit_breaker import circuit_breaker
@@ -166,28 +164,65 @@ class ManifestacaoService:
         justificativa: str,
         ambiente: str | None = None,
     ) -> ManifestacaoResponse:
-        """Executa chamada SOAP ao RecepcaoEvento."""
+        """Executa chamada SOAP ao RecepcaoEvento via HTTP raw.
+
+        Usa HTTP POST direto com envelope SOAP 1.2 ao invés de zeep,
+        porque o WSDL da SEFAZ às vezes confunde a resolução de
+        operações do zeep.
+        """
         effective_ambiente = ambiente or self.ambiente
         endpoint = RECEPCAO_EVENTO_ENDPOINTS[effective_ambiente]
+        # URL sem ?wsdl para o POST
+        post_url = endpoint.replace("?wsdl", "")
         start_time = time.time()
 
+        xml_evento = self._build_evento_xml(
+            chave_acesso, cnpj, tipo_evento, justificativa,
+            effective_ambiente,
+        )
+        xml_evento_str = etree.tostring(xml_evento, encoding="unicode")
+
+        # SOAP 1.2 envelope
+        soap_envelope = (
+            '<?xml version="1.0" encoding="utf-8"?>'
+            '<soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope"'
+            ' xmlns:nfe="http://www.portalfiscal.inf.br/nfe/wsdl/NFeRecepcaoEvento4">'
+            '<soap12:Body>'
+            '<nfe:nfeRecepcaoEvento>'
+            f'<nfe:nfeDadosMsg>{xml_evento_str}</nfe:nfeDadosMsg>'
+            '</nfe:nfeRecepcaoEvento>'
+            '</soap12:Body>'
+            '</soap12:Envelope>'
+        )
+
         with temp_cert_files(pfx_bytes, pfx_password) as (cert_path, key_path):
-            session = requests.Session()
-            session.cert = (cert_path, key_path)
-            session.verify = True
-
-            transport = Transport(session=session, timeout=30)
-            client = ZeepClient(wsdl=endpoint, transport=transport)
-
-            xml_evento = self._build_evento_xml(
-                chave_acesso, cnpj, tipo_evento, justificativa,
-                effective_ambiente,
+            resp = requests.post(
+                post_url,
+                data=soap_envelope.encode("utf-8"),
+                headers={
+                    "Content-Type": "application/soap+xml; charset=utf-8",
+                },
+                cert=(cert_path, key_path),
+                verify=True,
+                timeout=30,
             )
 
-            response = client.service.nfeRecepcaoEvento(nfeDadosMsg=xml_evento)
-
         latency_ms = int((time.time() - start_time) * 1000)
-        return self._parse_response(response, latency_ms)
+
+        if resp.status_code != 200:
+            logger.error(
+                "Manifestação SOAP HTTP %d para %s: %s",
+                resp.status_code, chave_acesso, resp.text[:500],
+            )
+            return ManifestacaoResponse(
+                cstat="999",
+                xmotivo=f"SEFAZ HTTP {resp.status_code}: {resp.text[:200]}",
+                protocolo=None,
+                latency_ms=latency_ms,
+                success=False,
+            )
+
+        return self._parse_response(resp.content, latency_ms)
 
     def _build_evento_xml(
         self,
