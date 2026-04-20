@@ -301,13 +301,17 @@ def _enqueue_and_ciencia(
         return
 
     # Send ciencia (210210)
+    # manifestacao_service expects bytes for pfx_encrypted/pfx_iv.
+    # _normalize_pfx_blob may return str for v2 certs ("v2:...").
+    _pfx_enc = pfx_encrypted if isinstance(pfx_encrypted, bytes) else pfx_encrypted.encode("utf-8") if isinstance(pfx_encrypted, str) else pfx_encrypted
+    _pfx_iv = pfx_iv if isinstance(pfx_iv, bytes) else pfx_iv if pfx_iv is None else bytes(pfx_iv) if isinstance(pfx_iv, (bytearray, memoryview)) else pfx_iv
     try:
         result = manifestacao_service.enviar_evento(
             chave_acesso=doc.chave,
             cnpj=cnpj,
             tipo_evento="210210",
-            pfx_encrypted=pfx_encrypted,
-            pfx_iv=pfx_iv,
+            pfx_encrypted=_pfx_enc,
+            pfx_iv=_pfx_iv,
             tenant_id=tenant_id,
             pfx_password=pfx_password,
             ambiente=ambiente,
