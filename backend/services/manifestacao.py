@@ -109,7 +109,31 @@ class ManifestacaoService:
                 success=False,
             )
 
-        pfx_bytes = decrypt_pfx(pfx_encrypted, pfx_iv, tenant_id)
+        # Auto-detect v1/v2 PFX format (same logic as sefaz_client)
+        pfx_encrypted_str = (
+            pfx_encrypted
+            if isinstance(pfx_encrypted, str)
+            else pfx_encrypted.decode("utf-8", errors="ignore")
+            if isinstance(pfx_encrypted, bytes)
+            else str(pfx_encrypted)
+        )
+
+        if pfx_encrypted_str.startswith("v2:"):
+            blob = bytes.fromhex(pfx_encrypted_str[3:])
+            pfx_bytes = decrypt_pfx(blob, None, tenant_id)
+        else:
+            enc_bytes = (
+                bytes.fromhex(pfx_encrypted_str)
+                if isinstance(pfx_encrypted_str, str)
+                else pfx_encrypted
+            )
+            iv_bytes = (
+                bytes.fromhex(pfx_iv)
+                if isinstance(pfx_iv, str)
+                else pfx_iv
+            )
+            pfx_bytes = decrypt_pfx(enc_bytes, iv_bytes, tenant_id)
+
         effective_ambiente = ambiente or self.ambiente
 
         start_time = time.time()

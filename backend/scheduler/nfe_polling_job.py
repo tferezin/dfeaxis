@@ -360,12 +360,13 @@ def _enqueue_and_ciencia(
             )
 
     except Exception as exc:
+        err_msg = str(exc) or repr(exc)
         logger.error(
-            "nfe_poll_resumos: ciencia erro chave=%s: %s",
-            doc.chave, exc,
+            "nfe_poll_resumos: ciencia erro chave=%s: %s: %s",
+            doc.chave, type(exc).__name__, err_msg,
         )
         sb.table("nfe_ciencia_queue").update({
-            "ultimo_erro": f"ciencia exception: {type(exc).__name__}: {exc}",
+            "ultimo_erro": f"ciencia exception: {type(exc).__name__}: {err_msg}",
             "tentativas": 1,
         }).eq("tenant_id", tenant_id).eq(
             "chave_acesso", doc.chave,
