@@ -452,6 +452,9 @@ async def nfe_retry_ciencia(
                 "source": "dashboard",
             }).execute()
 
+            # cStats de rejeição permanente — descartar da fila
+            _DISCARD_CSTATS = {"575", "596"}
+
             if manif_result.success:
                 sb.table("nfe_ciencia_queue").update({
                     "ciencia_enviada": True,
@@ -464,6 +467,24 @@ async def nfe_retry_ciencia(
                 results.append({
                     "chave": entry["chave_acesso"],
                     "status": "ciencia_ok",
+                    "cstat": manif_result.cstat,
+                    "xmotivo": manif_result.xmotivo,
+                })
+            elif manif_result.cstat in _DISCARD_CSTATS:
+                # Rejeição permanente — marcar como descartado
+                sb.table("nfe_ciencia_queue").update({
+                    "ciencia_enviada": True,
+                    "ciencia_enviada_at": datetime.now(timezone.utc).isoformat(),
+                    "ciencia_cstat": manif_result.cstat,
+                    "xml_fetched": True,
+                    "xml_fetched_at": datetime.now(timezone.utc).isoformat(),
+                    "ultimo_erro": f"descartado: cstat={manif_result.cstat} {manif_result.xmotivo}",
+                }).eq("id", entry["id"]).execute()
+
+                ciencia_failed += 1
+                results.append({
+                    "chave": entry["chave_acesso"],
+                    "status": "discarded",
                     "cstat": manif_result.cstat,
                     "xmotivo": manif_result.xmotivo,
                 })
@@ -558,48 +579,51 @@ async def nfe_xml_completo(
         )
 
     entries = queue_result.data
-    pending_chaves = {e["chave_acesso"]: e for e in entries}
-
-    # Call SEFAZ DistDFe from the lowest pending NSU
-    min_nsu = min(
-        (e["nsu"] for e in entries),
-        key=lambda n: int(n) if n else 0,
-    )
-
-    try:
-        response = sefaz_client.consultar_distribuicao(
-            cnpj=body.cnpj,
-            tipo="nfe",
-            ult_nsu=min_nsu,
-            pfx_encrypted=pfx_encrypted,
-            pfx_iv=pfx_iv,
-            tenant_id=tenant_id,
-            pfx_password=pfx_password,
-            ambiente=ambiente,
-        )
-    except Exception as exc:
-        logger.error(
-            "nfe-xml-completo: SEFAZ call failed cnpj=%s: %s",
-            mask_cnpj(body.cnpj), exc,
-        )
-        raise HTTPException(
-            status_code=502,
-            detail=f"Erro na consulta SEFAZ: {type(exc).__name__}: {exc}",
-        )
-
-    # Index full XML docs by chave
-    full_docs_by_chave: dict[str, object] = {}
-    for doc in response.documents:
-        if not doc.schema.startswith("res") and doc.chave in pending_chaves:
-            full_docs_by_chave[doc.chave] = doc
 
     results = []
     saved = 0
     still_pending = 0
 
-    for chave, entry in pending_chaves.items():
-        if chave in full_docs_by_chave:
-            full_doc = full_docs_by_chave[chave]
+    # Busca XML completo por chave (consChNFe) — sem depender do cursor NSU
+    for entry in entries:
+        chave = entry["chave_acesso"]
+
+        try:
+            response = sefaz_client.consultar_por_chave(
+                cnpj=body.cnpj,
+                chave_acesso=chave,
+                pfx_encrypted=pfx_encrypted,
+                pfx_iv=pfx_iv,
+                tenant_id=tenant_id,
+                pfx_password=pfx_password,
+                ambiente=ambiente,
+            )
+        except Exception as exc:
+            logger.error(
+                "nfe-xml-completo: consChNFe failed chave=%s: %s",
+                chave[:20], exc,
+            )
+            still_pending += 1
+            sb.table("nfe_ciencia_queue").update({
+                "tentativas": entry.get("tentativas", 0) + 1,
+                "ultimo_erro": f"consChNFe error: {type(exc).__name__}: {exc}",
+            }).eq("id", entry["id"]).execute()
+            results.append({
+                "chave": chave,
+                "status": "error",
+                "detail": f"{type(exc).__name__}: {exc}",
+            })
+            time.sleep(1)
+            continue
+
+        # Procura procNFe (XML completo, não resumo) na resposta
+        full_doc = None
+        for doc in response.documents:
+            if not doc.schema.startswith("res"):
+                full_doc = doc
+                break
+
+        if full_doc:
             row = _build_document_row(
                 tenant_id=tenant_id,
                 cnpj=body.cnpj,
@@ -646,14 +670,16 @@ async def nfe_xml_completo(
             new_tentativas = entry.get("tentativas", 0) + 1
             sb.table("nfe_ciencia_queue").update({
                 "tentativas": new_tentativas,
-                "ultimo_erro": "procNFe nao encontrado na resposta SEFAZ",
+                "ultimo_erro": f"procNFe nao retornado (cstat={response.cstat}: {response.xmotivo})",
             }).eq("id", entry["id"]).execute()
             results.append({
                 "chave": chave,
                 "status": "pending",
                 "tentativas": new_tentativas,
-                "detail": "XML ainda nao disponivel na SEFAZ",
+                "detail": f"SEFAZ cstat={response.cstat}: {response.xmotivo}",
             })
+
+        time.sleep(1)  # Rate limit entre chamadas
 
     # Log
     sb.table("polling_log").insert({
