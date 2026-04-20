@@ -188,6 +188,10 @@ class ManifestacaoService:
 
         xml_evento_str = etree.tostring(xml_evento, encoding="unicode")
 
+        # SEFAZ rejects namespace prefixes (cStat 404).
+        # signxml uses "ds:" prefix — strip it.
+        xml_evento_str = xml_evento_str.replace("<ds:", "<").replace("</ds:", "</").replace("xmlns:ds=", "xmlns=")
+
         # SOAP 1.2 envelope — ASMX expects nfeDadosMsg directly in Body
         soap_envelope = (
             '<?xml version="1.0" encoding="utf-8"?>'
