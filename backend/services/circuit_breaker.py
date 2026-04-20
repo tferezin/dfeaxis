@@ -20,6 +20,7 @@ class CircuitEntry:
     failure_count: int = 0
     last_failure_time: float = 0.0
     success_count_half_open: int = 0
+    override_recovery_s: float | None = None  # per-entry override (e.g. 656)
 
 
 class CircuitBreaker:
@@ -54,7 +55,8 @@ class CircuitBreaker:
 
         if entry.state == CircuitState.OPEN:
             elapsed = time.time() - entry.last_failure_time
-            if elapsed >= self.recovery_timeout_s:
+            timeout = entry.override_recovery_s or self.recovery_timeout_s
+            if elapsed >= timeout:
                 entry.state = CircuitState.HALF_OPEN
                 entry.success_count_half_open = 0
                 return True
@@ -83,6 +85,14 @@ class CircuitBreaker:
             entry.state = CircuitState.OPEN
         elif entry.failure_count >= self.failure_threshold:
             entry.state = CircuitState.OPEN
+
+    def force_open(self, cnpj: str, tipo: str, recovery_s: float) -> None:
+        """Force circuit open with a custom recovery timeout."""
+        entry = self._get(cnpj, tipo)
+        entry.state = CircuitState.OPEN
+        entry.last_failure_time = time.time()
+        entry.failure_count = self.failure_threshold
+        entry.override_recovery_s = recovery_s
 
     def get_state(self, cnpj: str, tipo: str) -> CircuitState:
         return self._get(cnpj, tipo).state

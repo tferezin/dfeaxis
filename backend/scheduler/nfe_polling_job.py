@@ -180,6 +180,31 @@ def _poll_resumos_for_cert(cert: dict, tenant_data: dict) -> None:
         }).execute()
         return
 
+    # cStat 656 = Consumo Indevido — SEFAZ blocked this CNPJ for ~1h.
+    # Do NOT retry — it only renews the block. Open circuit breaker to
+    # prevent the next scheduled run from calling again.
+    if response.cstat == "656":
+        logger.warning(
+            "nfe_poll_resumos: cStat 656 Consumo Indevido cnpj=%s — "
+            "backing off (circuit breaker open for 70 min)",
+            mask_cnpj(cnpj),
+        )
+        # Force circuit breaker open for 70 min (SEFAZ requires 1h)
+        from services.circuit_breaker import circuit_breaker as cb
+        cb.force_open(cnpj, "nfe", recovery_s=4200)  # 70 min
+        sb.table("polling_log").insert({
+            "tenant_id": tenant_id,
+            "cnpj": cnpj,
+            "tipo": "nfe",
+            "triggered_by": "nfe_poll_resumos",
+            "status": "error",
+            "docs_found": 0,
+            "ult_nsu": response.ult_nsu,
+            "latency_ms": response.latency_ms,
+            "error_message": f"cStat 656: {response.xmotivo}",
+        }).execute()
+        return
+
     docs = list(response.documents)
     docs_found = len(docs)
 
