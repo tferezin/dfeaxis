@@ -439,22 +439,10 @@ async def nfe_retry_ciencia(
                 ambiente=ambiente,
             )
 
-            # Audit
-            sb.table("manifestacao_events").insert({
-                "tenant_id": tenant_id,
-                "document_id": None,
-                "chave_acesso": entry["chave_acesso"],
-                "tipo_evento": "210210",
-                "cstat": manif_result.cstat,
-                "xmotivo": manif_result.xmotivo,
-                "protocolo": manif_result.protocolo,
-                "latency_ms": manif_result.latency_ms,
-                "source": "dashboard",
-            }).execute()
-
             # cStats de rejeição permanente — descartar da fila
             _DISCARD_CSTATS = {"575", "596"}
 
+            # PRIMEIRO atualiza a queue, DEPOIS faz audit (audit pode falhar por constraint)
             if manif_result.success:
                 sb.table("nfe_ciencia_queue").update({
                     "ciencia_enviada": True,
@@ -509,6 +497,22 @@ async def nfe_retry_ciencia(
                 "status": "error",
                 "detail": f"{type(exc).__name__}: {err_msg}",
             })
+
+        # Audit (best-effort — não aborta se falhar)
+        try:
+            sb.table("manifestacao_events").insert({
+                "tenant_id": tenant_id,
+                "document_id": None,
+                "chave_acesso": entry["chave_acesso"],
+                "tipo_evento": "210210",
+                "cstat": manif_result.cstat if 'manif_result' in dir() else "999",
+                "xmotivo": manif_result.xmotivo if 'manif_result' in dir() else "",
+                "protocolo": manif_result.protocolo if 'manif_result' in dir() else None,
+                "latency_ms": manif_result.latency_ms if 'manif_result' in dir() else 0,
+                "source": "dashboard",
+            }).execute()
+        except Exception:
+            pass  # Audit failure não deve bloquear o fluxo
 
         time.sleep(0.5)
 
@@ -573,9 +577,26 @@ async def nfe_xml_completo(
     ).execute()
 
     if not queue_result.data:
+        # Diagnóstico: mostra quantas entries existem e seu status
+        all_entries = sb.table("nfe_ciencia_queue").select(
+            "chave_acesso, ciencia_enviada, xml_fetched, ciencia_cstat, ultimo_erro",
+        ).eq("tenant_id", tenant_id).eq("cnpj", body.cnpj).execute()
+        diag = []
+        for e in (all_entries.data or []):
+            diag.append({
+                "chave": e["chave_acesso"][:20] + "...",
+                "ciencia": e["ciencia_enviada"],
+                "xml_fetched": e["xml_fetched"],
+                "cstat": e.get("ciencia_cstat"),
+                "erro": (e.get("ultimo_erro") or "")[:80],
+            })
         return NfeXmlCompletoResponse(
             xml_found=0, saved=0, still_pending=0,
-            results=[{"status": "empty", "detail": "Nenhuma entrada pendente na fila de ciencia para este CNPJ"}],
+            results=[{
+                "status": "empty",
+                "detail": f"Nenhuma entrada com ciencia_enviada=True e xml_fetched=False. Total na fila: {len(diag)}",
+                "diagnostico": diag,
+            }],
         )
 
     entries = queue_result.data
