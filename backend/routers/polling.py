@@ -225,13 +225,16 @@ async def nfe_resumos(
                 })
                 continue
 
+            # manifestacao_service expects bytes; _normalize_pfx_blob may return str for v2
+            _pfx_enc = pfx_encrypted if isinstance(pfx_encrypted, bytes) else pfx_encrypted.encode("utf-8") if isinstance(pfx_encrypted, str) else pfx_encrypted
+            _pfx_iv = pfx_iv if pfx_iv is None or isinstance(pfx_iv, bytes) else bytes(pfx_iv)
             try:
                 manif_result = manifestacao_service.enviar_evento(
                     chave_acesso=doc.chave,
                     cnpj=body.cnpj,
                     tipo_evento="210210",
-                    pfx_encrypted=pfx_encrypted,
-                    pfx_iv=pfx_iv,
+                    pfx_encrypted=_pfx_enc,
+                    pfx_iv=_pfx_iv,
                     tenant_id=tenant_id,
                     pfx_password=pfx_password,
                     ambiente=ambiente,
