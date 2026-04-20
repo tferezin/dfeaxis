@@ -182,15 +182,16 @@ class ManifestacaoService:
         )
         xml_evento_str = etree.tostring(xml_evento, encoding="unicode")
 
-        # SOAP 1.2 envelope
+        # SOAP 1.2 envelope — ASMX expects nfeDadosMsg directly in Body
         soap_envelope = (
             '<?xml version="1.0" encoding="utf-8"?>'
             '<soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope"'
-            ' xmlns:nfe="http://www.portalfiscal.inf.br/nfe/wsdl/NFeRecepcaoEvento4">'
+            ' xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"'
+            ' xmlns:xsd="http://www.w3.org/2001/XMLSchema">'
             '<soap12:Body>'
-            '<nfe:nfeRecepcaoEvento>'
-            f'<nfe:nfeDadosMsg>{xml_evento_str}</nfe:nfeDadosMsg>'
-            '</nfe:nfeRecepcaoEvento>'
+            '<nfeDadosMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeRecepcaoEvento4">'
+            f'{xml_evento_str}'
+            '</nfeDadosMsg>'
             '</soap12:Body>'
             '</soap12:Envelope>'
         )
@@ -209,6 +210,45 @@ class ManifestacaoService:
 
         latency_ms = int((time.time() - start_time) * 1000)
 
+        if resp.status_code == 500:
+            # SEFAZ returns SOAP Faults with HTTP 500 — try to parse
+            try:
+                fault_root = etree.fromstring(resp.content)
+                # Try SOAP 1.2 fault
+                fault_msg = None
+                for elem in fault_root.iter():
+                    tag = elem.tag.split("}")[-1] if "}" in elem.tag else elem.tag
+                    if tag in ("Text", "faultstring", "Message"):
+                        if elem.text:
+                            fault_msg = elem.text.strip()
+                            break
+                if fault_msg:
+                    logger.error(
+                        "Manifestação SOAP Fault %s: %s",
+                        chave_acesso, fault_msg,
+                    )
+                    return ManifestacaoResponse(
+                        cstat="999",
+                        xmotivo=f"SEFAZ SOAP Fault: {fault_msg}",
+                        protocolo=None,
+                        latency_ms=latency_ms,
+                        success=False,
+                    )
+            except Exception:
+                pass
+
+            logger.error(
+                "Manifestação SOAP HTTP %d para %s: %s",
+                resp.status_code, chave_acesso, resp.text[:500],
+            )
+            return ManifestacaoResponse(
+                cstat="999",
+                xmotivo=f"SEFAZ HTTP {resp.status_code}: {resp.text[:300]}",
+                protocolo=None,
+                latency_ms=latency_ms,
+                success=False,
+            )
+
         if resp.status_code != 200:
             logger.error(
                 "Manifestação SOAP HTTP %d para %s: %s",
@@ -216,7 +256,7 @@ class ManifestacaoService:
             )
             return ManifestacaoResponse(
                 cstat="999",
-                xmotivo=f"SEFAZ HTTP {resp.status_code}: {resp.text[:200]}",
+                xmotivo=f"SEFAZ HTTP {resp.status_code}",
                 protocolo=None,
                 latency_ms=latency_ms,
                 success=False,
