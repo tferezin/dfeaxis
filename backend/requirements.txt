@@ -6,6 +6,7 @@ apscheduler==3.10.4
 zeep==4.3.1
 lxml==5.3.0
 cryptography==44.0.0
+signxml==4.4.0
 requests==2.32.3
 mercadopago==2.2.2
 pydantic==2.10.4
