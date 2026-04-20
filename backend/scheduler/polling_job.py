@@ -1378,39 +1378,54 @@ def start_scheduler() -> BackgroundScheduler:
         logger.warning("Não foi possível agendar pfx_cleanup_job: %s", exc)
 
     # NFe Polling v2: two background jobs for the 2-step SEFAZ flow
-    try:
-        from scheduler.nfe_polling_job import poll_nfe_resumos, fetch_nfe_xml_completo
+    # Em homologação (SEFAZ_AMBIENTE=2) NÃO agenda — captura é manual.
+    import os
+    sefaz_ambiente = os.getenv("SEFAZ_AMBIENTE", "2")
+    nfe_jobs_active = False
 
-        scheduler.add_job(
-            poll_nfe_resumos,
-            trigger=IntervalTrigger(minutes=60),
-            id="nfe_poll_resumos",
-            name="NFe: busca resumos + envia ciência",
-            replace_existing=True,
-        )
+    if sefaz_ambiente != "2":
+        try:
+            from scheduler.nfe_polling_job import poll_nfe_resumos, fetch_nfe_xml_completo
 
-        scheduler.add_job(
-            fetch_nfe_xml_completo,
-            trigger=IntervalTrigger(
-                minutes=60,
-                start_date=datetime.now() + timedelta(minutes=30),
-            ),
-            id="nfe_fetch_xml",
-            name="NFe: busca XML completo",
-            replace_existing=True,
-        )
+            scheduler.add_job(
+                poll_nfe_resumos,
+                trigger=IntervalTrigger(minutes=60),
+                id="nfe_poll_resumos",
+                name="NFe: busca resumos + envia ciência",
+                replace_existing=True,
+            )
 
+            scheduler.add_job(
+                fetch_nfe_xml_completo,
+                trigger=IntervalTrigger(
+                    minutes=60,
+                    start_date=datetime.now() + timedelta(minutes=30),
+                ),
+                id="nfe_fetch_xml",
+                name="NFe: busca XML completo",
+                replace_existing=True,
+            )
+
+            nfe_jobs_active = True
+            logger.info(
+                "nfe_polling_job v2 agendado: resumos a cada 60min, "
+                "XML completo a cada 60min (offset 30min)"
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Não foi possível agendar nfe_polling_job v2: %s", exc)
+    else:
         logger.info(
-            "nfe_polling_job v2 agendado: resumos a cada 60min, "
-            "XML completo a cada 60min (offset 30min)"
+            "nfe_polling_job v2 NAO agendado: SEFAZ_AMBIENTE=%s (homologacao). "
+            "Captura NFe apenas sob demanda.",
+            sefaz_ambiente,
         )
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("Não foi possível agendar nfe_polling_job v2: %s", exc)
 
     scheduler.start()
+    nfe_status = "nfe_poll_resumos, nfe_fetch_xml" if nfe_jobs_active else "NFe: DESABILITADO (homolog)"
     logger.info(
         "Scheduler iniciado. Jobs ativos: trial_emails, monthly_overage, "
-        "manifestacao_alerts, pfx_cleanup, nfe_poll_resumos, nfe_fetch_xml."
+        "manifestacao_alerts, pfx_cleanup, %s.",
+        nfe_status,
     )
     return scheduler
 

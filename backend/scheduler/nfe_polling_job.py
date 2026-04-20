@@ -369,8 +369,25 @@ def _enqueue_and_ciencia(
                 "nfe_poll_resumos: ciencia OK chave=%s cstat=%s",
                 doc.chave, result.cstat,
             )
+        elif result.cstat in ("575", "596"):
+            # Rejeição permanente — descartar da fila
+            sb.table("nfe_ciencia_queue").update({
+                "ciencia_enviada": True,
+                "ciencia_enviada_at": datetime.now(timezone.utc).isoformat(),
+                "ciencia_cstat": result.cstat,
+                "xml_fetched": True,
+                "xml_fetched_at": datetime.now(timezone.utc).isoformat(),
+                "ultimo_erro": f"descartado: cstat={result.cstat} {result.xmotivo}",
+            }).eq("tenant_id", tenant_id).eq(
+                "chave_acesso", doc.chave,
+            ).execute()
+
+            logger.info(
+                "nfe_poll_resumos: descartado chave=%s cstat=%s (%s)",
+                doc.chave, result.cstat, result.xmotivo,
+            )
         else:
-            # Ciencia failed -- update queue with error
+            # Ciencia failed -- update queue with error (retentável)
             sb.table("nfe_ciencia_queue").update({
                 "ciencia_cstat": result.cstat,
                 "ultimo_erro": f"ciencia falhou: cstat={result.cstat} {result.xmotivo}",

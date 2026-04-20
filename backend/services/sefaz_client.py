@@ -146,6 +146,87 @@ class SefazClient:
                 latency_ms=latency,
             )
 
+    def consultar_por_chave(
+        self,
+        cnpj: str,
+        chave_acesso: str,
+        pfx_encrypted,
+        pfx_iv,
+        tenant_id: str,
+        pfx_password: str,
+        cuf_autor: str = "35",
+        ambiente: str | None = None,
+    ) -> SefazResponse:
+        """Consulta uma NF-e específica por chave de acesso (consChNFe).
+
+        Não depende do cursor NSU — busca diretamente pelo chave_acesso.
+        Útil para buscar XML completo após ciência.
+        """
+        if not circuit_breaker.can_execute(cnpj, "nfe"):
+            state = circuit_breaker.get_state(cnpj, "nfe")
+            return SefazResponse(
+                cstat="999",
+                xmotivo=f"Circuit breaker {state.value} para {mask_cnpj(cnpj)}/nfe",
+                ult_nsu="0", max_nsu="0",
+                documents=[], latency_ms=0,
+            )
+
+        # Decifra o .pfx — auto-detect v1/v2 format
+        pfx_encrypted_str = pfx_encrypted if isinstance(pfx_encrypted, str) else pfx_encrypted.hex() if isinstance(pfx_encrypted, bytes) else str(pfx_encrypted)
+
+        if pfx_encrypted_str.startswith("v2:"):
+            blob = bytes.fromhex(pfx_encrypted_str[3:])
+            pfx_bytes = decrypt_pfx(blob, None, tenant_id)
+        else:
+            enc_bytes = bytes.fromhex(pfx_encrypted_str) if isinstance(pfx_encrypted_str, str) else pfx_encrypted
+            iv_bytes = bytes.fromhex(pfx_iv) if isinstance(pfx_iv, str) else pfx_iv
+            pfx_bytes = decrypt_pfx(enc_bytes, iv_bytes, tenant_id)
+
+        effective_ambiente = ambiente or self.ambiente
+
+        start_time = time.time()
+        try:
+            # Build consChNFe XML instead of distNSU
+            ns = NAMESPACES["nfe"]
+            xml_request = self._build_cons_ch_nfe_xml(
+                cnpj, chave_acesso, cuf_autor, ns, effective_ambiente,
+            )
+            result = self._soap_call(
+                cnpj, "nfe", "0", pfx_bytes, pfx_password, cuf_autor,
+                effective_ambiente, xml_override=xml_request,
+            )
+            circuit_breaker.record_success(cnpj, "nfe")
+            return result
+        except Exception as e:
+            circuit_breaker.record_failure(cnpj, "nfe")
+            latency = int((time.time() - start_time) * 1000)
+            logger.error(f"SEFAZ consChNFe error {mask_cnpj(cnpj)}/{chave_acesso[:10]}...: {e}")
+            return SefazResponse(
+                cstat="999", xmotivo=str(e),
+                ult_nsu="0", max_nsu="0",
+                documents=[], latency_ms=latency,
+            )
+
+    def _build_cons_ch_nfe_xml(
+        self, cnpj: str, chave_acesso: str, cuf_autor: str, ns: str,
+        ambiente: str | None = None,
+    ) -> etree._Element:
+        """Monta o XML distDFeInt com consChNFe (busca por chave)."""
+        effective_ambiente = ambiente or self.ambiente
+        nsmap = {None: ns}
+
+        root = etree.Element("distDFeInt", nsmap=nsmap)
+        root.set("versao", "1.01")
+
+        etree.SubElement(root, "tpAmb").text = effective_ambiente
+        etree.SubElement(root, "cUFAutor").text = cuf_autor
+        etree.SubElement(root, "CNPJ").text = cnpj
+
+        cons_ch = etree.SubElement(root, "consChNFe")
+        etree.SubElement(cons_ch, "chNFe").text = chave_acesso
+
+        return root
+
     def _soap_call(
         self,
         cnpj: str,
@@ -155,6 +236,7 @@ class SefazClient:
         pfx_password: str,
         cuf_autor: str,
         ambiente: str | None = None,
+        xml_override: etree._Element | None = None,
     ) -> SefazResponse:
         """Executa a chamada SOAP real à SEFAZ."""
         effective_ambiente = ambiente or self.ambiente
@@ -173,8 +255,8 @@ class SefazClient:
             transport = Transport(session=session, timeout=30)
             client = ZeepClient(wsdl=endpoint, transport=transport)
 
-            # Monta o XML do request
-            xml_request = self._build_dist_dfe_xml(
+            # Monta o XML do request (ou usa override de consChNFe)
+            xml_request = xml_override or self._build_dist_dfe_xml(
                 cnpj, tipo, ult_nsu, cuf_autor, ns, effective_ambiente,
             )
 
