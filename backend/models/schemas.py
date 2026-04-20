@@ -210,6 +210,13 @@ class NfeResumosResponse(BaseModel):
     total_docs_in_response: int | None = None
 
 
+class NfeRetryCienciaResponse(BaseModel):
+    pending_in_queue: int = 0
+    ciencia_sent: int = 0
+    ciencia_failed: int = 0
+    results: list[dict] = []
+
+
 class NfeXmlCompletoResponse(BaseModel):
     xml_found: int = 0
     saved: int = 0

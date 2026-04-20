@@ -1377,24 +1377,40 @@ def start_scheduler() -> BackgroundScheduler:
     except Exception as exc:  # noqa: BLE001
         logger.warning("Não foi possível agendar pfx_cleanup_job: %s", exc)
 
-    # NFe Polling v2: DESABILITADO — validação manual primeiro.
-    # Reabilitar quando o fluxo manual estiver validado.
-    # try:
-    #     from scheduler.nfe_polling_job import poll_nfe_resumos, fetch_nfe_xml_completo
-    #     scheduler.add_job(poll_nfe_resumos, trigger=IntervalTrigger(minutes=60),
-    #         id="nfe_poll_resumos", name="NFe: busca resumos + envia ciência", replace_existing=True)
-    #     scheduler.add_job(fetch_nfe_xml_completo, trigger=IntervalTrigger(minutes=60,
-    #         start_date=datetime.now() + timedelta(minutes=30)),
-    #         id="nfe_fetch_xml", name="NFe: busca XML completo", replace_existing=True)
-    #     logger.info("nfe_polling_job v2 agendado")
-    # except Exception as exc:
-    #     logger.warning("Não foi possível agendar nfe_polling_job v2: %s", exc)
-    logger.info("nfe_polling_job v2: DESABILITADO (validação manual)")
+    # NFe Polling v2: two background jobs for the 2-step SEFAZ flow
+    try:
+        from scheduler.nfe_polling_job import poll_nfe_resumos, fetch_nfe_xml_completo
+
+        scheduler.add_job(
+            poll_nfe_resumos,
+            trigger=IntervalTrigger(minutes=60),
+            id="nfe_poll_resumos",
+            name="NFe: busca resumos + envia ciência",
+            replace_existing=True,
+        )
+
+        scheduler.add_job(
+            fetch_nfe_xml_completo,
+            trigger=IntervalTrigger(
+                minutes=60,
+                start_date=datetime.now() + timedelta(minutes=30),
+            ),
+            id="nfe_fetch_xml",
+            name="NFe: busca XML completo",
+            replace_existing=True,
+        )
+
+        logger.info(
+            "nfe_polling_job v2 agendado: resumos a cada 60min, "
+            "XML completo a cada 60min (offset 30min)"
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Não foi possível agendar nfe_polling_job v2: %s", exc)
 
     scheduler.start()
     logger.info(
         "Scheduler iniciado. Jobs ativos: trial_emails, monthly_overage, "
-        "manifestacao_alerts, pfx_cleanup. NFe jobs: DESABILITADOS."
+        "manifestacao_alerts, pfx_cleanup, nfe_poll_resumos, nfe_fetch_xml."
     )
     return scheduler
 

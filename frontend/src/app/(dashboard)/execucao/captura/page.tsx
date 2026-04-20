@@ -118,6 +118,20 @@ export default function CapturaManualPage() {
   // NF-e 2-step state
   const [nfeResetNsu, setNfeResetNsu] = useState(false)
   const [nfeStep1Status, setNfeStep1Status] = useState<"idle" | "loading">("idle")
+  const [nfeRetryCienciaStatus, setNfeRetryCienciaStatus] = useState<"idle" | "loading">("idle")
+  const [nfeRetryCienciaResult, setNfeRetryCienciaResult] = useState<{
+    error?: string
+    pending_in_queue?: number
+    ciencia_sent?: number
+    ciencia_failed?: number
+    results?: Array<{
+      chave?: string
+      status?: string
+      cstat?: string
+      xmotivo?: string
+      detail?: string
+    }>
+  } | null>(null)
   const [nfeStep2Status, setNfeStep2Status] = useState<"idle" | "loading">("idle")
   const [nfeStep1Result, setNfeStep1Result] = useState<{
     error?: string
@@ -396,6 +410,41 @@ export default function CapturaManualPage() {
       setNfeStep1Result({ error: `Erro: ${String(err)}` })
     } finally {
       setNfeStep1Status("idle")
+    }
+  }
+
+  // --- NF-e Retry Ciencia ---
+  const handleRetryCiencia = async () => {
+    if (!cleanCnpj) return
+    setNfeRetryCienciaStatus("loading")
+    setNfeRetryCienciaResult(null)
+
+    const backendUrl = getBackendUrl()
+    try {
+      const token = await getAuthToken()
+      if (!token) {
+        setNfeRetryCienciaResult({ error: "Sessao expirada." })
+        return
+      }
+      const res = await fetch(`${backendUrl}/polling/nfe-retry-ciencia`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ cnpj: cleanCnpj }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        setNfeRetryCienciaResult({ error: `Erro ${res.status}: ${err.detail || res.statusText}` })
+        return
+      }
+      const data = await res.json()
+      setNfeRetryCienciaResult(data)
+    } catch (err) {
+      setNfeRetryCienciaResult({ error: `Erro: ${String(err)}` })
+    } finally {
+      setNfeRetryCienciaStatus("idle")
     }
   }
 
@@ -942,6 +991,79 @@ export default function CapturaManualPage() {
             )}
           </div>
           </div>{/* close grid */}
+
+          {/* Retry Ciencia button */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                className="gap-2 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-300"
+                disabled={nfeRetryCienciaStatus === "loading" || !cleanCnpj}
+                onClick={handleRetryCiencia}
+              >
+                {nfeRetryCienciaStatus === "loading" ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <ClipboardList className="size-4" />
+                )}
+                {nfeRetryCienciaStatus === "loading" ? "Reenviando..." : "Reenviar Ciencia (fila pendente)"}
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                Reenvia ciencia para resumos na fila sem chamar SEFAZ DistDFe
+              </span>
+            </div>
+
+            {nfeRetryCienciaResult && (
+              <div className="space-y-2">
+                {nfeRetryCienciaResult.error ? (
+                  <div className="rounded-lg border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30 p-3">
+                    <p className="text-xs text-red-700 dark:text-red-300 font-medium">{nfeRetryCienciaResult.error}</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-3">
+                      <div className="flex gap-4 text-xs flex-wrap">
+                        <span className="text-amber-800 dark:text-amber-300">
+                          <strong>{nfeRetryCienciaResult.pending_in_queue ?? 0}</strong> na fila
+                        </span>
+                        <span className="text-emerald-700 dark:text-emerald-300">
+                          <strong>{nfeRetryCienciaResult.ciencia_sent ?? 0}</strong> ciencia(s) enviada(s)
+                        </span>
+                        {(nfeRetryCienciaResult.ciencia_failed ?? 0) > 0 && (
+                          <span className="text-red-700 dark:text-red-300">
+                            <strong>{nfeRetryCienciaResult.ciencia_failed}</strong> falha(s)
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {nfeRetryCienciaResult.results?.map((r, i) => (
+                      <div
+                        key={i}
+                        className={`rounded-lg border p-2 text-xs ${
+                          r.status === "ciencia_ok"
+                            ? "border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30"
+                            : "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={`font-medium ${
+                            r.status === "ciencia_ok" ? "text-emerald-700 dark:text-emerald-300" : "text-red-700 dark:text-red-300"
+                          }`}>
+                            {r.status === "ciencia_ok" ? "Ciencia OK" : r.status}
+                          </span>
+                          {r.cstat && <span className="text-muted-foreground">cStat {r.cstat}</span>}
+                        </div>
+                        <p className="text-muted-foreground mt-0.5 font-mono text-[10px] truncate">{r.chave}</p>
+                        {(r.xmotivo || r.detail) && (
+                          <p className="text-muted-foreground mt-0.5">{r.xmotivo || r.detail}</p>
+                        )}
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Wait notice */}
           <div className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30 p-3">
