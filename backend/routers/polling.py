@@ -689,11 +689,10 @@ async def nfe_xml_completo(
         "triggered_by": "nfe-xml-completo-manual",
         "status": "success",
         "docs_found": saved,
-        "latency_ms": response.latency_ms,
     }).execute()
 
     return NfeXmlCompletoResponse(
-        xml_found=len(full_docs_by_chave),
+        xml_found=saved + still_pending,
         saved=saved,
         still_pending=still_pending,
         results=results,
