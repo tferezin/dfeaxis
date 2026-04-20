@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional
 
+from cryptography.hazmat.primitives.serialization import pkcs12
+
 import requests
 from lxml import etree
 
@@ -180,6 +182,10 @@ class ManifestacaoService:
             chave_acesso, cnpj, tipo_evento, justificativa,
             effective_ambiente,
         )
+
+        # Sign the infEvento element with the A1 certificate
+        self._sign_evento(xml_evento, pfx_bytes, pfx_password)
+
         xml_evento_str = etree.tostring(xml_evento, encoding="unicode")
 
         # SOAP 1.2 envelope — ASMX expects nfeDadosMsg directly in Body
@@ -308,6 +314,80 @@ class ManifestacaoService:
             etree.SubElement(det_evento, "xJust").text = justificativa
 
         return env_evento
+
+    def _sign_evento(
+        self,
+        env_evento: etree._Element,
+        pfx_bytes: bytes,
+        pfx_password: str,
+    ) -> None:
+        """Assina o elemento infEvento com XMLDSig (enveloped-signature).
+
+        SEFAZ exige assinatura digital em cada evento de manifestação.
+        A Signature fica como filho do elemento <evento>, após <infEvento>.
+        """
+        from signxml import XMLSigner, methods
+
+        # Extract private key and certificate from PFX
+        private_key, certificate, _ = pkcs12.load_key_and_certificates(
+            pfx_bytes, pfx_password.encode()
+        )
+
+        if private_key is None or certificate is None:
+            raise ValueError("Certificado ou chave privada nao encontrados no PFX")
+
+        # Find the evento element and its infEvento
+        # Elements were created with default nsmap, tags stored without Clark notation
+        evento = env_evento.find("evento")
+        if evento is None:
+            evento = env_evento.find(f"{{{NFE_NS}}}evento")
+        if evento is None:
+            raise ValueError("Elemento <evento> nao encontrado no XML")
+
+        inf_evento = evento.find("infEvento")
+        if inf_evento is None:
+            inf_evento = evento.find(f"{{{NFE_NS}}}infEvento")
+        if inf_evento is None:
+            raise ValueError("Elemento <infEvento> nao encontrado no XML")
+
+        # The Id attribute of infEvento is what we reference in the signature
+        inf_evento_id = inf_evento.get("Id")
+
+        # Create the signer — SEFAZ NF-e 4.0 accepts RSA-SHA256
+        signer = XMLSigner(
+            method=methods.enveloped,
+            signature_algorithm="rsa-sha256",
+            digest_algorithm="sha256",
+            c14n_algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
+        )
+
+        # Sign the infEvento. signxml adds Signature as child of the signed element.
+        signed_evento = signer.sign(
+            inf_evento,
+            key=private_key,
+            cert=[certificate],
+            reference_uri=f"#{inf_evento_id}",
+        )
+
+        # signxml returns a new tree with Signature inside infEvento,
+        # but SEFAZ expects Signature as sibling of infEvento (child of evento).
+        # Move it: remove from signed infEvento, append to evento.
+        ds_ns = "http://www.w3.org/2000/09/xmldsig#"
+        signature = signed_evento.find(f"{{{ds_ns}}}Signature")
+
+        # Replace the original infEvento with the signed version
+        old_inf = evento.find("infEvento")
+        if old_inf is None:
+            old_inf = evento.find(f"{{{NFE_NS}}}infEvento")
+        if old_inf is not None:
+            idx = list(evento).index(old_inf)
+            evento.remove(old_inf)
+            evento.insert(idx, signed_evento)
+
+        # Move Signature from inside infEvento to be child of evento
+        if signature is not None:
+            signed_evento.remove(signature)
+            evento.append(signature)
 
     def _parse_response(
         self, response, latency_ms: int
