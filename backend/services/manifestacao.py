@@ -272,7 +272,14 @@ class ManifestacaoService:
     def _parse_response(
         self, response, latency_ms: int
     ) -> ManifestacaoResponse:
-        """Parse da resposta do RecepcaoEvento."""
+        """Parse da resposta do RecepcaoEvento.
+
+        A resposta SOAP contém dois níveis de cStat:
+        - retEnvEvento/cStat (128 = lote processado)
+        - retEvento/infEvento/cStat (135 = evento registrado)
+
+        Precisamos do cStat do EVENTO, não do lote.
+        """
         if isinstance(response, str):
             root = etree.fromstring(response.encode())
         elif isinstance(response, bytes):
@@ -282,10 +289,16 @@ class ManifestacaoService:
 
         nsmap = {"ns": NFE_NS}
 
-        # Busca retEvento/infEvento
-        cstat = self._find_text(root, ".//ns:cStat", nsmap)
-        xmotivo = self._find_text(root, ".//ns:xMotivo", nsmap) or ""
-        protocolo = self._find_text(root, ".//ns:nProt", nsmap)
+        # Busca cStat dentro de retEvento/infEvento (evento individual)
+        # Se não achar, faz fallback pro cStat do lote
+        cstat = self._find_text(root, ".//ns:retEvento//ns:cStat", nsmap)
+        xmotivo = self._find_text(root, ".//ns:retEvento//ns:xMotivo", nsmap) or ""
+        protocolo = self._find_text(root, ".//ns:retEvento//ns:nProt", nsmap)
+
+        if cstat is None:
+            # Fallback: cStat do lote (retEnvEvento ou raiz)
+            cstat = self._find_text(root, ".//ns:cStat", nsmap)
+            xmotivo = self._find_text(root, ".//ns:xMotivo", nsmap) or xmotivo
 
         # cStat 135 = Evento registrado e vinculado
         # cStat 573 = Duplicidade de evento (já manifestou antes — ok)
