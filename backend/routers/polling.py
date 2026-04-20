@@ -16,6 +16,7 @@ from middleware.security import verify_jwt_or_api_key, verify_jwt_with_trial
 from models.schemas import (
     NfeCnpjRequest,
     NfeResumosResponse,
+    NfeRetryCienciaResponse,
     NfeXmlCompletoResponse,
     PollingTipoResult,
     PollingTriggerRequest,
@@ -366,6 +367,135 @@ async def nfe_resumos(
         ult_nsu_returned=response.ult_nsu,
         max_nsu=response.max_nsu,
         total_docs_in_response=len(docs),
+    )
+
+
+@router.post("/polling/nfe-retry-ciencia", response_model=NfeRetryCienciaResponse)
+async def nfe_retry_ciencia(
+    body: NfeCnpjRequest,
+    auth: dict = Depends(verify_jwt_or_api_key),
+):
+    """Reenvia ciencia para resumos na fila onde ciencia falhou.
+
+    NAO chama SEFAZ DistDFe (evita 656). Apenas envia manifestacao
+    (RecepcaoEvento) para as entradas pendentes na nfe_ciencia_queue.
+    """
+    sb = get_supabase_client()
+    tenant_id = auth["tenant_id"]
+
+    # Busca certificado
+    cert_result = sb.table("certificates").select("*").eq(
+        "tenant_id", tenant_id
+    ).eq("cnpj", body.cnpj).eq("is_active", True).execute()
+
+    if not cert_result.data:
+        raise HTTPException(status_code=404, detail="CNPJ nao encontrado")
+
+    cert = cert_result.data[0]
+
+    # Tenant data
+    tenant_res = sb.table("tenants").select(
+        "id, sefaz_ambiente"
+    ).eq("id", tenant_id).single().execute()
+
+    ambiente = tenant_res.data.get("sefaz_ambiente", "2") if tenant_res.data else "2"
+
+    pfx_password = _get_pfx_password(cert["id"], tenant_id)
+    if not pfx_password:
+        raise HTTPException(status_code=400, detail="Senha do certificado nao encontrada")
+
+    pfx_encrypted, pfx_iv = _normalize_pfx_blob(
+        cert["pfx_encrypted"], cert["pfx_iv"]
+    )
+
+    # Busca entradas na fila onde ciencia NAO foi enviada
+    queue_result = sb.table("nfe_ciencia_queue").select("*").eq(
+        "tenant_id", tenant_id,
+    ).eq("cnpj", body.cnpj).eq(
+        "ciencia_enviada", False,
+    ).execute()
+
+    if not queue_result.data:
+        return NfeRetryCienciaResponse(
+            pending_in_queue=0,
+            results=[{"status": "empty", "detail": "Nenhuma entrada pendente na fila de ciencia"}],
+        )
+
+    entries = queue_result.data
+    results = []
+    ciencia_sent = 0
+    ciencia_failed = 0
+
+    for entry in entries:
+        try:
+            manif_result = manifestacao_service.enviar_evento(
+                chave_acesso=entry["chave_acesso"],
+                cnpj=body.cnpj,
+                tipo_evento="210210",
+                pfx_encrypted=pfx_encrypted,
+                pfx_iv=pfx_iv,
+                tenant_id=tenant_id,
+                pfx_password=pfx_password,
+                ambiente=ambiente,
+            )
+
+            # Audit
+            sb.table("manifestacao_events").insert({
+                "tenant_id": tenant_id,
+                "document_id": None,
+                "chave_acesso": entry["chave_acesso"],
+                "tipo_evento": "210210",
+                "cstat": manif_result.cstat,
+                "xmotivo": manif_result.xmotivo,
+                "protocolo": manif_result.protocolo,
+                "latency_ms": manif_result.latency_ms,
+                "source": "nfe-retry-ciencia-manual",
+            }).execute()
+
+            if manif_result.success:
+                sb.table("nfe_ciencia_queue").update({
+                    "ciencia_enviada": True,
+                    "ciencia_enviada_at": datetime.now(timezone.utc).isoformat(),
+                    "ciencia_cstat": manif_result.cstat,
+                    "ultimo_erro": None,
+                }).eq("id", entry["id"]).execute()
+
+                ciencia_sent += 1
+                results.append({
+                    "chave": entry["chave_acesso"],
+                    "status": "ciencia_ok",
+                    "cstat": manif_result.cstat,
+                    "xmotivo": manif_result.xmotivo,
+                })
+            else:
+                sb.table("nfe_ciencia_queue").update({
+                    "ciencia_cstat": manif_result.cstat,
+                    "ultimo_erro": f"ciencia falhou: cstat={manif_result.cstat} {manif_result.xmotivo}",
+                }).eq("id", entry["id"]).execute()
+
+                ciencia_failed += 1
+                results.append({
+                    "chave": entry["chave_acesso"],
+                    "status": "ciencia_failed",
+                    "cstat": manif_result.cstat,
+                    "xmotivo": manif_result.xmotivo,
+                })
+        except Exception as exc:
+            err_msg = str(exc) or repr(exc)
+            ciencia_failed += 1
+            results.append({
+                "chave": entry["chave_acesso"],
+                "status": "error",
+                "detail": f"{type(exc).__name__}: {err_msg}",
+            })
+
+        time.sleep(0.5)
+
+    return NfeRetryCienciaResponse(
+        pending_in_queue=len(entries),
+        ciencia_sent=ciencia_sent,
+        ciencia_failed=ciencia_failed,
+        results=results,
     )
 
 
