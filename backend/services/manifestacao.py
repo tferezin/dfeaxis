@@ -14,7 +14,12 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional
 
-from cryptography.hazmat.primitives.serialization import pkcs12
+import base64
+import hashlib
+
+from cryptography.hazmat.primitives import hashes as crypto_hashes
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives.serialization import Encoding, pkcs12
 
 import requests
 from lxml import etree
@@ -188,9 +193,7 @@ class ManifestacaoService:
 
         xml_evento_str = etree.tostring(xml_evento, encoding="unicode")
 
-        # SEFAZ rejects namespace prefixes (cStat 404).
-        # signxml uses "ds:" prefix — strip it.
-        xml_evento_str = xml_evento_str.replace("<ds:", "<").replace("</ds:", "</").replace("xmlns:ds=", "xmlns=")
+        # Signature built manually without namespace prefix (SEFAZ cStat 404)
 
         # SOAP 1.2 envelope — ASMX expects nfeDadosMsg directly in Body
         soap_envelope = (
@@ -204,6 +207,12 @@ class ManifestacaoService:
             '</nfeDadosMsg>'
             '</soap12:Body>'
             '</soap12:Envelope>'
+        )
+
+        # DEBUG: log full envelope for schema debugging
+        logger.info(
+            "Manifestacao SOAP envelope (first 3000 chars): %s",
+            soap_envelope[:3000],
         )
 
         with temp_cert_files(pfx_bytes, pfx_password) as (cert_path, key_path):
@@ -325,13 +334,12 @@ class ManifestacaoService:
         pfx_bytes: bytes,
         pfx_password: str,
     ) -> None:
-        """Assina o elemento infEvento com XMLDSig (enveloped-signature).
+        """Assina o elemento infEvento com XMLDSig RSA-SHA1 (enveloped).
 
-        SEFAZ exige assinatura digital em cada evento de manifestação.
-        A Signature fica como filho do elemento <evento>, após <infEvento>.
+        SEFAZ NF-e exige assinatura com SHA-1 (schema fixo).
+        Implementação manual sem signxml para controle total.
+        A Signature fica como filho de <evento>, após <infEvento>.
         """
-        from signxml import XMLSigner, methods
-
         # Extract private key and certificate from PFX
         private_key, certificate, _ = pkcs12.load_key_and_certificates(
             pfx_bytes, pfx_password.encode()
@@ -340,58 +348,80 @@ class ManifestacaoService:
         if private_key is None or certificate is None:
             raise ValueError("Certificado ou chave privada nao encontrados no PFX")
 
-        # Find the evento element and its infEvento
-        # Elements were created with default nsmap, tags stored without Clark notation
+        # Find evento/infEvento
         evento = env_evento.find("evento")
         if evento is None:
             evento = env_evento.find(f"{{{NFE_NS}}}evento")
         if evento is None:
-            raise ValueError("Elemento <evento> nao encontrado no XML")
+            raise ValueError("Elemento <evento> nao encontrado")
 
         inf_evento = evento.find("infEvento")
         if inf_evento is None:
             inf_evento = evento.find(f"{{{NFE_NS}}}infEvento")
         if inf_evento is None:
-            raise ValueError("Elemento <infEvento> nao encontrado no XML")
+            raise ValueError("Elemento <infEvento> nao encontrado")
 
-        # The Id attribute of infEvento is what we reference in the signature
-        inf_evento_id = inf_evento.get("Id")
+        inf_id = inf_evento.get("Id")
 
-        # Create the signer — SEFAZ NF-e 4.0 accepts RSA-SHA256
-        signer = XMLSigner(
-            method=methods.enveloped,
-            signature_algorithm="rsa-sha256",
-            digest_algorithm="sha256",
-            c14n_algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
+        # 1. Canonicalize infEvento (C14N exclusive, without comments)
+        inf_c14n = etree.tostring(inf_evento, method="c14n")
+
+        # 2. SHA-1 digest of the canonicalized infEvento
+        digest = hashlib.sha1(inf_c14n).digest()
+        digest_b64 = base64.b64encode(digest).decode()
+
+        # 3. Build SignedInfo element
+        DSIG = "http://www.w3.org/2000/09/xmldsig#"
+        signed_info = etree.Element("SignedInfo", xmlns=DSIG)
+        etree.SubElement(signed_info, "CanonicalizationMethod").set(
+            "Algorithm", "http://www.w3.org/TR/2001/REC-xml-c14n-20010315"
+        )
+        etree.SubElement(signed_info, "SignatureMethod").set(
+            "Algorithm", "http://www.w3.org/2000/09/xmldsig#rsa-sha1"
         )
 
-        # Sign the infEvento. signxml adds Signature as child of the signed element.
-        signed_evento = signer.sign(
-            inf_evento,
-            key=private_key,
-            cert=[certificate],
-            reference_uri=f"#{inf_evento_id}",
+        reference = etree.SubElement(signed_info, "Reference")
+        reference.set("URI", f"#{inf_id}")
+
+        transforms = etree.SubElement(reference, "Transforms")
+        etree.SubElement(transforms, "Transform").set(
+            "Algorithm", "http://www.w3.org/2000/09/xmldsig#enveloped-signature"
+        )
+        etree.SubElement(transforms, "Transform").set(
+            "Algorithm", "http://www.w3.org/TR/2001/REC-xml-c14n-20010315"
         )
 
-        # signxml returns a new tree with Signature inside infEvento,
-        # but SEFAZ expects Signature as sibling of infEvento (child of evento).
-        # Move it: remove from signed infEvento, append to evento.
-        ds_ns = "http://www.w3.org/2000/09/xmldsig#"
-        signature = signed_evento.find(f"{{{ds_ns}}}Signature")
+        etree.SubElement(reference, "DigestMethod").set(
+            "Algorithm", "http://www.w3.org/2000/09/xmldsig#sha1"
+        )
+        etree.SubElement(reference, "DigestValue").text = digest_b64
 
-        # Replace the original infEvento with the signed version
-        old_inf = evento.find("infEvento")
-        if old_inf is None:
-            old_inf = evento.find(f"{{{NFE_NS}}}infEvento")
-        if old_inf is not None:
-            idx = list(evento).index(old_inf)
-            evento.remove(old_inf)
-            evento.insert(idx, signed_evento)
+        # 4. Canonicalize SignedInfo and sign with RSA-SHA1
+        signed_info_c14n = etree.tostring(signed_info, method="c14n")
+        signature_value = private_key.sign(
+            signed_info_c14n,
+            padding.PKCS1v15(),
+            crypto_hashes.SHA1(),
+        )
+        sig_b64 = base64.b64encode(signature_value).decode()
 
-        # Move Signature from inside infEvento to be child of evento
-        if signature is not None:
-            signed_evento.remove(signature)
-            evento.append(signature)
+        # 5. Build X509 certificate data
+        cert_der = certificate.public_bytes(Encoding.DER)
+        cert_b64 = base64.b64encode(cert_der).decode()
+
+        # 6. Assemble Signature element (no namespace prefix!)
+        sig_elem = etree.SubElement(evento, "Signature")
+        sig_elem.set("xmlns", DSIG)
+
+        sig_elem.append(signed_info)
+
+        sig_value_elem = etree.SubElement(sig_elem, "SignatureValue")
+        sig_value_elem.text = sig_b64
+
+        key_info = etree.SubElement(sig_elem, "KeyInfo")
+        x509_data = etree.SubElement(key_info, "X509Data")
+        x509_cert = etree.SubElement(x509_data, "X509Certificate")
+        x509_cert.text = cert_b64
 
     def _parse_response(
         self, response, latency_ms: int
