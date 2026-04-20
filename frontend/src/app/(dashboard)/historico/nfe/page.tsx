@@ -68,23 +68,23 @@ interface NfeRow {
 
 const statusConfig: Record<NfeStatus, { label: string; description: string; className: string }> = {
   Pendente: {
-    label: "Pendente Manifesto",
-    description: "Resumo detectado, aguardando ciencia",
+    label: "Aguardando Ciência",
+    description: "Resumo detectado, aguardando envio de ciência da operação",
     className: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
   },
   Ciencia: {
-    label: "Ciencia",
-    description: "Ciencia enviada, aguardando XML completo",
+    label: "Ciência Enviada",
+    description: "Ciência enviada, aguardando XML completo da SEFAZ",
     className: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
   },
   Disponivel: {
-    label: "Disponivel",
-    description: "XML completo pronto para download pelo SAP",
+    label: "Disponível",
+    description: "XML completo pronto para download pelo ERP",
     className: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
   },
   Entregue: {
-    label: "Entregue",
-    description: "SAP ja baixou e confirmou",
+    label: "Entregue ao ERP",
+    description: "ERP já baixou e confirmou recebimento",
     className: "bg-gray-100 text-gray-600 dark:bg-gray-800/50 dark:text-gray-400",
   },
   Cancelada: {
@@ -191,7 +191,7 @@ function ActionCell({ row, onManifest }: { row: { chave: string; status: NfeStat
           onClick={() => onManifest?.(row.chave, "210210", "Ciência da Operação")}
         >
           <CheckCircle2 className="size-3.5" />
-          Reenviar Ciência
+          Dar Ciência
         </Button>
       )
     case "Ciencia":
@@ -275,12 +275,22 @@ export default function HistoricoNfePage() {
     setRealLoading(true)
     try {
       const sb = getSupabase()
-      const { data, error } = await sb
+      // Build date range for filtering: start of dateFrom to end of dateTo (BRT, UTC-3)
+      const startISO = `${dateFrom}T00:00:00-03:00`
+      const endISO = `${dateTo}T23:59:59-03:00`
+
+      let query = sb
         .from('documents')
-        .select('*')
+        .select('*, is_resumo, manifestacao_status')
         .eq('tipo', 'NFE')
+        .eq('is_resumo', false)  // Só docs com XML completo — resumos são transitórios
+        .or(
+          `and(data_emissao.gte.${startISO},data_emissao.lte.${endISO}),and(data_emissao.is.null,fetched_at.gte.${startISO},fetched_at.lte.${endISO})`
+        )
         .order('fetched_at', { ascending: false })
-        .limit(100)
+        .limit(200)
+
+      const { data, error } = await query
 
       if (!error && data) {
         setRealData(data)
@@ -290,7 +300,7 @@ export default function HistoricoNfePage() {
     } finally {
       setRealLoading(false)
     }
-  }, [])
+  }, [dateFrom, dateTo])
 
   useEffect(() => {
     if (!settings.showMockData) {
@@ -343,26 +353,34 @@ export default function HistoricoNfePage() {
   }, [])
 
   if (!settings.showMockData) {
-    const statusMap: Record<string, NfeStatus> = {
-      available: "Disponivel",
-      delivered: "Entregue",
-      expired: "Cancelada",
-    }
-
-    const manifestacaoToStatus: Record<string, NfeStatus> = {
-      pendente: "Pendente",
-      ciencia: "Ciencia",
-      confirmada: "Disponivel",
-    }
-
     const mappedData = realData.map((doc, i) => {
-      // Prioritize manifestacao_status for NF-e lifecycle
+      // Determine display status from DB fields:
+      // 1. delivered → always "Entregue"
+      // 2. is_resumo=true: depends on manifestacao_status
+      //    - "ciencia" → "Ciencia" (waiting for full XML)
+      //    - "confirmada" → "Ciencia" (still a resumo, XML not yet fetched)
+      //    - else → "Pendente" (needs ciencia)
+      // 3. is_resumo=false (full XML available):
+      //    - "available" → "Disponivel"
+      //    - "delivered" → "Entregue"
+      // 4. expired → "Cancelada"
       let status: NfeStatus
-      if (doc.manifestacao_status && manifestacaoToStatus[doc.manifestacao_status]) {
-        status = manifestacaoToStatus[doc.manifestacao_status]
+      if (doc.status === "delivered") {
+        status = "Entregue"
+      } else if (doc.status === "expired") {
+        status = "Cancelada"
+      } else if (doc.is_resumo) {
+        // Resumo: no full XML yet
+        if (doc.manifestacao_status === "ciencia" || doc.manifestacao_status === "confirmada") {
+          status = "Ciencia"
+        } else {
+          status = "Pendente"
+        }
       } else {
-        status = statusMap[doc.status] || (doc.is_resumo ? "Pendente" : "Disponivel")
+        // Full XML available
+        status = doc.status === "available" ? "Disponivel" : "Disponivel"
       }
+
       return {
         id: i,
         chave: doc.chave_acesso || "",
@@ -406,6 +424,14 @@ export default function HistoricoNfePage() {
         {/* Filters */}
         <div className="flex flex-wrap items-end gap-3 rounded-lg border p-4">
           <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-muted-foreground">De</span>
+            <Input type="date" className="w-[150px]" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-muted-foreground">Até</span>
+            <Input type="date" className="w-[150px]" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+          </div>
+          <div className="flex flex-col gap-1.5">
             <span className="text-xs font-medium text-muted-foreground">Status</span>
             <Select value={statusFilter} onValueChange={(v) => { if (v) { setStatusFilter(v); setCurrentPage(1) } }}>
               <SelectTrigger className="w-[150px]">
@@ -413,10 +439,10 @@ export default function HistoricoNfePage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="Todos">Todos</SelectItem>
-                <SelectItem value="Pendente">Pendente Manifesto</SelectItem>
-                <SelectItem value="Ciencia">Ciencia</SelectItem>
-                <SelectItem value="Disponivel">Disponivel</SelectItem>
-                <SelectItem value="Entregue">Entregue</SelectItem>
+                <SelectItem value="Pendente">Aguardando Ciência</SelectItem>
+                <SelectItem value="Ciencia">Ciência Enviada</SelectItem>
+                <SelectItem value="Disponivel">Disponível</SelectItem>
+                <SelectItem value="Entregue">Entregue ao ERP</SelectItem>
                 <SelectItem value="Cancelada">Cancelada</SelectItem>
               </SelectContent>
             </Select>
@@ -450,35 +476,8 @@ export default function HistoricoNfePage() {
           </div>
         ) : (
           <>
-            {/* Pendente action banner — always visible when there are pendente docs */}
-            {(() => {
-              const pendenteCount = mappedData.filter((r) => r.status === "Pendente").length
-              return pendenteCount > 0 && selectedChaves.size === 0 ? (
-                <div className="flex items-center justify-between rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30 px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex size-2.5 rounded-full bg-amber-500" />
-                    <span className="text-sm font-medium text-amber-900 dark:text-amber-200">
-                      {pendenteCount} NF-e pendente{pendenteCount > 1 ? "s" : ""} de manifesto
-                    </span>
-                    <span className="text-xs text-amber-700 dark:text-amber-400">
-                      — selecione documentos na tabela para dar ciencia em lote
-                    </span>
-                  </div>
-                  <Button
-                    size="sm"
-                    className="gap-1.5"
-                    disabled={manifLoading}
-                    onClick={() => {
-                      const pendentes = mappedData.filter((r) => r.status === "Pendente")
-                      setSelectedChaves(new Set(pendentes.map((r) => r.chave)))
-                    }}
-                  >
-                    <CheckCircle2 className="size-3.5" />
-                    Selecionar Todas Pendentes
-                  </Button>
-                </div>
-              ) : null
-            })()}
+            {/* NF-e Recebidas mostra apenas docs com XML completo (is_resumo=false).
+               Ciência é automática e transparente — o cliente não precisa interagir. */}
 
             {/* Batch action bar */}
             {selectedChaves.size > 0 && (
@@ -547,24 +546,43 @@ export default function HistoricoNfePage() {
                       </TableCell>
                       <TableCell>
                         <div>
-                          {row.razaoSocialEmitente && (
-                            <p className="text-xs font-medium text-foreground truncate max-w-[180px]">
-                              {row.razaoSocialEmitente}
+                          {row.cnpjEmitente ? (
+                            <>
+                              {row.razaoSocialEmitente && (
+                                <p className="text-xs font-medium text-foreground truncate max-w-[180px]">
+                                  {row.razaoSocialEmitente}
+                                </p>
+                              )}
+                              <p className="font-mono text-xs text-muted-foreground">
+                                {row.cnpjEmitente}
+                              </p>
+                            </>
+                          ) : row.manifestacao === "ciencia" ? (
+                            <p className="text-xs italic text-muted-foreground">
+                              Aguardando XML completo
+                            </p>
+                          ) : (
+                            <p className="text-xs italic text-muted-foreground">
+                              Ciência pendente
                             </p>
                           )}
-                          <p className="font-mono text-xs text-muted-foreground">
-                            {row.cnpjEmitente || row.cnpj}
-                            {!row.cnpjEmitente && (
-                              <span className="ml-1 text-[10px] text-amber-600" title="CNPJ do certificado (emitente indisponivel)">(cert)</span>
-                            )}
-                          </p>
                         </div>
                       </TableCell>
                       <TableCell className="font-mono text-xs">{row.nsu}</TableCell>
                       <TableCell>
                         <StatusBadge status={row.status} />
                       </TableCell>
-                      <TableCell className="text-xs">{row.manifestacao || "--"}</TableCell>
+                      <TableCell className="text-xs">
+                        {row.manifestacao === "pendente"
+                          ? "Pendente"
+                          : row.manifestacao === "ciencia"
+                            ? "Ciência enviada"
+                            : row.manifestacao === "confirmada"
+                              ? "Confirmada"
+                              : row.manifestacao === "desconhecida"
+                                ? "Desconhecida"
+                                : row.manifestacao || "—"}
+                      </TableCell>
                       <TableCell className="text-xs">{row.fetchedAt}</TableCell>
                       <TableCell>
                         <ActionCell row={row} onManifest={handleOpenConfirmDialog} />
@@ -795,10 +813,10 @@ export default function HistoricoNfePage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="Todos">Todos</SelectItem>
-              <SelectItem value="Pendente">Pendente</SelectItem>
-              <SelectItem value="Ciencia">Ciência</SelectItem>
+              <SelectItem value="Pendente">Aguardando Ciência</SelectItem>
+              <SelectItem value="Ciencia">Ciência Enviada</SelectItem>
               <SelectItem value="Disponivel">Disponível</SelectItem>
-              <SelectItem value="Entregue">Entregue</SelectItem>
+              <SelectItem value="Entregue">Entregue ao ERP</SelectItem>
               <SelectItem value="Cancelada">Cancelada</SelectItem>
             </SelectContent>
           </Select>

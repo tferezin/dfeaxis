@@ -36,7 +36,6 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         <TrialBanner />
         <header className="flex h-14 shrink-0 items-center gap-4 border-b bg-background px-6">
           <SidebarTrigger />
-          <Separator orientation="vertical" className="h-5" />
           <div className="flex-1" />
           {isHomologacao ? (
             <div className="flex items-center gap-2 rounded-md bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium px-2.5 py-1">

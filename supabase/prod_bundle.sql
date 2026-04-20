@@ -192,12 +192,13 @@ $$ LANGUAGE plpgsql;
 
 -- 1. Campo no tenant para modo de manifestação
 ALTER TABLE tenants
-  ADD COLUMN manifestacao_mode TEXT DEFAULT 'manual'
-    CHECK (manifestacao_mode IN ('auto_ciencia', 'manual'));
+  ADD COLUMN manifestacao_mode TEXT DEFAULT 'auto_ciencia'
+    CHECK (manifestacao_mode IN ('auto_ciencia', 'manual', 'manual_only'));
 
 COMMENT ON COLUMN tenants.manifestacao_mode IS
-  'auto_ciencia: envia Ciência (210210) automaticamente ao detectar resumo. '
-  'manual: aguarda ação explícita do cliente para manifestar.';
+  'auto_ciencia (default): envia Ciência (210210) automaticamente ao detectar resumo. '
+  'manual: legado, equivale a auto_ciencia (ciência é obrigatória SEFAZ). '
+  'manual_only: desabilita ciência automática — cliente envia manualmente.';
 
 -- 2. Novos campos na tabela documents para rastrear manifestação
 ALTER TABLE documents
@@ -1149,4 +1150,37 @@ BEGIN
   ALTER TABLE tenants ADD CONSTRAINT tenants_subscription_status_check
     CHECK (subscription_status IN ('trial', 'active', 'cancelled', 'expired', 'past_due'));
 END $$;
+
+-- ================================================================
+-- 017_nfe_ciencia_queue.sql
+-- ================================================================
+-- Queue for NFe resumos awaiting ciencia + XML fetch
+CREATE TABLE IF NOT EXISTS nfe_ciencia_queue (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    certificate_id UUID NOT NULL REFERENCES certificates(id) ON DELETE CASCADE,
+    cnpj TEXT NOT NULL,
+    chave_acesso TEXT NOT NULL,
+    nsu TEXT NOT NULL,
+    -- Ciencia status
+    ciencia_enviada BOOLEAN DEFAULT FALSE,
+    ciencia_enviada_at TIMESTAMPTZ,
+    ciencia_cstat TEXT,
+    -- XML fetch status
+    xml_fetched BOOLEAN DEFAULT FALSE,
+    xml_fetched_at TIMESTAMPTZ,
+    -- Control
+    tentativas INTEGER DEFAULT 0,
+    ultimo_erro TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    -- Unique per tenant+chave to avoid duplicates
+    UNIQUE(tenant_id, chave_acesso)
+);
+
+CREATE INDEX IF NOT EXISTS idx_nfe_ciencia_queue_pending
+    ON nfe_ciencia_queue(ciencia_enviada, xml_fetched)
+    WHERE ciencia_enviada = FALSE OR xml_fetched = FALSE;
+
+-- RLS
+ALTER TABLE nfe_ciencia_queue ENABLE ROW LEVEL SECURITY;
 

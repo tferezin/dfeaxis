@@ -65,7 +65,57 @@ export default function DashboardPage() {
   const [selectedCompetencia, setSelectedCompetencia] = useState<CompetenciaId>(
     currentCompetencia()
   )
-  const competenciaOptions = useMemo(() => buildCompetenciaOptions(11), [])
+  // Dynamic competencia options — fetched from actual document data
+  const [competenciaOptions, setCompetenciaOptions] = useState<
+    import("@/lib/competencia").CompetenciaRange[]
+  >([])
+
+  useEffect(() => {
+    async function fetchDistinctMonths() {
+      try {
+        const sb = getSupabase()
+        // Fetch data_emissao (preferred) and fetched_at (fallback) for month list
+        const { data, error } = await sb
+          .from("documents")
+          .select("data_emissao, fetched_at")
+        if (error || !data) {
+          setCompetenciaOptions(buildCompetenciaOptions(11))
+          return
+        }
+        // Collect unique YYYY-MM from data_emissao (emission date, not capture)
+        const monthSet = new Set<string>()
+        for (const row of data) {
+          const dateStr = row.data_emissao || row.fetched_at
+          if (dateStr) {
+            const d = new Date(dateStr)
+            const sp = new Date(d.getTime() - 3 * 60 * 60 * 1000)
+            const id = `${sp.getUTCFullYear()}-${String(sp.getUTCMonth() + 1).padStart(2, "0")}`
+            monthSet.add(id)
+          }
+        }
+        if (monthSet.size === 0) {
+          // No documents at all — show current month
+          setCompetenciaOptions([getCompetenciaRange(currentCompetencia())])
+          return
+        }
+        // Sort descending (newest first), limit to 12 most recent
+        const sorted = Array.from(monthSet).sort((a, b) => b.localeCompare(a))
+        const recent = sorted.slice(0, 12)
+        const older = sorted.slice(12)
+        const options = recent.map((id) => getCompetenciaRange(id))
+        // If there are older months, add them as a separate group
+        if (older.length > 0) {
+          for (const id of older) {
+            options.push({ ...getCompetenciaRange(id), _older: true } as any)
+          }
+        }
+        setCompetenciaOptions(options)
+      } catch {
+        setCompetenciaOptions(buildCompetenciaOptions(11))
+      }
+    }
+    fetchDistinctMonths()
+  }, [])
   const isAllCompetencia = selectedCompetencia === COMPETENCIA_TODOS
   const currentRange = useMemo(
     () => isAllCompetencia ? null : getCompetenciaRange(selectedCompetencia),
@@ -119,6 +169,8 @@ export default function DashboardPage() {
     numero_documento?: string | null
     data_emissao?: string | null
     valor_total?: number | null
+    is_resumo?: boolean | null
+    manifestacao_status?: string | null
   }>>([])
   const [realNfeTotal, setRealNfeTotal] = useState(0)
   const [realCteTotal, setRealCteTotal] = useState(0)
@@ -183,11 +235,14 @@ export default function DashboardPage() {
     try {
       const sb = getSupabase()
 
-      // Helper to apply optional date range filter
-      // When "Todos" is selected (currentRange === null), no date filter is applied
-      function applyDateFilter<T extends { gte: (col: string, val: string) => T; lte: (col: string, val: string) => T }>(query: T): T {
+      // Helper to apply optional date range filter based on data_emissao
+      // (emission date, not capture date — matches fiscal competency period).
+      // Falls back to fetched_at for docs without data_emissao populated.
+      // When "Todos" is selected (currentRange === null), no date filter is applied.
+      function applyDateFilter<T extends { gte: (col: string, val: string) => T; lte: (col: string, val: string) => T; or: (filter: string) => T }>(query: T): T {
         if (currentRange) {
-          return query.gte('fetched_at', currentRange.start).lte('fetched_at', currentRange.end)
+          // Use data_emissao when available, fallback to fetched_at for old docs
+          return query.or(`and(data_emissao.gte.${currentRange.start},data_emissao.lte.${currentRange.end}),and(data_emissao.is.null,fetched_at.gte.${currentRange.start},fetched_at.lte.${currentRange.end})`)
         }
         return query
       }
@@ -263,10 +318,13 @@ export default function DashboardPage() {
         numero_documento?: string | null
         data_emissao?: string | null
         valor_total?: number | null
+        is_resumo?: boolean | null
+        manifestacao_status?: string | null
       }
       type AggregationRow = {
         tipo: string
         fetched_at: string
+        data_emissao: string | null
         valor_total: number | null
         xml_content: string | null
       }
@@ -277,7 +335,8 @@ export default function DashboardPage() {
             .from('documents')
             .select(
               'tipo, chave_acesso, cnpj, nsu, status, fetched_at, xml_content, ' +
-              'cnpj_emitente, razao_social_emitente, numero_documento, data_emissao, valor_total'
+              'cnpj_emitente, razao_social_emitente, numero_documento, data_emissao, valor_total, ' +
+              'is_resumo, manifestacao_status'
             )
         )
           .order('fetched_at', { ascending: false })
@@ -285,7 +344,7 @@ export default function DashboardPage() {
         applyDateFilter(
           sb
             .from('documents')
-            .select('tipo, fetched_at, valor_total, xml_content')
+            .select('tipo, fetched_at, data_emissao, valor_total, xml_content')
         ) as unknown as Promise<{ data: AggregationRow[] | null }>,
       ])
 
@@ -317,7 +376,8 @@ export default function DashboardPage() {
       // Volume chart agrupado por dia sobre TODOS os documents da competência
       const byDay: Record<string, { nfe: number; cte: number; mdfe: number; nfse: number }> = {}
       for (const doc of aggregationRows) {
-        const day = new Date(doc.fetched_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
+        const dateStr = doc.data_emissao || doc.fetched_at
+        const day = new Date(dateStr).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
         if (!byDay[day]) byDay[day] = { nfe: 0, cte: 0, mdfe: 0, nfse: 0 }
         const key = doc.tipo.toLowerCase() as "nfe" | "cte" | "mdfe" | "nfse"
         if (key in byDay[day]) byDay[day][key]++
@@ -407,7 +467,15 @@ export default function DashboardPage() {
               className="absolute inset-0 cursor-pointer opacity-0"
             >
               <option value={COMPETENCIA_TODOS}>Todos</option>
-              {competenciaOptions.map((opt) => (
+              {competenciaOptions.filter((o: any) => !o._older).map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.shortLabel}
+                </option>
+              ))}
+              {competenciaOptions.some((o: any) => o._older) && (
+                <option disabled>── Período anterior ──</option>
+              )}
+              {competenciaOptions.filter((o: any) => o._older).map((opt) => (
                 <option key={opt.id} value={opt.id}>
                   {opt.shortLabel}
                 </option>
@@ -483,7 +551,12 @@ export default function DashboardPage() {
             />
             {(() => {
               const isActivePlan = subscriptionStatus === "active"
-              const used = isActivePlan ? docsConsumidosMes : trialDocsConsumidos
+              // Use real doc count from current competencia (more accurate than
+              // docs_consumidos_mes which only tracks the billing cycle)
+              const realTotal = realCounts.nfe + realCounts.cte + realCounts.mdfe + realCounts.nfse
+              const used = isActivePlan
+                ? (realTotal > 0 ? realTotal : docsConsumidosMes)
+                : (realTotal > 0 ? realTotal : trialDocsConsumidos)
               const limit = isActivePlan ? docsIncludedMes : trialCap
               const pct = limit > 0 ? Math.round((used / limit) * 100) : 0
               const over = Math.max(0, used - limit)
@@ -512,7 +585,7 @@ export default function DashboardPage() {
                       <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
                         <div
                           className={`h-full rounded-full transition-all ${barColor}`}
-                          style={{ width: `${barWidth}%` }}
+                          style={{ width: `${barWidth}%`, minWidth: used > 0 && barWidth < 4 ? "4px" : undefined }}
                         />
                       </div>
                       {over > 0 ? (
@@ -577,7 +650,10 @@ export default function DashboardPage() {
                         ? "bg-amber-500"
                         : "bg-emerald-500"
                   }`}
-                  style={{ width: `${Math.max(pctUso, excedenteDocs > 0 ? 100 : pctUso)}%` }}
+                  style={{
+                    width: `${Math.max(pctUso, excedenteDocs > 0 ? 100 : pctUso)}%`,
+                    minWidth: realDocsNaCompetencia > 0 && pctUso < 4 ? "4px" : undefined,
+                  }}
                 />
               </div>
               <div className="flex items-center justify-between text-xs">
@@ -623,15 +699,15 @@ export default function DashboardPage() {
                 { label: "Autorizadas", value: "R$ 2.847.320,45", amount: 2847320, color: "text-emerald-600", bgColor: "bg-emerald-500" },
                 { label: "Canceladas", value: "R$ 63.250,00", amount: 63250, color: "text-gray-500", bgColor: "bg-gray-400" },
               ] : [
-                ...(realNfeTotal > 0 ? [{ label: `NF-e (${realCounts.nfe})`, value: fmt(realNfeTotal), amount: realNfeTotal, color: "text-blue-600", bgColor: "bg-blue-500" }] : []),
-                ...(realCteTotal > 0 ? [{ label: `CT-e (${realCounts.cte})`, value: fmt(realCteTotal), amount: realCteTotal, color: "text-violet-600", bgColor: "bg-violet-500" }] : []),
-                ...(realMdfeTotal > 0 ? [{ label: `MDF-e (${realCounts.mdfe})`, value: fmt(realMdfeTotal), amount: realMdfeTotal, color: "text-emerald-600", bgColor: "bg-emerald-500" }] : []),
-                ...(realNfseTotal > 0 ? [{ label: `NFS-e (${realCounts.nfse})`, value: fmt(realNfseTotal), amount: realNfseTotal, color: "text-amber-600", bgColor: "bg-amber-500" }] : []),
+                ...(realCounts.nfe > 0 ? [{ label: `NF-e (${realCounts.nfe})`, value: realNfeTotal > 0 ? fmt(realNfeTotal) : "aguardando XML", amount: realNfeTotal, color: "text-blue-600", bgColor: "bg-blue-500", hideBar: realNfeTotal === 0 }] : []),
+                ...(realCounts.cte > 0 ? [{ label: `CT-e (${realCounts.cte})`, value: realCteTotal > 0 ? fmt(realCteTotal) : "aguardando XML", amount: realCteTotal, color: "text-violet-600", bgColor: "bg-violet-500", hideBar: realCteTotal === 0 }] : []),
+                ...(realCounts.mdfe > 0 ? [{ label: `MDF-e (${realCounts.mdfe})`, value: realMdfeTotal > 0 ? fmt(realMdfeTotal) : "aguardando XML", amount: realMdfeTotal, color: "text-emerald-600", bgColor: "bg-emerald-500", hideBar: realMdfeTotal === 0 }] : []),
+                ...(realCounts.nfse > 0 ? [{ label: `NFS-e (${realCounts.nfse})`, value: realNfseTotal > 0 ? fmt(realNfseTotal) : "aguardando XML", amount: realNfseTotal, color: "text-amber-600", bgColor: "bg-amber-500", hideBar: realNfseTotal === 0 }] : []),
               ]}
             />
           )
         })()}
-        <VolumeChart empty={false} realData={showMock ? undefined : realVolumeData} />
+        <VolumeChart empty={false} realData={showMock ? undefined : realVolumeData} competenciaId={isAllCompetencia ? undefined : selectedCompetencia} />
       </div>
 
       {/* Recent documents */}

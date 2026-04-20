@@ -15,7 +15,7 @@ import {
   ShieldCheck,
   Key,
   Settings,
-  CreditCard,
+  Receipt,
   ChevronDown,
   LogOut,
   Play,
@@ -91,7 +91,6 @@ const navigation: NavSection[] = [
       { title: "CT-e Recebidos", href: "/historico/cte", icon: Truck, badge: "SAP" },
       { title: "NFS-e Recebidas", href: "/historico/nfse", icon: Building2, badge: "ADN" },
       { title: "MDF-e Recebidos", href: "/historico/mdfe", icon: FileStack },
-      { title: "Manifestação", href: "/historico/manifestacao", icon: FileCheck },
     ],
   },
   {
@@ -99,7 +98,7 @@ const navigation: NavSection[] = [
     items: [
       { title: "Certificados A1", href: "/cadastros/certificados", icon: ShieldCheck },
       { title: "Empresas / CNPJs", href: "/cadastros/empresas", icon: Building },
-      { title: "API Keys", href: "/cadastros/api-keys", icon: Key },
+      { title: "Chave da API", href: "/cadastros/api-keys", icon: Key },
       { title: "Configurações", href: "/cadastros/configuracoes", icon: Settings },
     ],
   },
@@ -112,7 +111,7 @@ const navigation: NavSection[] = [
   {
     label: "Financeiro",
     items: [
-      { title: "Créditos", href: "/financeiro/creditos", icon: CreditCard },
+      { title: "Assinatura", href: "/financeiro/creditos", icon: Receipt },
     ],
   },
   {
@@ -256,7 +255,7 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="p-4">
-        <Link href="/" className="flex items-center gap-2">
+        <Link href="/dashboard" className="flex items-center gap-2">
           <Image src="/logo-dfeaxis.png" alt="DFeAxis" width={140} height={40} className="object-contain" unoptimized />
         </Link>
       </SidebarHeader>
@@ -297,6 +296,15 @@ export function AppSidebar() {
                 >
                   <Play className="size-4" />
                   <span>Captura Manual</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={pathname === "/historico/manifestacao"}
+                  render={<Link href="/historico/manifestacao" />}
+                >
+                  <FileCheck className="size-4" />
+                  <span>Manifestação</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

@@ -56,11 +56,19 @@ interface ChartDataPoint extends VolumeDataPoint {
   overlap: number
 }
 
-function buildMonthDays(rawData: VolumeDataPoint[]): ChartDataPoint[] {
+function buildMonthDays(rawData: VolumeDataPoint[], competenciaId?: string): ChartDataPoint[] {
   const result: ChartDataPoint[] = []
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = now.getMonth()
+  // Use competencia month if provided (e.g., "2026-03"), otherwise current month
+  let year: number, month: number
+  if (competenciaId && /^\d{4}-\d{2}$/.test(competenciaId)) {
+    const [y, m] = competenciaId.split("-").map(Number)
+    year = y
+    month = m - 1 // JS months are 0-indexed
+  } else {
+    const now = new Date()
+    year = now.getFullYear()
+    month = now.getMonth()
+  }
   const daysInMonth = new Date(year, month + 1, 0).getDate()
 
   const dataMap: Record<string, VolumeDataPoint> = {}
@@ -83,9 +91,9 @@ function buildMonthDays(rawData: VolumeDataPoint[]): ChartDataPoint[] {
   return result
 }
 
-export function VolumeChart({ empty = false, realData }: { empty?: boolean; realData?: VolumeDataPoint[] }) {
+export function VolumeChart({ empty = false, realData, competenciaId }: { empty?: boolean; realData?: VolumeDataPoint[]; competenciaId?: string }) {
   const hasReal = realData && realData.some(d => d.nfe + d.cte + d.mdfe + d.nfse > 0)
-  const chartData = hasReal ? buildMonthDays(realData) : null
+  const chartData = hasReal ? buildMonthDays(realData, competenciaId) : null
 
   return (
     <Card className="transition-shadow hover:shadow-md">
