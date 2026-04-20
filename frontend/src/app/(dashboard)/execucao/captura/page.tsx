@@ -117,6 +117,8 @@ export default function CapturaManualPage() {
 
   // NF-e 2-step state
   const [nfeResetNsu, setNfeResetNsu] = useState(false)
+  const [nfeResetFilaStatus, setNfeResetFilaStatus] = useState<"idle" | "loading">("idle")
+  const [nfeResetFilaResult, setNfeResetFilaResult] = useState<string | null>(null)
   const [nfeStep1Status, setNfeStep1Status] = useState<"idle" | "loading">("idle")
   const [nfeRetryCienciaStatus, setNfeRetryCienciaStatus] = useState<"idle" | "loading">("idle")
   const [nfeRetryCienciaResult, setNfeRetryCienciaResult] = useState<{
@@ -368,6 +370,29 @@ export default function CapturaManualPage() {
     } finally {
       setCaptureAllStatus("idle")
       setCaptureAllProgress("")
+    }
+  }
+
+  // --- NF-e Reset Fila ---
+  const handleResetFila = async () => {
+    if (!cleanCnpj) return
+    setNfeResetFilaStatus("loading")
+    setNfeResetFilaResult(null)
+    const backendUrl = getBackendUrl()
+    try {
+      const token = await getAuthToken()
+      if (!token) { setNfeResetFilaResult("Sessao expirada."); return }
+      const res = await fetch(`${backendUrl}/polling/nfe-reset-fila`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ cnpj: cleanCnpj }),
+      })
+      const data = await res.json()
+      setNfeResetFilaResult(data.message || data.detail || JSON.stringify(data))
+    } catch (err) {
+      setNfeResetFilaResult(`Erro: ${String(err)}`)
+    } finally {
+      setNfeResetFilaStatus("idle")
     }
   }
 
@@ -807,6 +832,27 @@ export default function CapturaManualPage() {
           </p>
         </CardHeader>
         <CardContent className="space-y-5">
+          {/* Reset fila */}
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 text-xs border-red-300 text-red-600 hover:bg-red-50"
+              disabled={nfeResetFilaStatus === "loading" || !cleanCnpj}
+              onClick={handleResetFila}
+            >
+              {nfeResetFilaStatus === "loading" ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <AlertTriangle className="size-3.5" />
+              )}
+              Limpar fila e resetar cursor
+            </Button>
+            {nfeResetFilaResult && (
+              <span className="text-xs text-muted-foreground">{nfeResetFilaResult}</span>
+            )}
+          </div>
+
           <div className="grid gap-6 md:grid-cols-2">
           {/* Step 1 */}
           <div className="space-y-3">
