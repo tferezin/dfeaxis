@@ -166,18 +166,17 @@ async def nfe_resumos(
         except Exception:
             ult_nsu = cert.get("last_nsu_nfe", "000000000000000")
 
-    # Call SEFAZ DistDFe
-    try:
-        response = sefaz_client.consultar_distribuicao(
-            cnpj=body.cnpj,
-            tipo="nfe",
-            ult_nsu=ult_nsu,
-            pfx_encrypted=pfx_encrypted,
-            pfx_iv=pfx_iv,
-            tenant_id=tenant_id,
-            pfx_password=pfx_password,
+    # Call SEFAZ DistDFe — com auto-retry se 656 por cursor desatualizado
+    def _call_sefaz(nsu: str):
+        return sefaz_client.consultar_distribuicao(
+            cnpj=body.cnpj, tipo="nfe", ult_nsu=nsu,
+            pfx_encrypted=pfx_encrypted, pfx_iv=pfx_iv,
+            tenant_id=tenant_id, pfx_password=pfx_password,
             ambiente=ambiente,
         )
+
+    try:
+        response = _call_sefaz(ult_nsu)
     except Exception as exc:
         logger.error(
             "nfe-resumos: SEFAZ call failed cnpj=%s: %s",
@@ -188,15 +187,29 @@ async def nfe_resumos(
             detail=f"Erro na consulta SEFAZ: {type(exc).__name__}: {exc}",
         )
 
-    # Se 656 (Consumo Indevido), corrige o cursor com o ultNSU retornado
-    # pra que a próxima chamada use o NSU correto
+    # Se 656 com cursor diferente: corrige e retenta automaticamente
     if response.cstat == "656" and response.ult_nsu and response.ult_nsu != ult_nsu:
+        corrected_nsu = response.ult_nsu
         logger.warning(
-            "nfe-resumos: 656 detectado, corrigindo cursor de %s para %s",
-            ult_nsu, response.ult_nsu,
+            "nfe-resumos: 656 detectado (cursor %s desatualizado), "
+            "corrigindo para %s e retentando",
+            ult_nsu, corrected_nsu,
         )
-        nsu_controller.update_cursor(cert["id"], "nfe", ambiente, response.ult_nsu)
-        nsu_controller.update_last_nsu(cert["id"], "nfe", response.ult_nsu)
+        nsu_controller.update_cursor(cert["id"], "nfe", ambiente, corrected_nsu)
+        nsu_controller.update_last_nsu(cert["id"], "nfe", corrected_nsu)
+        ult_nsu = corrected_nsu
+
+        try:
+            response = _call_sefaz(corrected_nsu)
+        except Exception as exc:
+            logger.error(
+                "nfe-resumos: retry after 656 fix failed cnpj=%s: %s",
+                mask_cnpj(body.cnpj), exc,
+            )
+            raise HTTPException(
+                status_code=502,
+                detail=f"Erro na consulta SEFAZ (retry): {type(exc).__name__}: {exc}",
+            )
 
     docs = list(response.documents)
     results = []
