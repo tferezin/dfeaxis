@@ -12,7 +12,6 @@ import {
   Building2,
   Upload,
   Database,
-  ClipboardList,
   Download,
   Clock,
   Search,
@@ -116,24 +115,10 @@ export default function CapturaManualPage() {
   } | null>(null)
 
   // NF-e 2-step state
-  const [nfeResetNsu, setNfeResetNsu] = useState(false)
   const [nfeResetFilaStatus, setNfeResetFilaStatus] = useState<"idle" | "loading">("idle")
   const [nfeResetFilaResult, setNfeResetFilaResult] = useState<string | null>(null)
+  const [showAdvancedNfe, setShowAdvancedNfe] = useState(false)
   const [nfeStep1Status, setNfeStep1Status] = useState<"idle" | "loading">("idle")
-  const [nfeRetryCienciaStatus, setNfeRetryCienciaStatus] = useState<"idle" | "loading">("idle")
-  const [nfeRetryCienciaResult, setNfeRetryCienciaResult] = useState<{
-    error?: string
-    pending_in_queue?: number
-    ciencia_sent?: number
-    ciencia_failed?: number
-    results?: Array<{
-      chave?: string
-      status?: string
-      cstat?: string
-      xmotivo?: string
-      detail?: string
-    }>
-  } | null>(null)
   const [nfeStep2Status, setNfeStep2Status] = useState<"idle" | "loading">("idle")
   const [nfeStep1Result, setNfeStep1Result] = useState<{
     error?: string
@@ -420,7 +405,7 @@ export default function CapturaManualPage() {
           "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ cnpj: cleanCnpj, force_reset_nsu: nfeResetNsu }),
+        body: JSON.stringify({ cnpj: cleanCnpj }),
       })
 
       if (!res.ok) {
@@ -438,40 +423,6 @@ export default function CapturaManualPage() {
     }
   }
 
-  // --- NF-e Retry Ciencia ---
-  const handleRetryCiencia = async () => {
-    if (!cleanCnpj) return
-    setNfeRetryCienciaStatus("loading")
-    setNfeRetryCienciaResult(null)
-
-    const backendUrl = getBackendUrl()
-    try {
-      const token = await getAuthToken()
-      if (!token) {
-        setNfeRetryCienciaResult({ error: "Sessao expirada." })
-        return
-      }
-      const res = await fetch(`${backendUrl}/polling/nfe-retry-ciencia`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ cnpj: cleanCnpj }),
-      })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        setNfeRetryCienciaResult({ error: `Erro ${res.status}: ${err.detail || res.statusText}` })
-        return
-      }
-      const data = await res.json()
-      setNfeRetryCienciaResult(data)
-    } catch (err) {
-      setNfeRetryCienciaResult({ error: `Erro: ${String(err)}` })
-    } finally {
-      setNfeRetryCienciaStatus("idle")
-    }
-  }
 
   // --- NF-e Step 2: XML Completo ---
   const handleNfeStep2 = async () => {
@@ -832,27 +783,6 @@ export default function CapturaManualPage() {
           </p>
         </CardHeader>
         <CardContent className="space-y-5">
-          {/* Reset fila */}
-          <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 text-xs border-red-300 text-red-600 hover:bg-red-50"
-              disabled={nfeResetFilaStatus === "loading" || !cleanCnpj}
-              onClick={handleResetFila}
-            >
-              {nfeResetFilaStatus === "loading" ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : (
-                <AlertTriangle className="size-3.5" />
-              )}
-              Limpar fila e resetar cursor
-            </Button>
-            {nfeResetFilaResult && (
-              <span className="text-xs text-muted-foreground">{nfeResetFilaResult}</span>
-            )}
-          </div>
-
           <div className="grid gap-6 md:grid-cols-2">
           {/* Step 1 */}
           <div className="space-y-3">
@@ -862,15 +792,6 @@ export default function CapturaManualPage() {
                 Consulta a SEFAZ para obter resumos de NF-e pendentes e envia ciência automaticamente.
               </p>
             </div>
-            <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
-              <input
-                type="checkbox"
-                checked={nfeResetNsu}
-                onChange={(e) => setNfeResetNsu(e.target.checked)}
-                className="rounded"
-              />
-              Resetar cursor (buscar desde o inicio)
-            </label>
             <Button
               className="gap-2 bg-amber-600 hover:bg-amber-700 text-white"
               disabled={nfeStep1Status === "loading" || !cleanCnpj}
@@ -907,15 +828,12 @@ export default function CapturaManualPage() {
                           </span>
                         )}
                       </div>
-                      {/* SEFAZ diagnostic */}
-                      <div className="border-t border-amber-200 dark:border-amber-700 pt-1.5 space-y-0.5">
-                        <p className="text-[10px] font-mono text-amber-700 dark:text-amber-400">
-                          SEFAZ cStat: <strong>{nfeStep1Result.sefaz_cstat ?? "?"}</strong> — {nfeStep1Result.sefaz_xmotivo ?? "sem resposta"}
+                      {/* SEFAZ diagnostic — colapsável */}
+                      {nfeStep1Result.sefaz_cstat && nfeStep1Result.sefaz_cstat !== "138" && (
+                        <p className="text-[10px] text-amber-700 dark:text-amber-400 border-t border-amber-200 dark:border-amber-700 pt-1.5">
+                          SEFAZ cStat {nfeStep1Result.sefaz_cstat}: {nfeStep1Result.sefaz_xmotivo}
                         </p>
-                        <p className="text-[10px] font-mono text-amber-700/70 dark:text-amber-400/70">
-                          NSU enviado: {nfeStep1Result.ult_nsu_used ?? "?"} | NSU retornado: {nfeStep1Result.ult_nsu_returned ?? "?"} | maxNSU: {nfeStep1Result.max_nsu ?? "?"} | docs na resposta: {nfeStep1Result.total_docs_in_response ?? 0}
-                        </p>
-                      </div>
+                      )}
                     </div>
                     {nfeStep1Result.results?.map((r, i) => (
                       <div
@@ -1038,85 +956,53 @@ export default function CapturaManualPage() {
           </div>
           </div>{/* close grid */}
 
-          {/* Retry Ciencia button */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-3">
-              <Button
-                variant="outline"
-                className="gap-2 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-300"
-                disabled={nfeRetryCienciaStatus === "loading" || !cleanCnpj}
-                onClick={handleRetryCiencia}
-              >
-                {nfeRetryCienciaStatus === "loading" ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <ClipboardList className="size-4" />
-                )}
-                {nfeRetryCienciaStatus === "loading" ? "Reenviando..." : "Reenviar Ciencia (fila pendente)"}
-              </Button>
-              <span className="text-xs text-muted-foreground">
-                Reenvia ciencia para resumos na fila sem chamar SEFAZ DistDFe
-              </span>
-            </div>
-
-            {nfeRetryCienciaResult && (
-              <div className="space-y-2">
-                {nfeRetryCienciaResult.error ? (
-                  <div className="rounded-lg border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30 p-3">
-                    <p className="text-xs text-red-700 dark:text-red-300 font-medium">{nfeRetryCienciaResult.error}</p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-3">
-                      <div className="flex gap-4 text-xs flex-wrap">
-                        <span className="text-amber-800 dark:text-amber-300">
-                          <strong>{nfeRetryCienciaResult.pending_in_queue ?? 0}</strong> na fila
-                        </span>
-                        <span className="text-emerald-700 dark:text-emerald-300">
-                          <strong>{nfeRetryCienciaResult.ciencia_sent ?? 0}</strong> ciencia(s) enviada(s)
-                        </span>
-                        {(nfeRetryCienciaResult.ciencia_failed ?? 0) > 0 && (
-                          <span className="text-red-700 dark:text-red-300">
-                            <strong>{nfeRetryCienciaResult.ciencia_failed}</strong> falha(s)
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    {nfeRetryCienciaResult.results?.map((r, i) => (
-                      <div
-                        key={i}
-                        className={`rounded-lg border p-2 text-xs ${
-                          r.status === "ciencia_ok"
-                            ? "border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30"
-                            : "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className={`font-medium ${
-                            r.status === "ciencia_ok" ? "text-emerald-700 dark:text-emerald-300" : "text-red-700 dark:text-red-300"
-                          }`}>
-                            {r.status === "ciencia_ok" ? "Ciencia OK" : r.status}
-                          </span>
-                          {r.cstat && <span className="text-muted-foreground">cStat {r.cstat}</span>}
-                        </div>
-                        <p className="text-muted-foreground mt-0.5 font-mono text-[10px] truncate">{r.chave}</p>
-                        {(r.xmotivo || r.detail) && (
-                          <p className="text-muted-foreground mt-0.5">{r.xmotivo || r.detail}</p>
-                        )}
-                      </div>
-                    ))}
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-
           {/* Wait notice */}
           <div className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30 p-3">
             <Clock className="size-4 text-blue-500 dark:text-blue-400 mt-0.5 flex-shrink-0" />
             <p className="text-xs text-blue-700 dark:text-blue-300">
               Aguarde <strong>30-60 minutos</strong> entre a Etapa 1 e a Etapa 2 para a SEFAZ processar a ciência.
             </p>
+          </div>
+
+          {/* Opcoes avancadas */}
+          <div className="border-t pt-3">
+            <button
+              type="button"
+              className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              onClick={() => setShowAdvancedNfe(!showAdvancedNfe)}
+            >
+              {showAdvancedNfe ? (
+                <ChevronDown className="size-3.5" />
+              ) : (
+                <ChevronRight className="size-3.5" />
+              )}
+              Opcoes avancadas
+            </button>
+
+            {showAdvancedNfe && (
+              <div className="mt-3 flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 text-xs border-red-300 text-red-600 hover:bg-red-50"
+                  disabled={nfeResetFilaStatus === "loading" || !cleanCnpj}
+                  onClick={handleResetFila}
+                >
+                  {nfeResetFilaStatus === "loading" ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <AlertTriangle className="size-3.5" />
+                  )}
+                  Limpar fila e resetar cursor
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  Remove resumos pendentes e recomeca a busca do zero
+                </span>
+                {nfeResetFilaResult && (
+                  <span className="text-xs text-emerald-600">{nfeResetFilaResult}</span>
+                )}
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
