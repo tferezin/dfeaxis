@@ -199,6 +199,19 @@ async def nfe_resumos(
 
         if is_resumo:
             resumos_found += 1
+
+            # Filtro: se o CNPJ na chave (pos 6:20) é o nosso, somos o emitente — skip ciência
+            cnpj_emitente = doc.chave[6:20] if len(doc.chave) >= 20 else ""
+            if cnpj_emitente == body.cnpj:
+                results.append({
+                    "chave": doc.chave,
+                    "nsu": doc.nsu,
+                    "tipo": "resumo",
+                    "status": "skipped_emitente",
+                    "detail": "NF-e emitida pelo proprio CNPJ — ciencia nao aplicavel",
+                })
+                continue
+
             # Enqueue + send ciencia
             try:
                 sb.table("nfe_ciencia_queue").upsert(
@@ -427,6 +440,27 @@ async def nfe_retry_ciencia(
     ciencia_failed = 0
 
     for entry in entries:
+        # Filtro: se CNPJ na chave é o nosso, somos emitente — descartar
+        chave = entry["chave_acesso"]
+        cnpj_emitente = chave[6:20] if len(chave) >= 20 else ""
+        if cnpj_emitente == body.cnpj:
+            sb.table("nfe_ciencia_queue").update({
+                "ciencia_enviada": True,
+                "ciencia_enviada_at": datetime.now(timezone.utc).isoformat(),
+                "ciencia_cstat": "575",
+                "xml_fetched": True,
+                "xml_fetched_at": datetime.now(timezone.utc).isoformat(),
+                "ultimo_erro": "descartado: emitente=nosso CNPJ, ciencia nao aplicavel",
+            }).eq("id", entry["id"]).execute()
+            ciencia_failed += 1
+            results.append({
+                "chave": chave,
+                "status": "discarded",
+                "cstat": "575",
+                "xmotivo": "NF-e emitida pelo proprio CNPJ",
+            })
+            continue
+
         try:
             manif_result = manifestacao_service.enviar_evento(
                 chave_acesso=entry["chave_acesso"],
