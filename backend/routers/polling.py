@@ -563,16 +563,13 @@ async def nfe_reset_fila(
     body: NfeCnpjRequest,
     auth: dict = Depends(verify_jwt_or_api_key),
 ):
-    """Limpa a fila de ciência e reseta o cursor NSU para reprocessar do zero."""
+    """Limpa a fila de ciência para reprocessar.
+
+    NÃO reseta o cursor NSU — a SEFAZ rejeita permanentemente (656)
+    qualquer consulta com NSU inferior ao último retornado.
+    """
     sb = get_supabase_client()
     tenant_id = auth["tenant_id"]
-
-    # Busca certificado pra pegar o cert_id
-    cert_result = sb.table("certificates").select("id").eq(
-        "tenant_id", tenant_id
-    ).eq("cnpj", body.cnpj).eq("is_active", True).execute()
-
-    cert_id = cert_result.data[0]["id"] if cert_result.data else None
 
     # Deleta entries da fila
     deleted = sb.table("nfe_ciencia_queue").delete().eq(
@@ -580,23 +577,10 @@ async def nfe_reset_fila(
     ).eq("cnpj", body.cnpj).execute()
     deleted_count = len(deleted.data) if deleted.data else 0
 
-    # Reseta cursor NSU
-    cursor_reset = False
-    if cert_id:
-        tenant_res = sb.table("tenants").select("sefaz_ambiente").eq(
-            "id", tenant_id
-        ).single().execute()
-        ambiente = tenant_res.data.get("sefaz_ambiente", "2") if tenant_res.data else "2"
-
-        nsu_controller.update_cursor(cert_id, "nfe", ambiente, "000000000000000")
-        nsu_controller.update_last_nsu(cert_id, "nfe", "000000000000000")
-        cursor_reset = True
-
     return {
         "status": "ok",
         "deleted_from_queue": deleted_count,
-        "cursor_reset": cursor_reset,
-        "message": f"Fila limpa ({deleted_count} entries) e cursor NSU resetado. Pronto para reprocessar.",
+        "message": f"Fila limpa ({deleted_count} entries). Cursor NSU mantido.",
     }
 
 
@@ -736,6 +720,12 @@ async def nfe_xml_completo(
                     now + timedelta(days=180)
                 ).isoformat()
 
+                # Verifica se doc já existe (pra diferenciar novo vs atualizado)
+                existing = sb.table("documents").select("id", count="exact", head=True).eq(
+                    "tenant_id", tenant_id
+                ).eq("chave_acesso", chave).execute()
+                is_new = (existing.count or 0) == 0
+
                 sb.table("documents").upsert(
                     row, on_conflict="tenant_id,chave_acesso"
                 ).execute()
@@ -749,7 +739,7 @@ async def nfe_xml_completo(
                 results.append({
                     "chave": chave,
                     "nsu": full_doc.nsu,
-                    "status": "saved",
+                    "status": "saved" if is_new else "updated",
                 })
             else:
                 sb.table("nfe_ciencia_queue").update({

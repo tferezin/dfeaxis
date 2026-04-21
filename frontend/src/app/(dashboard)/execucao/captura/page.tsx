@@ -117,7 +117,6 @@ export default function CapturaManualPage() {
   // NF-e 2-step state
   const [nfeResetFilaStatus, setNfeResetFilaStatus] = useState<"idle" | "loading">("idle")
   const [nfeResetFilaResult, setNfeResetFilaResult] = useState<string | null>(null)
-  const [showAdvancedNfe, setShowAdvancedNfe] = useState(false)
   const [nfeStep1Status, setNfeStep1Status] = useState<"idle" | "loading">("idle")
   const [nfeStep2Status, setNfeStep2Status] = useState<"idle" | "loading">("idle")
   const [nfeStep1Result, setNfeStep1Result] = useState<{
@@ -964,45 +963,28 @@ export default function CapturaManualPage() {
             </p>
           </div>
 
-          {/* Opcoes avancadas */}
-          <div className="border-t pt-3">
-            <button
-              type="button"
-              className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              onClick={() => setShowAdvancedNfe(!showAdvancedNfe)}
+          {/* Limpar fila */}
+          <div className="border-t pt-3 flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 text-xs"
+              disabled={nfeResetFilaStatus === "loading" || !cleanCnpj}
+              onClick={handleResetFila}
             >
-              {showAdvancedNfe ? (
-                <ChevronDown className="size-3.5" />
+              {nfeResetFilaStatus === "loading" ? (
+                <Loader2 className="size-3.5 animate-spin" />
               ) : (
-                <ChevronRight className="size-3.5" />
+                <AlertTriangle className="size-3.5" />
               )}
-              Opcoes avancadas
-            </button>
-
-            {showAdvancedNfe && (
-              <div className="mt-3 flex items-center gap-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 text-xs border-red-300 text-red-600 hover:bg-red-50"
-                  disabled={nfeResetFilaStatus === "loading" || !cleanCnpj}
-                  onClick={handleResetFila}
-                >
-                  {nfeResetFilaStatus === "loading" ? (
-                    <Loader2 className="size-3.5 animate-spin" />
-                  ) : (
-                    <AlertTriangle className="size-3.5" />
-                  )}
-                  Limpar fila e resetar cursor
-                </Button>
-                <span className="text-xs text-muted-foreground">
-                  Remove resumos pendentes e recomeca a busca do zero
-                </span>
-                {nfeResetFilaResult && (
-                  <span className="text-xs text-emerald-600">{nfeResetFilaResult}</span>
+              Limpar fila de processamento
+            </Button>
+            <span className="text-xs text-muted-foreground">
+              Remove resumos pendentes para reprocessar ciencia e XML
+            </span>
+            {nfeResetFilaResult && (
+              <span className="text-xs text-emerald-600">{nfeResetFilaResult}</span>
                 )}
-              </div>
-            )}
           </div>
         </CardContent>
       </Card>
