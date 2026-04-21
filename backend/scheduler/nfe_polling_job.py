@@ -297,6 +297,15 @@ def _enqueue_and_ciencia(
     tenant_id = cert["tenant_id"]
     cnpj = cert["cnpj"]
 
+    # Filtro: se CNPJ na chave é o nosso, somos emitente — skip ciência
+    cnpj_emitente = doc.chave[6:20] if len(doc.chave) >= 20 else ""
+    if cnpj_emitente == cnpj:
+        logger.debug(
+            "nfe_poll_resumos: skip emitente chave=%s (CNPJ emitente=nosso)",
+            doc.chave,
+        )
+        return
+
     # Insert into queue (ignore if already exists via UNIQUE constraint)
     try:
         sb.table("nfe_ciencia_queue").upsert(
