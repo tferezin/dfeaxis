@@ -188,6 +188,16 @@ async def nfe_resumos(
             detail=f"Erro na consulta SEFAZ: {type(exc).__name__}: {exc}",
         )
 
+    # Se 656 (Consumo Indevido), corrige o cursor com o ultNSU retornado
+    # pra que a próxima chamada use o NSU correto
+    if response.cstat == "656" and response.ult_nsu and response.ult_nsu != ult_nsu:
+        logger.warning(
+            "nfe-resumos: 656 detectado, corrigindo cursor de %s para %s",
+            ult_nsu, response.ult_nsu,
+        )
+        nsu_controller.update_cursor(cert["id"], "nfe", ambiente, response.ult_nsu)
+        nsu_controller.update_last_nsu(cert["id"], "nfe", response.ult_nsu)
+
     docs = list(response.documents)
     results = []
     resumos_found = 0
@@ -637,25 +647,11 @@ async def nfe_xml_completo(
     ).execute()
 
     if not queue_result.data:
-        # Diagnóstico: mostra quantas entries existem e seu status
-        all_entries = sb.table("nfe_ciencia_queue").select(
-            "chave_acesso, ciencia_enviada, xml_fetched, ciencia_cstat, ultimo_erro",
-        ).eq("tenant_id", tenant_id).eq("cnpj", body.cnpj).execute()
-        diag = []
-        for e in (all_entries.data or []):
-            diag.append({
-                "chave": e["chave_acesso"][:20] + "...",
-                "ciencia": e["ciencia_enviada"],
-                "xml_fetched": e["xml_fetched"],
-                "cstat": e.get("ciencia_cstat"),
-                "erro": (e.get("ultimo_erro") or "")[:80],
-            })
         return NfeXmlCompletoResponse(
             xml_found=0, saved=0, still_pending=0,
             results=[{
                 "status": "empty",
-                "detail": f"Nenhuma entrada com ciencia_enviada=True e xml_fetched=False. Total na fila: {len(diag)}",
-                "diagnostico": diag,
+                "detail": "Nenhum resumo com ciencia processada aguardando XML. Execute a Etapa 1 primeiro.",
             }],
         )
 
