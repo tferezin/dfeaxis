@@ -97,6 +97,15 @@ class CircuitBreaker:
     def get_state(self, cnpj: str, tipo: str) -> CircuitState:
         return self._get(cnpj, tipo).state
 
+    def seconds_until_recovery(self, cnpj: str, tipo: str) -> int | None:
+        """Segundos restantes até o circuito fechar (None se já fechado/half-open)."""
+        entry = self._get(cnpj, tipo)
+        if entry.state != CircuitState.OPEN:
+            return None
+        timeout = entry.override_recovery_s or self.recovery_timeout_s
+        remaining = timeout - (time.time() - entry.last_failure_time)
+        return max(0, int(remaining))
+
 
 # Instância global
 circuit_breaker = CircuitBreaker()

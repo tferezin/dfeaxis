@@ -130,6 +130,9 @@ export default function CapturaManualPage() {
     ult_nsu_returned?: string
     max_nsu?: string
     total_docs_in_response?: number
+    throttled?: boolean
+    throttled_message?: string
+    next_try_in_seconds?: number
     results?: Array<{
       chave?: string
       nsu?: string
@@ -811,6 +814,13 @@ export default function CapturaManualPage() {
                   <div className="rounded-lg border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30 p-3">
                     <p className="text-xs text-red-700 dark:text-red-300 font-medium">{nfeStep1Result.error}</p>
                   </div>
+                ) : nfeStep1Result.throttled ? (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40 p-3">
+                    <p className="text-xs text-slate-700 dark:text-slate-300">
+                      {nfeStep1Result.throttled_message ||
+                        "Sem documentos novos no momento. Tente novamente em alguns minutos."}
+                    </p>
+                  </div>
                 ) : (
                   <>
                     <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-3 space-y-2">
@@ -827,8 +837,11 @@ export default function CapturaManualPage() {
                           </span>
                         )}
                       </div>
-                      {/* SEFAZ diagnostic — colapsável */}
-                      {nfeStep1Result.sefaz_cstat && nfeStep1Result.sefaz_cstat !== "138" && (
+                      {/* SEFAZ diagnostic — colapsável. Nunca exibe 656 (consumo
+                          indevido é tratado como estado neutro 'throttled'). */}
+                      {nfeStep1Result.sefaz_cstat &&
+                        nfeStep1Result.sefaz_cstat !== "138" &&
+                        nfeStep1Result.sefaz_cstat !== "656" && (
                         <p className="text-[10px] text-amber-700 dark:text-amber-400 border-t border-amber-200 dark:border-amber-700 pt-1.5">
                           SEFAZ cStat {nfeStep1Result.sefaz_cstat}: {nfeStep1Result.sefaz_xmotivo}
                         </p>

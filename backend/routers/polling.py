@@ -28,9 +28,30 @@ from scheduler.polling_job import (
     _normalize_pfx_blob,
     _poll_single_detailed,
 )
+from services.circuit_breaker import circuit_breaker as cb
 from services.manifestacao import manifestacao_service
 from services.nsu_controller import nsu_controller
 from services.sefaz_client import sefaz_client
+
+
+def _friendly_throttle_message(seconds_remaining: int | None) -> str:
+    """Mensagem amigável quando SEFAZ está em janela de backoff (ex: 656).
+
+    Nunca expõe 'Consumo Indevido' nem cStat — o usuário final vê apenas
+    uma indicação neutra de que não há novidades e sugestão de retentar.
+    """
+    if seconds_remaining is None or seconds_remaining <= 0:
+        return "Sem documentos novos no momento. Tente novamente em alguns minutos."
+    minutes = max(1, (seconds_remaining + 59) // 60)
+    if minutes >= 60:
+        return (
+            "Sem documentos novos no momento. Nova captura disponível em cerca de "
+            "uma hora."
+        )
+    return (
+        f"Sem documentos novos no momento. Nova captura disponível em cerca de "
+        f"{minutes} min."
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -154,6 +175,26 @@ async def nfe_resumos(
         cert["pfx_encrypted"], cert["pfx_iv"]
     )
 
+    # Circuit breaker guard: se SEFAZ disse 656 recentemente (ou houve falhas
+    # repetidas), NÃO chama SEFAZ de novo. Retorna resposta neutra "throttled"
+    # com o tempo restante do cooldown — o usuário final nunca vê "Consumo
+    # Indevido" nem cStat 656.
+    if not cb.can_execute(body.cnpj, "nfe"):
+        wait_s = cb.seconds_until_recovery(body.cnpj, "nfe")
+        logger.info(
+            "nfe-resumos: circuit breaker aberto cnpj=%s wait=%ss — resposta neutra",
+            mask_cnpj(body.cnpj), wait_s,
+        )
+        return NfeResumosResponse(
+            resumos_found=0,
+            ciencia_sent=0,
+            completos_found=0,
+            results=[],
+            throttled=True,
+            throttled_message=_friendly_throttle_message(wait_s),
+            next_try_in_seconds=wait_s,
+        )
+
     # Get current NSU cursor (optionally reset)
     if body.force_reset_nsu:
         ult_nsu = "000000000000000"
@@ -210,6 +251,40 @@ async def nfe_resumos(
                 status_code=502,
                 detail=f"Erro na consulta SEFAZ (retry): {type(exc).__name__}: {exc}",
             )
+
+    # 656 persistente (rate limit real, não cursor). Tripa o circuit breaker
+    # por 70 min e retorna resposta neutra — nunca expõe "Consumo Indevido"
+    # ou cStat 656 ao usuário final.
+    if response.cstat == "656":
+        logger.warning(
+            "nfe-resumos: 656 persistente cnpj=%s — abrindo circuit breaker 70min",
+            mask_cnpj(body.cnpj),
+        )
+        cb.force_open(body.cnpj, "nfe", recovery_s=4200)
+        try:
+            sb.table("polling_log").insert({
+                "tenant_id": tenant_id,
+                "cnpj": body.cnpj,
+                "tipo": "nfe",
+                "triggered_by": "nfe-resumos-manual",
+                "status": "error",
+                "docs_found": 0,
+                "ult_nsu": response.ult_nsu,
+                "latency_ms": response.latency_ms,
+                "error_message": f"cStat 656: {response.xmotivo}",
+            }).execute()
+        except Exception:
+            pass
+        wait_s = cb.seconds_until_recovery(body.cnpj, "nfe")
+        return NfeResumosResponse(
+            resumos_found=0,
+            ciencia_sent=0,
+            completos_found=0,
+            results=[],
+            throttled=True,
+            throttled_message=_friendly_throttle_message(wait_s),
+            next_try_in_seconds=wait_s,
+        )
 
     docs = list(response.documents)
     results = []
@@ -378,6 +453,10 @@ async def nfe_resumos(
             response.max_nsu or response.ult_nsu,
         )
         nsu_controller.update_last_nsu(cert["id"], "nfe", response.ult_nsu)
+
+    # Registra sucesso no circuit breaker (fecha half-open se vier de recovery)
+    if response.cstat in ("137", "138"):
+        cb.record_success(body.cnpj, "nfe")
 
     # Log
     sb.table("polling_log").insert({

@@ -208,6 +208,11 @@ class NfeResumosResponse(BaseModel):
     ult_nsu_returned: str | None = None
     max_nsu: str | None = None
     total_docs_in_response: int | None = None
+    # Throttling — quando SEFAZ está em janela de backoff (ex: 656)
+    # a resposta vira "neutra" e o frontend renderiza mensagem amigável.
+    throttled: bool = False
+    throttled_message: str | None = None
+    next_try_in_seconds: int | None = None
 
 
 class NfeRetryCienciaResponse(BaseModel):
