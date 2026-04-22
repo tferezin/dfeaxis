@@ -12,14 +12,14 @@ const nextConfig: NextConfig = {
   // Next.js 16 exige que outputFileTracingRoot seja igual a turbopack.root
   // pra evitar warning em build.
   outputFileTracingRoot: projectRoot,
-  // Serve a landing estática (public/landing-v3.html) em `/` sem expor o
-  // nome do arquivo na barra de endereço. Rewrite é invisível ao usuário,
-  // diferente do redirect 307 que estava no antigo app/page.tsx.
+  // Serve a landing estática em `/` sem expor o nome do arquivo na barra.
+  // V4 é a landing oficial (decidido em 22/04/2026). A V3 continua
+  // acessível via /landing-v3.html direto pra comparação/rollback rápido.
   async rewrites() {
     return [
       {
         source: "/",
-        destination: "/landing-v3.html",
+        destination: "/landing-v4.html",
       },
     ]
   },

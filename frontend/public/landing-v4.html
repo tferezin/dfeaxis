@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DFeAxis — A camada de recebimento fiscal que o SAP DRC não tem</title>
+<meta name="description" content="Captura automática de NF-e, CT-e, MDF-e e NFS-e direto da SEFAZ com entrega via API REST. Integração nativa com SAP DRC, TOTVS, Oracle e qualquer ERP. Zero armazenamento. Preço público. Trial 10 dias sem cartão.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://www.dfeaxis.com.br/landing-v4.html">
+<meta property="og:title" content="DFeAxis — A camada de recebimento fiscal que o SAP DRC não tem">
+<meta property="og:description" content="Captura automática de NF-e, CT-e, MDF-e e NFS-e direto da SEFAZ. Integração nativa SAP DRC. Zero armazenamento.">
+<meta property="og:image" content="https://www.dfeaxis.com.br/og-image.jpg">
+<meta property="og:url" content="https://www.dfeaxis.com.br/landing-v4.html">
+
+<!-- Tracking (mesmo bloco da V3) -->
+<script>
+window.DFEAXIS_TRACKING = {
+  GA4_ID:         "G-XZTRG63C53",
+  GTM_ID:         "GTM-PLACEHOLDER",
+  META_PIXEL_ID:  "PIXEL_PLACEHOLDER",
+  GOOGLE_ADS_ID:  "AW-PLACEHOLDER",
+  CLARITY_ID:     "wb36mtmtue",
+  LINKEDIN_ID:    "LINKEDIN_PLACEHOLDER"
+};
+(function(){
+  var T = window.DFEAXIS_TRACKING;
+  var isReal = function(v){ return v && v.indexOf("PLACEHOLDER") === -1; };
+  window.dataLayer = window.dataLayer || [];
+  window.gtag = function(){ dataLayer.push(arguments); };
+  try {
+    var qp = new URLSearchParams(window.location.search);
+    var trunc = function(v){ if(!v) return null; v = String(v).trim(); return v ? v.slice(0, 255) : null; };
+    var attr = {
+      utm_source: trunc(qp.get("utm_source")), utm_medium: trunc(qp.get("utm_medium")),
+      utm_campaign: trunc(qp.get("utm_campaign")), utm_term: trunc(qp.get("utm_term")),
+      utm_content: trunc(qp.get("utm_content")),
+      gclid: trunc(qp.get("gclid")), fbclid: trunc(qp.get("fbclid"))
+    };
+    var hasAny = attr.utm_source || attr.utm_medium || attr.utm_campaign || attr.gclid || attr.fbclid;
+    if (hasAny) {
+      attr.referrer = trunc(document.referrer);
+      attr.landing_path = trunc(window.location.pathname + window.location.search);
+      attr.captured_at = new Date().toISOString();
+      window.localStorage.setItem("dfeaxis_attribution", JSON.stringify(attr));
+    }
+  } catch(e) {}
+  if (isReal(T.GA4_ID) || isReal(T.GOOGLE_ADS_ID)) {
+    var loaderId = isReal(T.GA4_ID) ? T.GA4_ID : T.GOOGLE_ADS_ID;
+    var s = document.createElement("script");
+    s.async = true;
+    s.src = "https://www.googletagmanager.com/gtag/js?id=" + loaderId;
+    document.head.appendChild(s);
+    gtag("js", new Date());
+    if (isReal(T.GA4_ID)) gtag("config", T.GA4_ID, { send_page_view: true });
+    if (isReal(T.GOOGLE_ADS_ID)) gtag("config", T.GOOGLE_ADS_ID);
+  }
+  if (isReal(T.CLARITY_ID)) {
+    (function(c,l,a,r,i,t,y){
+      c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+      t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+      y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+    })(window, document, "clarity", "script", T.CLARITY_ID);
+  }
+  window.DFEAXIS_CONVERT = function(eventName, params) {
+    params = params || {};
+    try {
+      if (window.gtag && isReal(T.GA4_ID)) {
+        window.gtag('event', eventName, Object.assign({ currency: 'BRL', value: params.value||0 }, params));
+      }
+    } catch(e) {}
+  };
+})();
+</script>
+
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --bg:#edf0f6;--sur:#fff;--sur2:#f7f9fc;--dk:#0a1528;--dk2:#111d2e;
+  --tx:#111d2e;--tx2:#4a5670;--tx3:#8898b0;--tx4:#b8c4d8;
+  --bdr:#e1e7f0;--bdr2:#c8d2e0;
+  --gr:#0c4a30;--gr-m:#197550;--gr-l:#e0f0e8;--gr-xl:#f2faf6;
+  --bl:#122048;--am:#a35200;--rd:#a81a1a;
+  --fs:'Outfit',system-ui,sans-serif;--fd:'Fraunces',Georgia,serif;--mn:'JetBrains Mono',monospace;
+  --sh:0 1px 3px rgba(18,32,72,.06),0 1px 2px rgba(18,32,72,.04);
+  --sh-lg:0 10px 32px rgba(18,32,72,.1),0 4px 12px rgba(18,32,72,.06);
+  --sh-xl:0 24px 64px rgba(18,32,72,.18);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:80px}
+body{font-family:var(--fs);font-size:15px;line-height:1.55;color:var(--tx);background:var(--bg);-webkit-font-smoothing:antialiased;overflow-x:hidden;padding-bottom:72px}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit}
+
+/* NAV */
+#nav{position:fixed;top:0;left:0;right:0;z-index:200;height:62px;padding:0 52px;display:flex;align-items:center;gap:36px;background:rgba(237,240,246,.88);backdrop-filter:blur(18px);border-bottom:1px solid var(--bdr)}
+.logo img{height:52px;object-fit:contain}
+.nav-links{display:flex;gap:26px;margin-left:auto}
+.nav-links a{font-size:13.5px;font-weight:500;color:var(--tx2);transition:color .15s}
+.nav-links a:hover{color:var(--tx)}
+.nav-btns{display:flex;gap:9px;margin-left:20px}
+.btn-out{padding:8px 18px;border-radius:8px;font-size:13.5px;font-weight:500;color:var(--tx2);background:transparent;border:1px solid var(--bdr2);cursor:pointer;transition:all .15s}
+.btn-out:hover{color:var(--tx);background:var(--sur)}
+.btn-fill{padding:9px 22px;border-radius:9px;font-size:13.5px;font-weight:600;color:#fff;background:var(--gr);border:none;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:7px}
+.btn-fill:hover{background:var(--gr-m);transform:translateY(-1px);box-shadow:0 4px 14px rgba(12,74,48,.28)}
+.hamburger{display:none;background:none;border:none;cursor:pointer;padding:6px;margin-left:auto}
+.hamburger svg{width:26px;height:26px;stroke:var(--tx);stroke-width:2;stroke-linecap:round}
+
+/* HERO SPLIT */
+#hero{position:relative;overflow:hidden;padding:122px 52px 80px;min-height:calc(100vh - 62px);display:flex;align-items:center}
+@keyframes heroRise{from{opacity:0;transform:translateY(14px);filter:blur(10px)}to{opacity:1;transform:none;filter:none}}
+@media (prefers-reduced-motion: no-preference){
+  .hero-text > *{opacity:0;animation:heroRise .85s cubic-bezier(.2,.7,.2,1) forwards}
+  .hero-text > *:nth-child(1){animation-delay:80ms}
+  .hero-text > *:nth-child(2){animation-delay:180ms}
+  .hero-text > *:nth-child(3){animation-delay:300ms}
+  .hero-text > *:nth-child(4){animation-delay:420ms}
+  .hero-text > *:nth-child(5){animation-delay:540ms}
+  .hero-text > *:nth-child(6){animation-delay:660ms}
+  .hero-mockup{opacity:0;animation:heroRise 1.05s cubic-bezier(.2,.7,.2,1) 350ms forwards}
+}
+.hero-bg-fade{position:absolute;inset:0;background:
+  radial-gradient(ellipse 600px 400px at 15% 20%,rgba(25,117,80,.08) 0%,transparent 60%),
+  radial-gradient(ellipse 500px 400px at 85% 80%,rgba(22,56,120,.06) 0%,transparent 65%),
+  radial-gradient(ellipse 400px 300px at 50% 100%,rgba(163,82,0,.04) 0%,transparent 60%)}
+.hero-split{position:relative;z-index:1;max-width:1240px;margin:0 auto;display:grid;grid-template-columns:1.05fr 1fr;gap:60px;align-items:center;width:100%}
+.hero-text .eyebrow{display:inline-flex;align-items:center;gap:8px;background:rgba(168,26,26,.08);color:#8c1515;border:1px solid rgba(168,26,26,.18);padding:6px 16px;border-radius:24px;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:26px}
+.hero-text .eyebrow::before{content:'';width:7px;height:7px;background:#a81a1a;border-radius:50%;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.hero-text h1{font-family:var(--fd);font-size:clamp(40px,4.8vw,64px);font-weight:300;line-height:1.04;letter-spacing:-.028em;color:var(--tx);margin-bottom:22px}
+.hero-text h1 strong{font-weight:500;color:var(--gr-m);font-style:italic}
+.hero-text .hero-p{font-size:17px;font-weight:300;color:var(--tx2);line-height:1.7;margin-bottom:22px;max-width:560px}
+.hero-text .hero-p strong{font-weight:600;color:var(--tx)}
+.docs-pills{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:32px}
+.docs-pills span{background:var(--sur);border:1px solid var(--bdr);color:var(--tx);padding:6px 14px;border-radius:20px;font-size:12.5px;font-weight:600;letter-spacing:.01em}
+.docs-pills span.plus{background:var(--gr-l);color:var(--gr);border-color:rgba(12,74,48,.18)}
+.hero-ctas{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+.cta-p{padding:14px 28px;border-radius:10px;background:var(--gr);color:#fff;font-size:15px;font-weight:600;border:none;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:8px}
+.cta-p:hover{background:var(--gr-m);transform:translateY(-1px);box-shadow:0 6px 20px rgba(12,74,48,.3)}
+.cta-s{padding:14px 28px;border-radius:10px;background:var(--sur);color:var(--tx);font-size:15px;font-weight:600;border:1px solid var(--bdr2);cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:8px;box-shadow:var(--sh)}
+.cta-s:hover{transform:translateY(-1px);box-shadow:var(--sh-lg);border-color:var(--tx3)}
+.cta-s::before{content:'';width:8px;height:8px;background:#22c55e;border-radius:50%;box-shadow:0 0 0 3px rgba(34,197,94,.2)}
+.trust-inline{display:flex;gap:18px;flex-wrap:wrap;font-size:12.5px;font-weight:600;color:var(--tx2)}
+.trust-inline span{display:inline-flex;align-items:center;gap:6px}
+.trust-inline span::before{content:'✓';color:var(--gr-m);font-weight:700}
+
+/* HERO MOCKUP (CSS-only dashboard) */
+.hero-mockup{position:relative;border-radius:14px;background:linear-gradient(135deg,#1a1f2e 0%,#0c1220 60%,#0a0f1a 100%);padding:12px;box-shadow:0 40px 80px rgba(10,15,30,.25),0 20px 40px rgba(10,15,30,.18),0 0 0 1px rgba(255,255,255,.05);transform:perspective(1600px) rotateY(-6deg) rotateX(2deg);transform-origin:left center}
+.mockup-bar{display:flex;align-items:center;gap:6px;padding:6px 8px;margin-bottom:8px}
+.mockup-bar span{width:10px;height:10px;border-radius:50%;background:#fc5c5c}
+.mockup-bar span:nth-child(2){background:#fdbc39}
+.mockup-bar span:nth-child(3){background:#44c74a}
+.mockup-bar .url-pill{flex:1;margin-left:10px;height:20px;border-radius:5px;background:rgba(255,255,255,.05);display:flex;align-items:center;padding:0 10px;font-size:10px;color:rgba(255,255,255,.45);font-family:var(--mn)}
+.mockup-body{background:#f7f9fc;border-radius:8px;padding:16px 18px;min-height:420px;display:flex;flex-direction:column;gap:14px}
+.mck-row{display:flex;align-items:center;justify-content:space-between;font-size:12px}
+.mck-logo{font-family:var(--fd);font-weight:400;color:var(--tx);font-size:14px}
+.mck-logo b{color:var(--gr-m);font-weight:400}
+.mck-user{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#197550,#0c4a30);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600}
+.mck-title{font-family:var(--fd);font-weight:400;font-size:19px;color:var(--tx);letter-spacing:-.015em}
+.mck-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.mck-stat{background:#fff;border:1px solid var(--bdr);border-radius:8px;padding:10px 12px}
+.mck-stat-l{font-size:9.5px;font-weight:600;color:var(--tx3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+.mck-stat-n{font-family:var(--fd);font-size:18px;font-weight:400;color:var(--tx);letter-spacing:-.02em}
+.mck-stat-n em{font-style:normal;color:var(--gr-m);font-size:12px}
+.mck-table{background:#fff;border:1px solid var(--bdr);border-radius:8px;overflow:hidden}
+.mck-table-h{display:grid;grid-template-columns:.8fr 1.4fr .9fr .7fr;padding:9px 12px;background:#fafbfd;font-size:9.5px;font-weight:600;color:var(--tx3);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--bdr)}
+.mck-table-r{display:grid;grid-template-columns:.8fr 1.4fr .9fr .7fr;padding:9px 12px;font-size:11px;color:var(--tx);align-items:center;border-bottom:1px solid var(--bdr)}
+.mck-table-r:last-child{border-bottom:none}
+.mck-table-r .mck-date{font-family:var(--mn);font-size:10px;color:var(--tx2)}
+.mck-table-r .mck-cnpj{font-family:var(--mn);font-size:10px;color:var(--tx2);filter:blur(3px);letter-spacing:.03em}
+.mck-table-r .mck-val{font-weight:600;color:var(--tx)}
+.mck-pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:9px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.mck-pill.nfe{background:rgba(25,117,80,.14);color:var(--gr-m)}
+.mck-pill.cte{background:rgba(22,56,120,.14);color:#2c5db8}
+.mck-pill.mdfe{background:rgba(163,82,0,.14);color:var(--am)}
+.mck-pill.nfse{background:rgba(139,92,246,.16);color:#7c4dd1}
+.mck-badge-ok{background:rgba(34,197,94,.15);color:#15803d;font-size:9.5px;font-weight:700;padding:2px 7px;border-radius:9px}
+.mockup-live{position:absolute;top:-14px;right:-14px;background:#0c4a30;color:#fff;font-size:11px;font-weight:700;padding:6px 12px;border-radius:20px;letter-spacing:.04em;box-shadow:0 8px 24px rgba(12,74,48,.35);display:flex;align-items:center;gap:6px}
+.mockup-live::before{content:'';width:7px;height:7px;background:#4ade80;border-radius:50%;animation:pulse 1.5s infinite}
+
+/* STATS BAR (fiscal.io style — números monstros) */
+#stats-hero{background:var(--dk);color:#fff;padding:32px 52px;border-top:1px solid rgba(255,255,255,.05)}
+.stats-grid{max-width:1240px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:32px}
+.stat-hero{text-align:center}
+.stat-hero-n{font-family:var(--fd);font-size:clamp(32px,3.2vw,44px);font-weight:300;letter-spacing:-.03em;color:#fff;line-height:1}
+.stat-hero-n span{font-size:.5em;color:var(--gr-m);font-weight:400}
+.stat-hero-l{font-size:11.5px;font-weight:600;color:rgba(255,255,255,.55);letter-spacing:.06em;text-transform:uppercase;margin-top:8px}
+
+/* LOGO WALL */
+#logos-wall{background:var(--sur);padding:36px 52px;border-bottom:1px solid var(--bdr)}
+.logos-inner{max-width:1100px;margin:0 auto;text-align:center}
+.logos-label{font-size:11.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--tx3);margin-bottom:18px}
+.logos-row{display:flex;justify-content:center;gap:32px;flex-wrap:wrap;align-items:center}
+.logos-row span{font-size:15px;font-weight:700;color:var(--tx)}
+.logos-row span.primary{color:var(--gr);background:var(--gr-l);padding:7px 18px;border-radius:8px;border:1px solid rgba(12,74,48,.18)}
+.logos-row span.muted{opacity:.45}
+
+/* GENERIC SECTION */
+.sec{max-width:1100px;margin:0 auto;padding:88px 52px}
+.sec-tag{font-size:11.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--gr-m);margin-bottom:13px}
+.sec h2{font-family:var(--fd);font-size:clamp(28px,3.5vw,44px);font-weight:300;line-height:1.18;letter-spacing:-.02em;margin-bottom:15px}
+.sec-sub{font-size:16px;font-weight:300;color:var(--tx2);max-width:620px;line-height:1.75}
+
+/* DOR */
+#dor{background:var(--sur);border-top:1px solid var(--bdr);border-bottom:1px solid var(--bdr)}
+.dor-inner{max-width:820px;margin:0 auto;padding:88px 52px}
+.dor-inner h2{font-family:var(--fd);font-size:clamp(26px,3.2vw,40px);font-weight:300;line-height:1.2;letter-spacing:-.02em;margin-bottom:28px}
+.dor-inner h2 em{font-style:normal;color:var(--am)}
+.dor-p{font-size:15px;color:var(--tx2);line-height:1.8;margin-bottom:20px}
+.dor-p strong{color:var(--tx);font-weight:600}
+.dor-close{font-size:16px;font-weight:500;color:var(--gr);line-height:1.7;padding:20px 24px;background:var(--gr-xl);border-left:3px solid var(--gr-m);border-radius:0 10px 10px 0;margin-top:32px}
+
+/* DIAGRAMA NETWORK — high-tech version */
+#diagram{background:linear-gradient(180deg,#070d1a 0%,#0a1528 50%,#060a14 100%);color:#fff;padding:96px 52px;position:relative;overflow:hidden}
+#diagram::before{content:'';position:absolute;inset:0;background:
+  radial-gradient(ellipse 800px 600px at 50% 50%,rgba(25,117,80,.12) 0%,transparent 65%),
+  radial-gradient(ellipse 500px 400px at 15% 80%,rgba(99,102,241,.06) 0%,transparent 60%),
+  radial-gradient(ellipse 400px 350px at 85% 20%,rgba(25,117,80,.08) 0%,transparent 60%)}
+#diagram::after{content:'';position:absolute;inset:0;
+  background-image:linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);
+  background-size:36px 36px;pointer-events:none;mask-image:radial-gradient(ellipse at 50% 50%,#000 30%,transparent 80%);-webkit-mask-image:radial-gradient(ellipse at 50% 50%,#000 30%,transparent 80%)}
+.diagram-inner{max-width:1100px;margin:0 auto;position:relative;z-index:1}
+.diagram-inner h2{font-family:var(--fd);font-size:clamp(28px,3.5vw,42px);font-weight:300;color:#fff;line-height:1.18;letter-spacing:-.02em;margin-bottom:15px;text-align:center}
+.diagram-inner h2 em{font-style:italic;color:#86efac}
+.diagram-sub{font-size:15px;color:rgba(255,255,255,.55);max-width:560px;margin:0 auto 72px;line-height:1.75;text-align:center}
+
+/* Wrap */
+.diagram-stage{position:relative;max-width:980px;margin:0 auto;aspect-ratio:16/10;min-height:480px}
+.diagram-svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+
+/* Cards sobre SVG */
+.dgc{position:absolute;width:182px;padding:13px 14px 13px 16px;background:linear-gradient(135deg,rgba(255,255,255,.055),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.1);border-radius:12px;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:0 12px 32px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.06);display:flex;align-items:center;gap:11px;transition:transform .25s,border-color .25s}
+.dgc::before{content:'';position:absolute;left:0;top:10px;bottom:10px;width:2px;background:linear-gradient(180deg,#197550,transparent);border-radius:2px}
+.dgc:hover{transform:translateX(2px);border-color:rgba(25,117,80,.45)}
+.dgc.dst::before{left:auto;right:0;background:linear-gradient(180deg,#4ade80,transparent)}
+.dgc.dst{padding:13px 16px 13px 14px}
+.dgc.highlight{border-color:rgba(25,117,80,.55);box-shadow:0 12px 32px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.08),0 0 0 1px rgba(25,117,80,.35)}
+.dgc-icon{width:34px;height:34px;border-radius:9px;background:rgba(25,117,80,.18);border:1px solid rgba(25,117,80,.35);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.dgc-icon svg{width:16px;height:16px;stroke:#86efac;fill:none;stroke-width:1.8}
+.dgc-body{min-width:0}
+.dgc-t{font-size:12.5px;font-weight:600;color:#fff;letter-spacing:.01em;line-height:1.15;margin-bottom:3px}
+.dgc-s{font-size:9.5px;font-weight:600;color:rgba(255,255,255,.45);letter-spacing:.06em;text-transform:uppercase}
+
+/* Source positions (left) */
+.dgc.src-1{top:5%;left:1%}
+.dgc.src-2{top:43%;left:1%}
+.dgc.src-3{top:82%;left:1%}
+
+/* Destination positions (right) */
+.dgc.dst-1{top:5%;right:1%}
+.dgc.dst-2{top:43%;right:1%}
+.dgc.dst-3{top:82%;right:1%}
+
+/* Live badge */
+.dgc-live{position:absolute;top:-8px;right:-8px;background:#0c4a30;border:1px solid #197550;color:#86efac;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:10px;display:flex;align-items:center;gap:5px}
+.dgc-live::before{content:'';width:5px;height:5px;border-radius:50%;background:#4ade80;box-shadow:0 0 6px #4ade80;animation:pulse 1.5s infinite}
+
+/* Diagram ticker */
+.diagram-ticker{max-width:900px;margin:32px auto 0;padding:13px 20px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;display:flex;align-items:center;gap:14px;font-family:var(--mn);font-size:12px;color:rgba(255,255,255,.6);overflow:hidden}
+.diagram-ticker-dot{width:7px;height:7px;border-radius:50%;background:#4ade80;box-shadow:0 0 10px rgba(74,222,128,.6);flex-shrink:0;animation:pulse 1.8s infinite}
+.diagram-ticker-label{color:rgba(255,255,255,.4);font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+.diagram-ticker-text{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.diagram-ticker-text em{color:#86efac;font-style:normal;font-weight:600}
+
+@media(max-width:820px){
+  .diagram-stage{min-height:auto;aspect-ratio:auto}
+  .diagram-stage{display:flex;flex-direction:column;gap:10px}
+  .dgc{position:static;width:100%}
+  .diagram-svg{display:none}
+  .dgc.dst::before{left:0;right:auto}
+  .diagram-center-mobile{display:flex;align-items:center;justify-content:center;padding:18px 0;font-family:var(--fd);font-weight:400;color:#86efac;font-size:20px;letter-spacing:-.01em}
+}
+@media(min-width:821px){
+  .diagram-center-mobile{display:none}
+}
+
+/* TABS FEATURES */
+#features-tabs{background:var(--sur);border-bottom:1px solid var(--bdr)}
+.ft-inner{max-width:1200px;margin:0 auto;padding:88px 52px}
+.ft-inner h2{text-align:center;font-family:var(--fd);font-size:clamp(28px,3.5vw,42px);font-weight:300;line-height:1.18;letter-spacing:-.02em;margin-bottom:48px}
+.ft-tabs{display:flex;gap:0;border-bottom:1px solid var(--bdr);margin-bottom:40px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.ft-tab{padding:14px 24px;border:none;background:transparent;font-family:var(--fs);font-size:14.5px;font-weight:600;color:var(--tx3);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s}
+.ft-tab.active{color:var(--gr);border-bottom-color:var(--gr)}
+.ft-tab:hover{color:var(--tx)}
+.ft-panels{position:relative;min-height:360px}
+.ft-panel{display:none;grid-template-columns:1fr 1.2fr;gap:48px;align-items:center;animation:fadeIn .2s ease}
+.ft-panel.active{display:grid}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.ft-panel-text h3{font-family:var(--fd);font-size:clamp(22px,2.5vw,30px);font-weight:400;color:var(--tx);margin-bottom:14px;line-height:1.25;letter-spacing:-.015em}
+.ft-panel-text p{font-size:15px;color:var(--tx2);line-height:1.75;margin-bottom:20px}
+.ft-bullets{display:flex;flex-direction:column;gap:10px;margin-bottom:24px}
+.ft-bullet{display:flex;align-items:flex-start;gap:10px;font-size:14px;color:var(--tx2)}
+.ft-bullet::before{content:'✓';color:var(--gr-m);font-weight:700;flex-shrink:0}
+.ft-panel-visual{background:var(--sur2);border:1px solid var(--bdr);border-radius:14px;padding:24px;min-height:320px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;box-shadow:var(--sh)}
+.ft-panel-visual.dark{background:var(--dk);color:#fff}
+.ft-panel-visual pre{font-family:var(--mn);font-size:12.5px;line-height:1.75;color:#d1d5db;width:100%}
+.ft-panel-visual pre .c-k{color:#60a5fa}
+.ft-panel-visual pre .c-s{color:#fde68a}
+.ft-panel-visual pre .c-c{color:#6b7280}
+.ft-panel-visual pre .c-p{color:#86efac}
+.ft-panel-visual pre .c-u{color:#a78bfa}
+.ft-flow{display:flex;flex-direction:column;gap:14px;width:100%}
+.ft-flow-row{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--sur);border:1px solid var(--bdr);border-radius:10px;font-size:13px}
+.ft-flow-row .ft-flow-icon{width:32px;height:32px;border-radius:8px;background:var(--gr-l);color:var(--gr);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:700;font-size:13px}
+.ft-flow-arrow{text-align:center;color:var(--tx4);font-size:18px}
+
+/* COMO FUNCIONA */
+#how{background:var(--sur2);border-bottom:1px solid var(--bdr)}
+.how-inner{max-width:1100px;margin:0 auto;padding:88px 52px}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-top:48px}
+.step{padding:26px 22px;text-align:center;position:relative}
+.step::after{content:'→';position:absolute;right:-8px;top:38px;font-size:17px;color:var(--tx4)}
+.step:last-child::after{display:none}
+.step-n{font-family:var(--fd);font-size:34px;font-weight:300;color:var(--gr-m);opacity:.3;margin-bottom:11px;letter-spacing:-.04em}
+.step h3{font-size:14px;font-weight:600;margin-bottom:7px}
+.step p{font-size:13px;color:var(--tx2);line-height:1.6}
+.step code{font-family:var(--mn);font-size:.85em;background:var(--bg);padding:2px 6px;border-radius:4px}
+
+/* 3 PERSONAS (fiscal.io style) */
+#personas{background:var(--sur);border-bottom:1px solid var(--bdr)}
+.personas-inner{max-width:1200px;margin:0 auto;padding:88px 52px}
+.personas-inner h2{font-family:var(--fd);font-size:clamp(28px,3.5vw,42px);font-weight:300;line-height:1.18;letter-spacing:-.02em;margin-bottom:15px;text-align:center}
+.personas-sub{font-size:16px;font-weight:300;color:var(--tx2);line-height:1.75;text-align:center;margin-bottom:56px;max-width:620px;margin-left:auto;margin-right:auto}
+.personas-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.persona{background:linear-gradient(180deg,var(--sur) 0%,var(--sur2) 100%);border:1px solid var(--bdr);border-radius:18px;padding:32px 28px;display:flex;flex-direction:column;transition:all .2s;box-shadow:var(--sh)}
+.persona:hover{transform:translateY(-4px);box-shadow:var(--sh-lg);border-color:rgba(12,74,48,.18)}
+.persona-icon{width:52px;height:52px;border-radius:13px;background:var(--gr-l);color:var(--gr);display:flex;align-items:center;justify-content:center;margin-bottom:18px;font-family:var(--fd);font-weight:400;font-size:22px;letter-spacing:-.03em}
+.persona h3{font-family:var(--fd);font-size:20px;font-weight:400;color:var(--tx);margin-bottom:10px;line-height:1.25;letter-spacing:-.01em}
+.persona p{font-size:14px;color:var(--tx2);line-height:1.7;margin-bottom:18px}
+.persona-link{font-size:13px;font-weight:600;color:var(--gr);display:inline-flex;align-items:center;gap:5px;margin-top:auto;cursor:pointer;background:none;border:none;padding:0}
+.persona-link:hover{color:var(--gr-m)}
+.persona-link::after{content:'→';transition:transform .15s}
+.persona-link:hover::after{transform:translateX(3px)}
+
+/* ZERO-RETENTION */
+#security{background:var(--dk);color:#fff;padding:88px 52px;position:relative;overflow:hidden}
+#security::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 600px 400px at 20% 30%,rgba(25,117,80,.08) 0%,transparent 60%),radial-gradient(ellipse 500px 400px at 80% 70%,rgba(22,56,120,.06) 0%,transparent 65%)}
+.sec-inner-dark{max-width:1100px;margin:0 auto;position:relative;z-index:1}
+.sec-inner-dark .sec-tag{color:var(--gr-m)}
+.sec-inner-dark h2{font-family:var(--fd);font-size:clamp(28px,3.5vw,44px);font-weight:300;line-height:1.18;letter-spacing:-.02em;color:#fff;margin-bottom:15px}
+.sec-inner-dark h2 em{font-style:italic;color:var(--gr-m)}
+.sec-inner-dark h2 span{opacity:.5}
+.sec-inner-dark p.sub{font-size:16px;color:rgba(255,255,255,.55);max-width:620px;line-height:1.75;margin-bottom:52px}
+.sec-inner-dark p.sub strong{color:#fff;font-weight:600}
+.privacy-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.pcard{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:28px 24px;transition:all .2s}
+.pcard:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.18);transform:translateY(-3px)}
+.pcard-ico{width:48px;height:48px;border-radius:12px;background:rgba(25,117,80,.2);display:flex;align-items:center;justify-content:center;margin-bottom:16px}
+.pcard h3{font-size:16px;font-weight:500;color:#fff;margin-bottom:10px}
+.pcard p{font-size:13px;color:rgba(255,255,255,.5);line-height:1.65}
+
+/* COMPETITOR COMPARE */
+#vs{background:var(--sur2);border-bottom:1px solid var(--bdr)}
+.vs-inner{max-width:1100px;margin:0 auto;padding:88px 52px}
+.vs-inner h2{font-family:var(--fd);font-size:clamp(28px,3.5vw,42px);font-weight:300;line-height:1.18;letter-spacing:-.02em;margin-bottom:15px;text-align:center}
+.vs-sub{font-size:15px;color:var(--tx2);line-height:1.75;text-align:center;max-width:600px;margin:0 auto 48px}
+.vs-table-wrap{background:var(--sur);border:1px solid var(--bdr);border-radius:16px;overflow:hidden;box-shadow:var(--sh)}
+.vs-table-scroll{overflow-x:auto}
+.vs-table{width:100%;border-collapse:collapse;font-size:14px;min-width:720px}
+.vs-table th,.vs-table td{padding:14px 16px;text-align:center;border-bottom:1px solid var(--bdr)}
+.vs-table th:first-child,.vs-table td:first-child{text-align:left;font-weight:500;color:var(--tx2)}
+.vs-table thead th{font-family:var(--fd);font-weight:500;font-size:15px;background:var(--sur2);color:var(--tx);padding:18px 16px}
+.vs-table thead th.us{background:var(--gr);color:#fff;position:relative}
+.vs-table thead th.us::after{content:'Nós';position:absolute;top:4px;right:6px;font-size:9.5px;font-weight:700;background:rgba(255,255,255,.2);padding:2px 6px;border-radius:8px;letter-spacing:.04em}
+.vs-table tbody td.us{background:rgba(25,117,80,.04);font-weight:600;color:var(--gr)}
+.vs-yes{color:var(--gr-m);font-size:17px;font-weight:700}
+.vs-no{color:var(--tx4);font-size:15px}
+.vs-partial{color:var(--am);font-size:14px;font-weight:600}
+.vs-footnote{text-align:center;font-size:12px;color:var(--tx3);margin-top:16px;font-style:italic}
+
+/* TRUST */
+#trust-section{background:var(--sur);border-top:1px solid var(--bdr);border-bottom:1px solid var(--bdr)}
+.trust-inner{max-width:1100px;margin:0 auto;padding:88px 52px}
+.trust-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:44px;margin-bottom:44px}
+.trust-stat{background:var(--sur2);border:1px solid var(--bdr);border-radius:16px;padding:28px 24px;text-align:center}
+.trust-stat-n{font-family:var(--fd);font-size:clamp(32px,4vw,44px);font-weight:300;letter-spacing:-.03em;color:var(--gr)}
+.trust-stat-l{font-size:13px;font-weight:500;color:var(--tx2);margin-top:6px}
+.trust-founder{background:var(--sur2);border:1px solid var(--bdr);border-radius:16px;padding:32px 36px}
+.trust-founder p{font-size:15px;color:var(--tx2);line-height:1.8;font-style:italic}
+.trust-founder .sig{font-size:13px;font-weight:600;color:var(--tx);margin-top:16px;font-style:normal}
+.trust-founder .sig span{color:var(--tx3);font-weight:400}
+
+/* RETRO */
+#retro{padding-top:88px;padding-bottom:88px}
+.retro-wrap{background:var(--sur);border:1px solid var(--bdr);border-radius:20px;overflow:hidden;margin-top:48px;box-shadow:var(--sh);max-width:1100px;margin-left:auto;margin-right:auto}
+.retro-grid{display:grid;grid-template-columns:1fr 1fr;gap:0}
+.retro-text{padding:44px 40px;display:flex;flex-direction:column;justify-content:center}
+.retro-text h3{font-family:var(--fd);font-size:clamp(22px,2.5vw,30px);font-weight:300;line-height:1.25;letter-spacing:-.015em;margin-bottom:14px}
+.retro-text p{font-size:14px;color:var(--tx2);line-height:1.7;margin-bottom:20px}
+.retro-bullets{display:flex;flex-direction:column;gap:9px}
+.retro-bullet{display:flex;align-items:flex-start;gap:10px;font-size:13.5px;color:var(--tx2)}
+.retro-bullet::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--gr-m);flex-shrink:0;margin-top:7px}
+.retro-visual{background:var(--dk);padding:36px;position:relative;overflow:hidden}
+.code-mini{background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:20px 22px}
+.code-mini pre{font-family:var(--mn);font-size:12px;color:#d1d5db;line-height:1.8}
+.retro-note{margin-top:12px;font-size:12.5px;color:rgba(255,255,255,.3)}
+
+/* PRICING */
+#pricing{padding-top:88px;padding-bottom:48px}
+.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;margin-top:48px;max-width:1100px;margin-left:auto;margin-right:auto}
+.plan{background:var(--sur);border:1px solid var(--bdr);border-radius:20px;padding:30px;box-shadow:var(--sh);transition:transform .2s,box-shadow .2s;display:flex;flex-direction:column}
+.plan:hover{transform:translateY(-4px);box-shadow:var(--sh-lg)}
+.plan.fp{background:var(--gr);border-color:var(--gr);color:#fff}
+.plan-badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:rgba(255,255,255,.15);color:rgba(255,255,255,.85);margin-bottom:14px}
+.plan-name{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--tx3);margin-bottom:14px}
+.fp .plan-name{color:rgba(255,255,255,.5)}
+.plan-price{font-family:var(--fd);font-size:38px;font-weight:300;letter-spacing:-.03em;margin-bottom:4px}
+.plan-price span{font-size:16px;font-weight:400}
+.plan-desc{font-size:13px;color:var(--tx2);margin-bottom:22px}
+.fp .plan-desc{color:rgba(255,255,255,.6)}
+.plan-div{height:1px;background:var(--bdr);margin-bottom:18px}
+.fp .plan-div{background:rgba(255,255,255,.15)}
+.plan-f{display:flex;align-items:flex-start;gap:10px;font-size:13.5px;color:var(--tx2);margin-bottom:9px}
+.fp .plan-f{color:rgba(255,255,255,.85)}
+.chk{width:17px;height:17px;border-radius:50%;background:var(--gr-l);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;font-size:9px;color:var(--gr-m)}
+.fp .chk{background:rgba(255,255,255,.2);color:rgba(255,255,255,.85)}
+.plan-btn{width:100%;margin-top:24px;padding:11.5px;border-radius:9px;font-size:14px;font-weight:600;cursor:pointer;border:none;background:var(--gr);color:#fff;transition:all .15s}
+.plan-btn:hover{background:var(--gr-m)}
+.fp .plan-btn{background:rgba(255,255,255,.18)}.fp .plan-btn:hover{background:rgba(255,255,255,.28)}
+.price-note{text-align:center;margin-top:24px;font-size:13px;color:var(--tx3)}
+.price-note a{color:var(--gr-m);font-weight:600}
+
+/* SPECIALIST CTA (a grande jogada) */
+#specialist{background:linear-gradient(135deg,var(--gr) 0%,#0a3c27 50%,#0c4a30 100%);color:#fff;padding:88px 52px;position:relative;overflow:hidden}
+#specialist::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 600px 400px at 100% 50%,rgba(25,117,80,.3) 0%,transparent 60%),radial-gradient(ellipse 400px 300px at 0% 80%,rgba(255,255,255,.04) 0%,transparent 65%)}
+.specialist-inner{max-width:1100px;margin:0 auto;position:relative;z-index:1;display:grid;grid-template-columns:1.2fr 1fr;gap:48px;align-items:center}
+.specialist-text .sec-tag{color:rgba(255,255,255,.7)}
+.specialist-text h2{font-family:var(--fd);font-size:clamp(28px,3.5vw,42px);font-weight:300;line-height:1.2;letter-spacing:-.02em;color:#fff;margin-bottom:18px}
+.specialist-text h2 em{font-style:italic;color:#86efac}
+.specialist-text p{font-size:16px;color:rgba(255,255,255,.72);line-height:1.75;margin-bottom:28px}
+.specialist-ctas{display:flex;gap:12px;flex-wrap:wrap}
+.sp-btn-chat{padding:14px 28px;border-radius:10px;background:#fff;color:var(--gr);font-size:15px;font-weight:700;border:none;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:9px;box-shadow:0 8px 24px rgba(0,0,0,.18)}
+.sp-btn-chat:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(0,0,0,.25)}
+.sp-btn-wa{padding:14px 28px;border-radius:10px;background:rgba(255,255,255,.1);color:#fff;font-size:15px;font-weight:600;border:1px solid rgba(255,255,255,.2);cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:9px;text-decoration:none}
+.sp-btn-wa:hover{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.35)}
+.specialist-signals{display:flex;flex-direction:column;gap:8px;margin-top:20px;font-size:12.5px;color:rgba(255,255,255,.55)}
+.specialist-signals span{display:inline-flex;align-items:center;gap:6px}
+.specialist-signals span::before{content:'✓';color:#4ade80;font-weight:700}
+.specialist-card{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:18px;padding:28px 28px;backdrop-filter:blur(10px)}
+.sp-avatar{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#4ade80,#197550);display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-weight:400;font-size:24px;color:#fff;margin-bottom:14px;border:2px solid rgba(255,255,255,.2)}
+.specialist-card h4{font-family:var(--fd);font-size:18px;font-weight:400;color:#fff;margin-bottom:6px}
+.specialist-card .title{font-size:13px;color:rgba(255,255,255,.55);margin-bottom:16px}
+.specialist-card .teaser{font-size:13.5px;color:rgba(255,255,255,.75);line-height:1.7;font-style:italic;padding-left:12px;border-left:2px solid rgba(25,117,80,.6)}
+
+/* FAQ */
+#faq{background:var(--sur)}
+.faq-list{display:flex;flex-direction:column;gap:10px;margin-top:40px;max-width:780px;margin-left:auto;margin-right:auto}
+.faq-list details{border:1px solid var(--bdr);border-radius:12px;padding:18px 22px;background:var(--sur2)}
+.faq-list summary{font-size:15px;font-weight:600;cursor:pointer;list-style:none;position:relative;padding-right:28px}
+.faq-list summary::-webkit-details-marker{display:none}
+.faq-list summary::after{content:'+';position:absolute;right:0;top:0;font-size:20px;color:var(--tx3);transition:transform .15s}
+.faq-list details[open] summary::after{transform:rotate(45deg)}
+.faq-list p{font-size:14px;color:var(--tx2);margin-top:12px;line-height:1.75}
+
+/* CTA BAND */
+#cta-band{background:var(--gr-l);border-top:1px solid rgba(12,74,48,.11);border-bottom:1px solid rgba(12,74,48,.11)}
+.cta-in{max-width:1100px;margin:0 auto;padding:68px 52px;display:flex;align-items:center;justify-content:space-between;gap:28px;flex-wrap:wrap}
+.cta-in h2{font-family:var(--fd);font-size:clamp(22px,3vw,34px);font-weight:300;letter-spacing:-.015em;max-width:520px}
+.cta-in h2 em{font-style:italic;color:var(--gr-m)}
+
+/* FOOTER */
+footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
+.foot-in{max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.foot-top{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px}
+.foot-logo img{height:52px}
+.foot-links{display:flex;gap:22px;font-size:13px;color:var(--tx3)}
+.foot-links a:hover{color:var(--tx2)}
+.foot-note{font-size:12px;color:var(--tx4)}
+.foot-scope{font-size:11.5px;color:var(--tx3);line-height:1.6}
+
+/* STICKY BAR */
+#sticky-bar{position:fixed;bottom:0;left:0;right:0;z-index:150;background:var(--gr);border-top:1px solid rgba(255,255,255,.1);padding:12px 32px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+#sticky-bar .st-text{font-size:13.5px;font-weight:600;color:#fff}
+#sticky-bar .st-sub{font-size:12px;color:rgba(255,255,255,.6);margin-top:2px}
+#sticky-bar a{background:#fff;color:var(--gr);padding:10px 22px;border-radius:8px;font-size:13.5px;font-weight:700;text-decoration:none;white-space:nowrap}
+
+/* RESPONSIVE */
+@media(max-width:1000px){
+  .hero-split{grid-template-columns:1fr;gap:40px}
+  .hero-mockup{transform:none;max-width:560px;margin:0 auto}
+  .stats-grid{grid-template-columns:repeat(2,1fr);gap:24px}
+  .ft-panel.active{grid-template-columns:1fr}
+  .personas-grid{grid-template-columns:1fr}
+  .specialist-inner{grid-template-columns:1fr}
+  .retro-grid{grid-template-columns:1fr}
+  .steps{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:800px){
+  #nav{padding:0 20px;flex-wrap:wrap;height:auto;min-height:56px;padding-top:8px;padding-bottom:8px}
+  .hamburger{display:block}
+  .nav-links,.nav-btns{display:none;width:100%;padding-top:14px}
+  .nav-links.open,.nav-btns.open{display:flex}
+  .nav-links{flex-direction:column;gap:10px;border-top:1px solid var(--bdr);margin-left:0}
+  .nav-btns{margin-left:0;gap:10px;padding-bottom:6px}
+  .nav-btns button{flex:1}
+  #hero{padding:110px 20px 60px}
+  #stats-hero{padding:28px 20px}
+  .stats-grid{grid-template-columns:repeat(2,1fr);gap:20px}
+  #logos-wall,.sec,.dor-inner,.how-inner,.ft-inner,.personas-inner,.trust-inner,.vs-inner,#security,#specialist,.cta-in{padding-left:20px;padding-right:20px}
+  .privacy-cards{grid-template-columns:1fr}
+  .plans{grid-template-columns:1fr}
+  .trust-stats{grid-template-columns:1fr}
+  .steps{grid-template-columns:1fr}
+  #sticky-bar{padding:10px 16px}
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav id="nav">
+  <div class="logo"><img src="/logo-dfeaxis.png" alt="DFeAxis"></div>
+  <button class="hamburger" id="menuBtn" onclick="toggleMenu()" aria-label="Menu">
+    <svg viewBox="0 0 24 24" fill="none"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
+  <div class="nav-links" id="navLinks">
+    <a href="#features-tabs">Funcionalidades</a>
+    <a href="#personas">Pra quem é</a>
+    <a href="#vs">Comparativo</a>
+    <a href="#pricing">Planos</a>
+    <a href="#faq">FAQ</a>
+  </div>
+  <div class="nav-btns" id="navBtns">
+    <button class="btn-out" onclick="openSpecialistChat('nav');">Falar com especialista</button>
+    <button class="btn-fill" onclick="DFEAXIS_CONVERT('cta_nav',{value:50});window.location.href='/signup'">Começar grátis</button>
+  </div>
+</nav>
+
+<!-- HERO SPLIT -->
+<section id="hero">
+  <div class="hero-bg-fade"></div>
+  <div class="hero-split">
+    <div class="hero-text">
+      <div class="eyebrow">SAP GRC NFe descontinuado · DRC não recebe</div>
+      <h1>O SAP DRC não recebe NF-e<br>de fornecedores.<br><strong>O DFeAxis sim.</strong></h1>
+      <p class="hero-p">Capturamos <strong>NF-e, CT-e, MDF-e e NFS-e</strong> direto da SEFAZ e entregamos no seu ERP via API REST. Sem middleware. Sem armazenamento. Captura em minutos após o upload do certificado.</p>
+      <div class="docs-pills">
+        <span>NF-e</span><span>CT-e</span><span>MDF-e</span><span>NFS-e</span><span class="plus" title="Ciência automática pra liberar o XML completo. Demais manifestos (confirmação, desconhecimento, operação não realizada) são disparados manualmente pelo usuário.">+ ciência automática</span>
+      </div>
+      <div class="hero-ctas">
+        <button class="cta-p" onclick="DFEAXIS_CONVERT('cta_hero',{value:50});window.location.href='/signup'">Começar grátis — 10 dias</button>
+        <button class="cta-s" onclick="openSpecialistChat('hero');">Falar com especialista</button>
+      </div>
+      <div class="trust-inline">
+        <span>Sem cartão de crédito</span>
+        <span>Preço público</span>
+        <span>Integra com qualquer ERP</span>
+      </div>
+    </div>
+    <div class="hero-mockup">
+      <div class="mockup-live">AO VIVO</div>
+      <div class="mockup-bar">
+        <span></span><span></span><span></span>
+        <div class="url-pill">dfeaxis.com.br/dashboard</div>
+      </div>
+      <div class="mockup-body">
+        <div class="mck-row">
+          <div class="mck-logo">DFe<b>Axis</b></div>
+          <div class="mck-user">TF</div>
+        </div>
+        <div class="mck-title">Documentos recebidos · Abril/2026</div>
+        <div class="mck-stats">
+          <div class="mck-stat"><div class="mck-stat-l">NF-e</div><div class="mck-stat-n">1.248 <em>+12</em></div></div>
+          <div class="mck-stat"><div class="mck-stat-l">CT-e</div><div class="mck-stat-n">386 <em>+4</em></div></div>
+          <div class="mck-stat"><div class="mck-stat-l">MDF-e</div><div class="mck-stat-n">92</div></div>
+          <div class="mck-stat"><div class="mck-stat-l">NFS-e</div><div class="mck-stat-n">217 <em>+2</em></div></div>
+        </div>
+        <div class="mck-table">
+          <div class="mck-table-h"><span>Tipo</span><span>Emitente</span><span>Valor</span><span>Status</span></div>
+          <div class="mck-table-r"><span><span class="mck-pill nfe">NF-e</span></span><span class="mck-cnpj">12.345.678/0001-95</span><span class="mck-val">R$ 12.480,00</span><span><span class="mck-badge-ok">Enviado</span></span></div>
+          <div class="mck-table-r"><span><span class="mck-pill cte">CT-e</span></span><span class="mck-cnpj">98.765.432/0001-10</span><span class="mck-val">R$ 2.380,50</span><span><span class="mck-badge-ok">Enviado</span></span></div>
+          <div class="mck-table-r"><span><span class="mck-pill nfe">NF-e</span></span><span class="mck-cnpj">45.678.901/0001-22</span><span class="mck-val">R$ 890,00</span><span><span class="mck-badge-ok">Enviado</span></span></div>
+          <div class="mck-table-r"><span><span class="mck-pill mdfe">MDF-e</span></span><span class="mck-cnpj">11.222.333/0001-44</span><span class="mck-val">R$ 540,00</span><span><span class="mck-badge-ok">Enviado</span></span></div>
+          <div class="mck-table-r"><span><span class="mck-pill nfse">NFS-e</span></span><span class="mck-cnpj">77.888.999/0001-55</span><span class="mck-val">R$ 4.200,00</span><span><span class="mck-badge-ok">Enviado</span></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STATS HERO -->
+<div id="stats-hero">
+  <div class="stats-grid">
+    <div class="stat-hero"><div class="stat-hero-n">4<span>tipos</span></div><div class="stat-hero-l">NF-e · CT-e · MDF-e · NFS-e</div></div>
+    <div class="stat-hero"><div class="stat-hero-n">15<span>min</span></div><div class="stat-hero-l">Polling SEFAZ</div></div>
+    <div class="stat-hero"><div class="stat-hero-n">99,7<span>%</span></div><div class="stat-hero-l">Uptime desde o lançamento</div></div>
+    <div class="stat-hero"><div class="stat-hero-n">5<span>min</span></div><div class="stat-hero-l">Do cadastro ao 1º doc em homologação</div></div>
+  </div>
+</div>
+
+<!-- LOGO WALL -->
+<div id="logos-wall">
+  <div class="logos-inner">
+    <div class="logos-label">Integra nativamente com</div>
+    <div class="logos-row">
+      <span class="primary">SAP DRC</span>
+      <span class="muted">TOTVS</span>
+      <span class="muted">Oracle</span>
+      <span class="muted">Senior</span>
+      <span class="muted">Sankhya</span>
+      <span class="muted">Qualquer ERP via API REST</span>
+    </div>
+  </div>
+</div>
+
+<!-- DOR -->
+<section id="dor">
+  <div class="dor-inner">
+    <div class="sec-tag">O cenário fiscal em 2026</div>
+    <h2>O GRC foi descontinuado.<br>O DRC resolve a emissão.<br><em>E o recebimento fiscal?</em></h2>
+    <p class="dor-p">Em dezembro de 2025, a SAP encerrou o suporte ao GRC NF-e. A pesquisa <strong>Tax do Amanhã 2025</strong> da Deloitte revelou que 66% das empresas demonstraram receio com a fase de transição. Milhares migraram para o DRC &mdash; e descobriram que a automação do recebimento de documentos fiscais de fornecedores não veio junto.</p>
+    <p class="dor-p">Hoje, equipes fiscais de empresas com SAP ainda acessam a SEFAZ manualmente, baixam XMLs de NF-e e CT-e um a um, e correm o risco de perder créditos de ICMS sobre frete por falta de captura tempestiva. Quando a SEFAZ fica instável, ninguém sabe quais documentos ficaram pra trás. E quando o auditor pede rastreabilidade do processo, a resposta é um print de tela.</p>
+    <p class="dor-p">Com a <strong>Reforma Tributária</strong> exigindo rastreabilidade em tempo real de créditos e débitos &mdash; IBS com integração instantânea entre todos os elos da cadeia, CBS com rastreabilidade ininterrupta em nível transacional &mdash; esse processo manual virou bomba-relógio.</p>
+    <div class="dor-close">O DFeAxis resolve exatamente esse gap: captura automática de documentos fiscais de fornecedores na SEFAZ, com entrega direta ao seu ERP &mdash; seja SAP DRC via RFC Destination, TOTVS, Oracle, Senior ou qualquer sistema via API REST. Sem middleware, sem intervenção humana.</div>
+  </div>
+</section>
+
+<!-- DIAGRAMA NETWORK -->
+<section id="diagram">
+  <div class="diagram-inner">
+    <div class="sec-tag" style="text-align:center;color:#86efac">Cobertura fiscal</div>
+    <h2>Sua cobertura fiscal <em>completa</em>,<br>sem depender do fornecedor.</h2>
+    <p class="diagram-sub">NF-e, CT-e, MDF-e e NFS-e entram direto da fonte oficial, em paralelo &mdash; e saem prontos pro seu ERP via API REST.</p>
+
+    <div class="diagram-stage">
+      <!-- SVG: linhas + centro + partículas -->
+      <svg class="diagram-svg" viewBox="0 0 980 500" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+        <defs>
+          <!-- Gradiente das linhas -->
+          <linearGradient id="lineGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="rgba(25,117,80,.08)"/>
+            <stop offset="35%" stop-color="rgba(25,117,80,.55)"/>
+            <stop offset="65%" stop-color="rgba(74,222,128,.7)"/>
+            <stop offset="100%" stop-color="rgba(25,117,80,.08)"/>
+          </linearGradient>
+          <!-- Gradiente do centro -->
+          <radialGradient id="centerGrad" cx="40%" cy="40%">
+            <stop offset="0%" stop-color="#2d9668"/>
+            <stop offset="55%" stop-color="#197550"/>
+            <stop offset="100%" stop-color="#0c4a30"/>
+          </radialGradient>
+          <!-- Glow filter -->
+          <filter id="centerGlow" x="-100%" y="-100%" width="300%" height="300%">
+            <feGaussianBlur stdDeviation="8" result="blur"/>
+            <feMerge>
+              <feMergeNode in="blur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+          <!-- Gradiente particle -->
+          <radialGradient id="pGrad">
+            <stop offset="0%" stop-color="#4ade80" stop-opacity="1"/>
+            <stop offset="70%" stop-color="#4ade80" stop-opacity=".4"/>
+            <stop offset="100%" stop-color="#4ade80" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+
+        <!-- Glow pulsante atrás do centro -->
+        <circle cx="490" cy="250" r="98" fill="rgba(25,117,80,.22)" filter="url(#centerGlow)">
+          <animate attributeName="r" values="88;108;88" dur="3.5s" repeatCount="indefinite"/>
+          <animate attributeName="opacity" values=".4;.7;.4" dur="3.5s" repeatCount="indefinite"/>
+        </circle>
+
+        <!-- Anéis orbitais -->
+        <circle cx="490" cy="250" r="90" fill="none" stroke="rgba(25,117,80,.28)" stroke-width="1" stroke-dasharray="2,6">
+          <animateTransform attributeName="transform" type="rotate" from="0 490 250" to="360 490 250" dur="24s" repeatCount="indefinite"/>
+        </circle>
+        <circle cx="490" cy="250" r="115" fill="none" stroke="rgba(25,117,80,.18)" stroke-width="1" stroke-dasharray="3,10">
+          <animateTransform attributeName="transform" type="rotate" from="360 490 250" to="0 490 250" dur="36s" repeatCount="indefinite"/>
+        </circle>
+        <circle cx="490" cy="250" r="140" fill="none" stroke="rgba(74,222,128,.09)" stroke-width="1" stroke-dasharray="1,14"/>
+
+        <!-- Linhas de conexão (fontes → centro) -->
+        <path id="p1" d="M 195 80 Q 340 130 435 235" fill="none" stroke="url(#lineGrad)" stroke-width="1.6" opacity=".85"/>
+        <path id="p2" d="M 195 250 Q 320 250 430 250" fill="none" stroke="url(#lineGrad)" stroke-width="1.6" opacity=".85"/>
+        <path id="p3" d="M 195 420 Q 340 370 435 265" fill="none" stroke="url(#lineGrad)" stroke-width="1.6" opacity=".85"/>
+        <!-- Linhas (centro → destinos) -->
+        <path id="p4" d="M 545 235 Q 660 130 785 80" fill="none" stroke="url(#lineGrad)" stroke-width="1.6" opacity=".85"/>
+        <path id="p5" d="M 550 250 Q 670 250 785 250" fill="none" stroke="url(#lineGrad)" stroke-width="1.6" opacity=".85"/>
+        <path id="p6" d="M 545 265 Q 660 370 785 420" fill="none" stroke="url(#lineGrad)" stroke-width="1.6" opacity=".85"/>
+
+        <!-- Partículas flowing -->
+        <g>
+          <circle r="4" fill="url(#pGrad)"><animateMotion dur="2.8s" repeatCount="indefinite" path="M 195 80 Q 340 130 435 235"/></circle>
+          <circle r="3" fill="url(#pGrad)"><animateMotion dur="2.8s" begin="1.1s" repeatCount="indefinite" path="M 195 80 Q 340 130 435 235"/></circle>
+          <circle r="4" fill="url(#pGrad)"><animateMotion dur="2.4s" repeatCount="indefinite" path="M 195 250 Q 320 250 430 250"/></circle>
+          <circle r="3" fill="url(#pGrad)"><animateMotion dur="2.4s" begin=".9s" repeatCount="indefinite" path="M 195 250 Q 320 250 430 250"/></circle>
+          <circle r="4" fill="url(#pGrad)"><animateMotion dur="3s" repeatCount="indefinite" path="M 195 420 Q 340 370 435 265"/></circle>
+          <circle r="3" fill="url(#pGrad)"><animateMotion dur="3s" begin="1.3s" repeatCount="indefinite" path="M 195 420 Q 340 370 435 265"/></circle>
+
+          <circle r="4" fill="url(#pGrad)"><animateMotion dur="2.6s" repeatCount="indefinite" path="M 545 235 Q 660 130 785 80"/></circle>
+          <circle r="3" fill="url(#pGrad)"><animateMotion dur="2.6s" begin="1s" repeatCount="indefinite" path="M 545 235 Q 660 130 785 80"/></circle>
+          <circle r="4" fill="url(#pGrad)"><animateMotion dur="2.2s" repeatCount="indefinite" path="M 550 250 Q 670 250 785 250"/></circle>
+          <circle r="3" fill="url(#pGrad)"><animateMotion dur="2.2s" begin=".8s" repeatCount="indefinite" path="M 550 250 Q 670 250 785 250"/></circle>
+          <circle r="4" fill="url(#pGrad)"><animateMotion dur="2.9s" repeatCount="indefinite" path="M 545 265 Q 660 370 785 420"/></circle>
+          <circle r="3" fill="url(#pGrad)"><animateMotion dur="2.9s" begin="1.2s" repeatCount="indefinite" path="M 545 265 Q 660 370 785 420"/></circle>
+        </g>
+
+        <!-- Centro: círculo gradiente + borda brilhante + texto -->
+        <circle cx="490" cy="250" r="72" fill="url(#centerGrad)" stroke="rgba(134,239,172,.4)" stroke-width="1.5" filter="url(#centerGlow)"/>
+        <circle cx="490" cy="250" r="60" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="1"/>
+        <text x="490" y="245" text-anchor="middle" font-family="Fraunces,serif" font-size="22" font-weight="400" fill="#fff" letter-spacing="-.02em">DFe</text>
+        <text x="490" y="272" text-anchor="middle" font-family="Fraunces,serif" font-size="22" font-weight="400" fill="#86efac" letter-spacing="-.02em" font-style="italic">Axis</text>
+      </svg>
+
+      <!-- Cards sobre SVG -->
+      <div class="dgc src-1">
+        <div class="dgc-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h4"/></svg></div>
+        <div class="dgc-body"><div class="dgc-t">SEFAZ</div><div class="dgc-s">NF-e · CT-e · MDF-e</div></div>
+      </div>
+      <div class="dgc src-2">
+        <div class="dgc-icon"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg></div>
+        <div class="dgc-body"><div class="dgc-t">Portal Nacional NFS-e</div><div class="dgc-s">Municípios · ADN</div></div>
+      </div>
+      <div class="dgc src-3">
+        <div class="dgc-icon"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <div class="dgc-body"><div class="dgc-t">Manifestação</div><div class="dgc-s">Ciência automática</div></div>
+      </div>
+
+      <div class="dgc dst dst-1 highlight">
+        <div class="dgc-body" style="text-align:right;width:100%"><div class="dgc-t">SAP DRC</div><div class="dgc-s">RFC Destination HTTP</div></div>
+        <div class="dgc-icon"><svg viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></div>
+        <div class="dgc-live">LIVE</div>
+      </div>
+      <div class="dgc dst dst-2">
+        <div class="dgc-body" style="text-align:right;width:100%"><div class="dgc-t">TOTVS · Oracle</div><div class="dgc-s">Smart Link · REST</div></div>
+        <div class="dgc-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg></div>
+      </div>
+      <div class="dgc dst dst-3">
+        <div class="dgc-body" style="text-align:right;width:100%"><div class="dgc-t">ERP próprio</div><div class="dgc-s">API REST · JSON</div></div>
+        <div class="dgc-icon"><svg viewBox="0 0 24 24"><polyline points="8 17 4 21 4 3 20 3 20 21 16 17"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="16" y2="13"/></svg></div>
+      </div>
+
+      <!-- Fallback mobile center -->
+      <div class="diagram-center-mobile">DFe<em style="font-style:italic;color:#86efac;font-family:var(--fd)">Axis</em></div>
+    </div>
+
+    <!-- Ticker live -->
+    <div class="diagram-ticker" aria-hidden="true">
+      <div class="diagram-ticker-dot"></div>
+      <div class="diagram-ticker-label">Última captura</div>
+      <div class="diagram-ticker-text"><em>NF-e</em> · ██.███.███/0001-95 · R$ 12.480,00 · <em>Enviado ao SAP DRC</em> · há 3s</div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES TABS -->
+<section id="features-tabs">
+  <div class="ft-inner">
+    <div class="sec-tag" style="text-align:center">Funcionalidades</div>
+    <h2>Captura em escala com<br>governança desde o primeiro dia.</h2>
+    <div class="ft-tabs" role="tablist">
+      <button class="ft-tab active" onclick="switchFtTab(0)">Captura automática</button>
+      <button class="ft-tab" onclick="switchFtTab(1)">Integração SAP DRC</button>
+      <button class="ft-tab" onclick="switchFtTab(2)">Zero-retention</button>
+      <button class="ft-tab" onclick="switchFtTab(3)">Auditoria & Logs</button>
+    </div>
+    <div class="ft-panels">
+      <!-- TAB 1 -->
+      <div class="ft-panel active" data-tab="0">
+        <div class="ft-panel-text">
+          <h3>NF-e, CT-e, MDF-e e NFS-e entram direto da SEFAZ.</h3>
+          <p>Consulta sob demanda via API REST + opção de polling programado respeitando os rate limits da SEFAZ. Manifestação automática e circuit breaker pra proteger contra cStat 656 &mdash; se a SEFAZ ficar instável, o DFeAxis tenta de novo sem perder documento.</p>
+          <div class="ft-bullets">
+            <div class="ft-bullet">Captura contínua em background + consulta sob demanda via API</div>
+            <div class="ft-bullet">Ciência automática (manifestação) pra liberar o XML completo</div>
+            <div class="ft-bullet">Consulta retroativa de até 90 dias (janela máxima SEFAZ)</div>
+            <div class="ft-bullet">Controle de NSU sem gaps &mdash; detecta e reprocessa sequências quebradas</div>
+          </div>
+        </div>
+        <div class="ft-panel-visual">
+          <div class="ft-flow">
+            <div class="ft-flow-row"><div class="ft-flow-icon">1</div>Fornecedor emite NF-e · SEFAZ registra</div>
+            <div class="ft-flow-arrow">↓</div>
+            <div class="ft-flow-row"><div class="ft-flow-icon">2</div>DFeAxis detecta novo NSU · envia ciência</div>
+            <div class="ft-flow-arrow">↓</div>
+            <div class="ft-flow-row"><div class="ft-flow-icon">3</div>Baixa XML completo · disponibiliza na API</div>
+            <div class="ft-flow-arrow">↓</div>
+            <div class="ft-flow-row" style="background:var(--gr-l);border-color:rgba(12,74,48,.2)"><div class="ft-flow-icon" style="background:var(--gr);color:#fff">✓</div>Seu ERP recebe em segundos</div>
+          </div>
+        </div>
+      </div>
+      <!-- TAB 2 -->
+      <div class="ft-panel" data-tab="1">
+        <div class="ft-panel-text">
+          <h3>SAP DRC via RFC Destination HTTP &mdash; sem SAP PI, sem CPI, sem MuleSoft.</h3>
+          <p>O SAP GRC fazia polling via SAP PI a cada 15-30 min. O DRC não tem esse mecanismo nativo. O DFeAxis preenche a lacuna expondo uma API REST que o DRC consome direto via Communication Arrangement ou RFC Destination.</p>
+          <div class="ft-bullets">
+            <div class="ft-bullet">Compatível com S/4HANA OnPremise e DRC Cloud (Public Cloud)</div>
+            <div class="ft-bullet">Endpoint único pra pull + confirmação de recebimento</div>
+            <div class="ft-bullet">Autenticação via API Key com rotation automática</div>
+            <div class="ft-bullet">Documentação completa pra seu time ABAP/Basis</div>
+          </div>
+        </div>
+        <div class="ft-panel-visual dark">
+<pre><span class="c-c">// SAP DRC chamando DFeAxis via RFC Destination</span>
+<span class="c-k">GET</span> <span class="c-u">/api/v1/documentos</span>?<span class="c-p">status</span>=<span class="c-s">pendente</span>&<span class="c-p">limit</span>=<span class="c-s">50</span>
+<span class="c-p">Authorization</span>: <span class="c-s">Bearer ${API_KEY}</span>
+
+<span class="c-c">// Resposta</span>
+{
+  <span class="c-p">"documentos"</span>: [
+    {
+      <span class="c-p">"id"</span>: <span class="c-s">"doc_01HZ9X..."</span>,
+      <span class="c-p">"tipo"</span>: <span class="c-s">"nfe"</span>,
+      <span class="c-p">"chave"</span>: <span class="c-s">"3526..."</span>,
+      <span class="c-p">"xml"</span>: <span class="c-s">"&lt;nfeProc&gt;..."</span>
+    }
+  ],
+  <span class="c-p">"total"</span>: <span class="c-s">12</span>
+}
+
+<span class="c-c">// Confirmar recebimento (descarta XML)</span>
+<span class="c-k">POST</span> <span class="c-u">/api/v1/documentos/confirmar</span></pre>
+        </div>
+      </div>
+      <!-- TAB 3 -->
+      <div class="ft-panel" data-tab="2">
+        <div class="ft-panel-text">
+          <h3>Seus XMLs chegam, vão pro ERP e <em>somem</em>. Por design.</h3>
+          <p>Diferente de repositórios genéricos que guardam documentos fiscais indefinidamente, o DFeAxis opera com <strong>zero-retention</strong>: XML capturado na SEFAZ, entregue ao ERP e descartado após confirmação. Você é o controlador, não nós.</p>
+          <div class="ft-bullets">
+            <div class="ft-bullet">Certificado A1 cifrado com AES-256 &mdash; nunca gravado em disco em texto claro</div>
+            <div class="ft-bullet">Isolamento por tenant via Row-Level Security no PostgreSQL</div>
+            <div class="ft-bullet">DPA contratual disponível sob solicitação</div>
+            <div class="ft-bullet">Retenção configurável por contrato (default: 0 dias após confirmação)</div>
+          </div>
+        </div>
+        <div class="ft-panel-visual">
+          <div class="ft-flow">
+            <div class="ft-flow-row"><div class="ft-flow-icon">↓</div><div><strong>1. Captura</strong><br><span style="font-size:12px;color:var(--tx3)">XML extraído da SEFAZ</span></div></div>
+            <div class="ft-flow-row"><div class="ft-flow-icon">→</div><div><strong>2. Entrega</strong><br><span style="font-size:12px;color:var(--tx3)">ERP busca via API</span></div></div>
+            <div class="ft-flow-row" style="background:#fef2f2;border-color:#fca5a5"><div class="ft-flow-icon" style="background:#fee2e2;color:#991b1b">✕</div><div><strong>3. Descarte</strong><br><span style="font-size:12px;color:var(--tx3)">XML removido permanentemente</span></div></div>
+          </div>
+        </div>
+      </div>
+      <!-- TAB 4 -->
+      <div class="ft-panel" data-tab="3">
+        <div class="ft-panel-text">
+          <h3>Rastreabilidade total de cada documento.</h3>
+          <p>Log auditável de cada documento recebido &mdash; quando foi capturado na SEFAZ, quando chegou ao ERP, quem confirmou o recebimento. Pronto pra auditor fiscal, InfoSec ou compliance.</p>
+          <div class="ft-bullets">
+            <div class="ft-bullet">Histórico completo por CNPJ, por tipo, por período</div>
+            <div class="ft-bullet">Exportação CSV pra evidência em auditoria</div>
+            <div class="ft-bullet">Alertas de anomalia (volume atípico, falha de captura)</div>
+            <div class="ft-bullet">Dashboard de monitoramento com métricas em tempo real</div>
+          </div>
+        </div>
+        <div class="ft-panel-visual" style="align-items:flex-start">
+          <div style="width:100%;display:flex;flex-direction:column;gap:8px">
+            <div style="font-size:11px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Audit log · últimas 5 entradas</div>
+            <div style="background:var(--sur);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px;font-family:var(--mn);font-size:11.5px;color:var(--tx2);display:flex;justify-content:space-between"><span>14:32:08 · nfe.captured · NSU 000123456789012</span><span style="color:var(--gr-m)">✓</span></div>
+            <div style="background:var(--sur);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px;font-family:var(--mn);font-size:11.5px;color:var(--tx2);display:flex;justify-content:space-between"><span>14:32:10 · nfe.ciencia_sent · cStat 135</span><span style="color:var(--gr-m)">✓</span></div>
+            <div style="background:var(--sur);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px;font-family:var(--mn);font-size:11.5px;color:var(--tx2);display:flex;justify-content:space-between"><span>14:45:22 · nfe.delivered · api.sap_drc</span><span style="color:var(--gr-m)">✓</span></div>
+            <div style="background:var(--sur);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px;font-family:var(--mn);font-size:11.5px;color:var(--tx2);display:flex;justify-content:space-between"><span>14:45:23 · nfe.confirmed · xml_purged</span><span style="color:#991b1b">✕</span></div>
+            <div style="background:var(--sur);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px;font-family:var(--mn);font-size:11.5px;color:var(--tx2);display:flex;justify-content:space-between"><span>14:58:14 · cte.captured · NSU 000123456789013</span><span style="color:var(--gr-m)">✓</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- COMO FUNCIONA -->
+<section id="how">
+  <div class="how-inner">
+    <div class="sec-tag">Como funciona</div>
+    <h2>Do certificado ao ERP<br>em 4 passos.</h2>
+    <p class="sec-sub">Sem integrações complexas. Sem middleware. Sem cenários B2B.</p>
+    <div class="steps">
+      <div class="step"><div class="step-n">01</div><h3>Crie sua conta</h3><p>Cadastre e-mail, senha e CNPJ. Menos de 2 minutos.</p></div>
+      <div class="step"><div class="step-n">02</div><h3>Upload do .pfx</h3><p>Carregue o certificado A1 e senha. Cifrado imediatamente em memória.</p></div>
+      <div class="step"><div class="step-n">03</div><h3>Captura sob demanda</h3><p>Seu ERP aciona <code>POST /capture</code>. DFeAxis consulta SEFAZ na hora. Ciência enviada automaticamente.</p></div>
+      <div class="step"><div class="step-n">04</div><h3>ERP recebe</h3><p>RFC Destination no SAP DRC ou polling via <code>/api/v1/documentos</code> &mdash; sem intervenção.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 3 PERSONAS -->
+<section id="personas">
+  <div class="personas-inner">
+    <div class="sec-tag" style="text-align:center">Pra quem é</div>
+    <h2>Três caminhos. Uma só API.</h2>
+    <p class="personas-sub">Não vendemos um software fiscal genérico. Resolvemos três problemas específicos &mdash; cada um com uma dor diferente.</p>
+    <div class="personas-grid">
+      <div class="persona">
+        <div class="persona-icon">SAP</div>
+        <h3>Pra quem migrou do GRC pro DRC</h3>
+        <p>O GRC fazia polling automático via SAP PI. O DRC não tem isso. O DFeAxis preenche a lacuna com RFC Destination HTTP nativa, sem middleware.</p>
+        <button class="persona-link" onclick="openSpecialistChat('persona_sap');">Falar sobre migração GRC→DRC</button>
+      </div>
+      <div class="persona">
+        <div class="persona-icon">ERP</div>
+        <h3>Pra quem tem TOTVS, Oracle ou ERP próprio</h3>
+        <p>Nosso endpoint é REST puro. Se seu ERP consome JSON, ele integra. TOTVS via Smart Link, Oracle via REST, ERPs próprios via HTTP. Documentação completa.</p>
+        <button class="persona-link" onclick="document.getElementById('features-tabs').scrollIntoView({behavior:'smooth'});">Ver endpoints da API</button>
+      </div>
+      <div class="persona">
+        <div class="persona-icon">API</div>
+        <h3>Pra quem quer só a API</h3>
+        <p>Não precisa do nosso dashboard? Sem problema. Consuma <code style="font-family:var(--mn);background:var(--bg);padding:2px 6px;border-radius:4px;font-size:12px">/api/v1/documentos</code> direto, gere suas próprias visualizações. Você paga por documento capturado.</p>
+        <button class="persona-link" onclick="document.getElementById('pricing').scrollIntoView({behavior:'smooth'});">Ver planos e preços</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ZERO-RETENTION (seção dedicada) -->
+<section id="security">
+  <div class="sec-inner-dark">
+    <div class="sec-tag">Privacidade e LGPD</div>
+    <h2>Seus XMLs chegam,<br>vão pro ERP e <em>somem.</em><br><span>Por design.</span></h2>
+    <p class="sub">Diferente de repositórios genéricos que guardam seus documentos fiscais indefinidamente em servidores de terceiros, o DFeAxis opera com <strong>zero-retention</strong>: o XML é capturado na SEFAZ, entregue ao seu ERP e descartado imediatamente após confirmação.</p>
+    <div class="privacy-cards">
+      <div class="pcard">
+        <div class="pcard-ico"><svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="rgba(25,117,80,.9)" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/></svg></div>
+        <h3>Captura</h3>
+        <p>XML capturado na SEFAZ via certificado A1 cifrado AES-256. Disponível apenas pelo tempo necessário pra entrega ao ERP.</p>
+      </div>
+      <div class="pcard">
+        <div class="pcard-ico"><svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="rgba(25,117,80,.9)" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg></div>
+        <h3>Entrega</h3>
+        <p>Seu ERP busca o documento via API REST. Confirmação automática. Processo em segundos.</p>
+      </div>
+      <div class="pcard">
+        <div class="pcard-ico"><svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="rgba(25,117,80,.9)" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></div>
+        <h3>Descarte</h3>
+        <p>XML removido permanentemente após confirmação. Sem histórico acumulado. Sem risco de exposição.</p>
+      </div>
+    </div>
+    <p style="text-align:center;margin-top:36px;font-size:13px;color:rgba(255,255,255,.3);font-style:italic">O DFeAxis não é um repositório de documentos fiscais. É um conector inteligente entre a SEFAZ e o seu ERP.</p>
+  </div>
+</section>
+
+<!-- DIFERENCIAIS — comparação com o padrão de mercado (sem citar concorrentes) -->
+<section id="vs">
+  <div class="vs-inner">
+    <div class="sec-tag" style="text-align:center">O que nos diferencia</div>
+    <h2>Pricing público, integração direta<br>e zero-retention desde o dia um.</h2>
+    <p class="vs-sub">O que você normalmente encontra no mercado brasileiro de soluções fiscais &mdash; e o que o DFeAxis faz diferente.</p>
+    <div class="vs-table-wrap">
+      <div class="vs-table-scroll">
+        <table class="vs-table">
+          <thead>
+            <tr>
+              <th>Recurso</th>
+              <th>Padrão de mercado</th>
+              <th class="us">DFeAxis</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Integração com SAP DRC</td><td>Via middleware (SAP PI/CPI, MuleSoft)</td><td class="us">Nativa · RFC Destination HTTP</td></tr>
+            <tr><td>Armazenamento dos XMLs</td><td>Repositório persistente no SaaS</td><td class="us">Zero-retention · descarte após entrega</td></tr>
+            <tr><td>Pricing no site</td><td>"Fale com um consultor"</td><td class="us">Público · R$ 290 / R$ 690 / R$ 1.490</td></tr>
+            <tr><td>Trial</td><td>7 dias com cartão ou demo agendada</td><td class="us">10 dias / 500 docs · sem cartão</td></tr>
+            <tr><td>Tipos de documento</td><td>Frequentemente por plano</td><td class="us">NF-e + CT-e + MDF-e + NFS-e em todos</td></tr>
+            <tr><td>Consulta retroativa</td><td>Cobrada à parte ou indisponível</td><td class="us">90 dias · inclusa em todos os planos</td></tr>
+            <tr><td>Onboarding</td><td>Semanas com consultor comercial</td><td class="us">Self-service · cadastra, sobe .pfx, usa</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <p class="vs-footnote">Baseado no padrão típico de soluções fiscais SaaS no Brasil em 2026. Características variam por fornecedor e por plano.</p>
+  </div>
+</section>
+
+<!-- TRUST -->
+<section id="trust-section">
+  <div class="trust-inner">
+    <div class="sec-tag">Por que confiar</div>
+    <h2 style="font-family:var(--fd);font-size:clamp(28px,3.5vw,44px);font-weight:300;line-height:1.18;letter-spacing:-.02em;margin-bottom:32px">Construído por quem<br>viveu a dor do DRC.</h2>
+    <div class="trust-founder">
+      <p>"O DFeAxis nasceu da prática em consultoria SAP. Acompanhando a migração do GRC para o DRC, ficou claro que o time fiscal continuaria dependendo de captura manual &mdash; e que esse gap podia ser resolvido com uma camada REST simples, sem middleware e sem armazenamento. Foi isso que construímos."</p>
+      <div class="sig">Co-fundador &middot; DFeAxis</div>
+    </div>
+  </div>
+</section>
+
+<!-- RETRO -->
+<div id="retro" class="sec">
+  <div class="sec-tag">Consulta retroativa</div>
+  <h2>Precisa de documentos<br>de dias anteriores?</h2>
+  <p class="sec-sub">O SaaS entrega o que é novo automaticamente. Mas se o ERP precisar reimportar um período específico, basta acionar o endpoint retroativo.</p>
+  <div class="retro-wrap">
+    <div class="retro-grid">
+      <div class="retro-text">
+        <div class="sec-tag">Como funciona</div>
+        <h3>O ERP solicita.<br>A SEFAZ entrega.</h3>
+        <p>Os documentos são mantidos por até 90 dias na SEFAZ. Dentro desse período, qualquer data pode ser reprocessada &mdash; sem guardar os XMLs permanentemente no SaaS.</p>
+        <div class="retro-bullets">
+          <div class="retro-bullet">O ERP envia a data de início e fim via API</div>
+          <div class="retro-bullet">O SaaS busca os NSUs correspondentes na SEFAZ</div>
+          <div class="retro-bullet">Retorna os XMLs no mesmo formato da consulta regular</div>
+          <div class="retro-bullet">Os créditos são descontados normalmente por documento</div>
+          <div class="retro-bullet">Após entrega confirmada, os dados são descartados</div>
+        </div>
+      </div>
+      <div class="retro-visual">
+        <div class="code-mini">
+<pre><span style="color:#6b7280">/* Consulta retroativa */</span>
+
+<span style="color:#60a5fa">POST</span> <span style="color:#a78bfa">/api/v1/documentos/retroativo</span>
+
+{
+  <span style="color:#86efac">"cnpj"</span>:        <span style="color:#fde68a">"12345678000195"</span>,
+  <span style="color:#86efac">"tipo"</span>:        <span style="color:#fde68a">"cte"</span>,
+  <span style="color:#86efac">"data_inicio"</span>: <span style="color:#fde68a">"2025-02-01"</span>,
+  <span style="color:#86efac">"data_fim"</span>:    <span style="color:#fde68a">"2025-02-28"</span>
+}
+
+<span style="color:#6b7280">// Resposta</span>
+{
+  <span style="color:#86efac">"job_id"</span>:     <span style="color:#fde68a">"retro_20260315_001"</span>,
+  <span style="color:#86efac">"status"</span>:     <span style="color:#fde68a">"processing"</span>,
+  <span style="color:#86efac">"estimativa"</span>: <span style="color:#fde68a">"~45s"</span>
+}</pre>
+        </div>
+        <div class="retro-note">Janela máxima: 90 dias (limite SEFAZ). Disponível em todos os planos.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PRICING -->
+<div id="pricing" class="sec">
+  <div class="sec-tag">Planos</div>
+  <h2>Créditos pré-pagos.<br>Sem surpresa no boleto.</h2>
+  <p class="sec-sub">Mensalidade por CNPJ + volume de documentos. Sem fatura retroativa. Sem contrato de fidelidade.</p>
+  <div class="plans">
+    <div class="plan">
+      <div class="plan-name">Starter</div>
+      <div class="plan-price">R$ 290<span>/mês</span></div>
+      <div class="plan-desc">Empresas menores com até 3.000 documentos/mês.</div>
+      <div class="plan-div"></div>
+      <div class="plan-f"><div class="chk">✓</div>1 CNPJ</div>
+      <div class="plan-f"><div class="chk">✓</div>3.000 docs inclusos</div>
+      <div class="plan-f"><div class="chk">✓</div>NF-e + CT-e + MDF-e + NFS-e</div>
+      <div class="plan-f"><div class="chk">✓</div>Excedente: R$ 0,12/doc</div>
+      <button class="plan-btn" onclick="DFEAXIS_CONVERT('plan_click_starter',{value:150,plan:'starter'});window.location.href='/signup?plan=starter'">Começar agora</button>
+    </div>
+    <div class="plan fp">
+      <div class="plan-badge">Mais popular</div>
+      <div class="plan-name">Business</div>
+      <div class="plan-price">R$ 690<span>/mês</span></div>
+      <div class="plan-desc">Médias empresas com até 8.000 documentos/mês.</div>
+      <div class="plan-div"></div>
+      <div class="plan-f"><div class="chk">✓</div>Até 5 CNPJs</div>
+      <div class="plan-f"><div class="chk">✓</div>8.000 docs inclusos</div>
+      <div class="plan-f"><div class="chk">✓</div>NF-e + CT-e + MDF-e + NFS-e</div>
+      <div class="plan-f"><div class="chk">✓</div>Excedente: R$ 0,09/doc</div>
+      <button class="plan-btn" onclick="DFEAXIS_CONVERT('plan_click_business',{value:400,plan:'business'});window.location.href='/signup?plan=business'">Começar agora</button>
+    </div>
+    <div class="plan">
+      <div class="plan-name">Enterprise</div>
+      <div class="plan-price">R$ 1.490<span>/mês</span></div>
+      <div class="plan-desc">Grandes grupos com até 20.000 documentos/mês.</div>
+      <div class="plan-div"></div>
+      <div class="plan-f"><div class="chk">✓</div>Até 50 CNPJs</div>
+      <div class="plan-f"><div class="chk">✓</div>20.000 docs inclusos</div>
+      <div class="plan-f"><div class="chk">✓</div>NF-e + CT-e + MDF-e + NFS-e</div>
+      <div class="plan-f"><div class="chk">✓</div>SLA contratual + suporte prioritário</div>
+      <div class="plan-f"><div class="chk">✓</div>Excedente: R$ 0,07/doc</div>
+      <button class="plan-btn" onclick="DFEAXIS_CONVERT('plan_click_enterprise',{value:800,plan:'enterprise'});window.location.href='/signup?plan=enterprise'">Começar agora</button>
+    </div>
+  </div>
+  <p class="price-note">Precisa de mais de 50 CNPJs? <a href="javascript:openSpecialistChat('pricing_custom');">Fale conosco</a>. Trial 10 dias grátis, sem cartão.</p>
+</div>
+
+<!-- SPECIALIST CTA -->
+<section id="specialist">
+  <div class="specialist-inner">
+    <div class="specialist-text">
+      <div class="sec-tag">Fale com o time</div>
+      <h2>Avaliando o DFeAxis pra sua operação?<br><em>Conversa pelo chat</em>, sem compromisso.</h2>
+      <p>Conta pra gente o cenário &mdash; ERP atual, volume aproximado de documentos e prazo da migração. Respondemos se o DFeAxis encaixa e mostramos como seria a integração.</p>
+      <div class="specialist-ctas">
+        <button class="sp-btn-chat" onclick="openSpecialistChat('specialist_section');">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Abrir conversa no chat
+        </button>
+        <a class="sp-btn-wa" href="mailto:contato@dfeaxis.com.br?subject=Avalia%C3%A7%C3%A3o%20DFeAxis" onclick="DFEAXIS_CONVERT('cta_email',{value:40});">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          Enviar e-mail
+        </a>
+      </div>
+      <div class="specialist-signals">
+        <span>Chat conectado direto com o time DFeAxis</span>
+        <span>Sem telefonema de SDR · sem pressão de venda</span>
+        <span>Se não encaixar no seu cenário, te dizemos de cara</span>
+      </div>
+    </div>
+    <div class="specialist-card">
+      <div class="sp-avatar" style="background:rgba(25,117,80,.25);border-color:rgba(255,255,255,.2)">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#86efac" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </div>
+      <h4>Time DFeAxis</h4>
+      <div class="title">Consultoria SAP · Engenharia fiscal</div>
+      <div class="teaser">Chat direto com o time. Sem SDR, sem demo agendada. Se não encaixar no seu cenário, a gente diz de cara.</div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="sec" id="faq">
+  <div class="sec-tag">Dúvidas frequentes</div>
+  <h2 style="font-family:var(--fd);font-size:clamp(28px,3.5vw,44px);font-weight:300;line-height:1.18;letter-spacing:-.02em">Perguntas que todo<br>time fiscal faz.</h2>
+  <div class="faq-list">
+    <details><summary>Funciona com qualquer ERP ou só SAP?</summary><p>Funciona com qualquer ERP que consuma API REST — TOTVS, Oracle, Senior, Sankhya ou sistema próprio. Pra SAP DRC, oferecemos integração nativa via RFC Destination HTTP, o que elimina a necessidade de middleware.</p></details>
+    <details><summary>Meus XMLs ficam armazenados em servidores de terceiros?</summary><p>Não. O DFeAxis opera com <strong>zero-retention por design</strong>. O XML é capturado na SEFAZ, entregue ao seu ERP e descartado imediatamente após a confirmação.</p></details>
+    <details><summary>Posso testar 10 dias sem cartão?</summary><p>Sim. Nenhum cartão é solicitado no cadastro. O trial dura 10 dias ou 500 documentos capturados (o que vier primeiro). Ao final, você escolhe um plano pra continuar.</p></details>
+    <details><summary>O certificado digital A1 fica seguro?</summary><p>Sim. O .pfx é cifrado com AES-256 com chave exclusiva derivada por tenant. Nunca é gravado em disco em texto claro. Isolamento total entre empresas.</p></details>
+    <details><summary>Preciso de middleware (SAP PI, CPI, MuleSoft) pra integrar?</summary><p>Não. O DFeAxis se conecta diretamente ao seu ERP via API REST. Sem SAP PI, sem CPI, sem MuleSoft. Pra SAP DRC, basta configurar uma RFC Destination HTTP nativa.</p></details>
+    <details><summary>Migramos do SAP GRC NFe pro DRC e perdemos a automação. O DFeAxis resolve?</summary><p>Exatamente. O GRC fazia polling automático via SAP PI a cada 15-30 min. O DRC não tem esse mecanismo nativo. O DFeAxis foi criado especificamente pra resolver essa lacuna.</p></details>
+    <details><summary>Funciona com SAP DRC Cloud (Public Cloud)?</summary><p>Sim. O DFeAxis expõe uma API REST pública acessível por qualquer ambiente SAP com acesso à internet via Communication Arrangement ou RFC Destination HTTP.</p></details>
+    <details><summary>Vocês atendem solicitação de InfoSec / procurement enterprise?</summary><p>Sim. Respondemos solicitações de avaliação de segurança (questionários, DPA, evidências técnicas) conforme contrato nos planos Business e Enterprise. Formato e prazo são combinados com seu time de InfoSec na contratação.</p></details>
+    <details><summary>E se a SEFAZ cair? Meus documentos somem?</summary><p>Não. Temos circuit breaker + retry automático + dead letter queue. Se a SEFAZ retornar erro (cStat 108/109/656), o DFeAxis aguarda janela de estabilização e reprocessa. Você não perde documento.</p></details>
+    <details><summary>Vocês têm preço público no site? Por que é raro no mercado?</summary><p>Sim. Nosso pricing está publicado acima: R$ 290 / R$ 690 / R$ 1.490 por mês, por faixa de volume. Transparência de preço é um diferencial declarado — boa parte do mercado fiscal brasileiro ainda trabalha com "Fale com um consultor" e proposta individual, o que a gente não faz.</p></details>
+  </div>
+</section>
+
+<!-- CTA BAND -->
+<div id="cta-band">
+  <div class="cta-in">
+    <h2>Pronto pra receber seus<br><em>documentos fiscais automaticamente?</em></h2>
+    <button class="cta-p" onclick="DFEAXIS_CONVERT('cta_bottom',{value:50});window.location.href='/signup'">Criar conta e testar agora</button>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div class="foot-in">
+    <div class="foot-top">
+      <div class="foot-logo"><img src="/logo-dfeaxis.png" alt="DFeAxis"></div>
+      <div class="foot-links">
+        <a href="/privacidade">Privacidade</a>
+        <a href="/termos">Termos</a>
+        <a href="/docs">API Docs</a>
+        <a href="mailto:contato@dfeaxis.com.br">Contato</a>
+      </div>
+      <div class="foot-note">&copy; 2026 DFeAxis &middot; Captura automática de documentos fiscais</div>
+    </div>
+    <p class="foot-scope">O DFeAxis monitora e distribui documentos fiscais <strong>recebidos</strong> de fornecedores e transportadoras (NF-e, CT-e, MDF-e, NFS-e). Desenvolvido pro SAP DRC, compatível com qualquer ERP via API REST. Documentos emitidos pela sua empresa não são escopo desta solução. Dados são descartados após entrega ao ERP (zero-retention).</p>
+  </div>
+</footer>
+
+<!-- STICKY BAR -->
+<div id="sticky-bar">
+  <div>
+    <div class="st-text">Automatize a captura de NF-e, CT-e e MDF-e dos seus fornecedores</div>
+    <div class="st-sub">10 dias grátis · sem cartão · sem armazenamento de XMLs</div>
+  </div>
+  <a href="/signup" onclick="DFEAXIS_CONVERT('cta_sticky',{value:50});">Começar grátis →</a>
+</div>
+
+<script>
+/* ===== TABS FEATURES ===== */
+function switchFtTab(idx){
+  document.querySelectorAll('.ft-tab').forEach(function(t,i){t.classList.toggle('active',i===idx)});
+  document.querySelectorAll('.ft-panel').forEach(function(p,i){p.classList.toggle('active',i===idx)});
+  DFEAXIS_CONVERT('tab_feature_'+idx,{value:5});
+}
+
+/* ===== MOBILE MENU ===== */
+function toggleMenu(){
+  var l=document.getElementById('navLinks'),b=document.getElementById('navBtns'),btn=document.getElementById('menuBtn');
+  var open=l.classList.toggle('open');
+  b.classList.toggle('open');
+  btn.innerHTML=open
+    ?'<svg viewBox="0 0 24 24" fill="none"><line x1="6" y1="6" x2="18" y2="18"/><line x1="6" y1="18" x2="18" y2="6"/></svg>'
+    :'<svg viewBox="0 0 24 24" fill="none"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>';
+}
+document.querySelectorAll('.nav-links a').forEach(function(a){a.addEventListener('click',function(){
+  document.getElementById('navLinks').classList.remove('open');
+  document.getElementById('navBtns').classList.remove('open');
+  document.getElementById('menuBtn').innerHTML='<svg viewBox="0 0 24 24" fill="none"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>';
+})});
+
+/* ===== SPECIALIST CHAT OPENER =====
+ * Dispara o botão flutuante do chat-widget.js (vanilla) e registra evento.
+ * O widget já é injetado via <script src="/chat-widget.js">.
+ */
+function openSpecialistChat(source){
+  DFEAXIS_CONVERT('chat_open_'+(source||'generic'),{value:30});
+  var btn = document.querySelector('.dfeax-chat-btn');
+  if (btn) {
+    btn.click();
+  } else {
+    // Widget ainda não montou — tenta de novo em 300ms
+    setTimeout(function(){
+      var b = document.querySelector('.dfeax-chat-btn');
+      if (b) b.click();
+    }, 300);
+  }
+}
+</script>
+
+<!-- Chat widget (bot comercial) -->
+<script src="/chat-widget.js" defer></script>
+</body>
+</html>

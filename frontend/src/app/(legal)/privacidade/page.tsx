@@ -19,10 +19,10 @@ export default function PrivacidadePage() {
           <section>
             <h2 className="text-xl font-semibold mb-3">1. Introducao</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              O DFeAxis, operado por <strong>[RAZAO SOCIAL A DEFINIR]</strong>, inscrita no CNPJ
-              sob o n. <strong>[CNPJ A DEFINIR]</strong>, tem o compromisso com a protecao dos
-              dados pessoais de seus usuarios, em conformidade com a Lei Geral de Protecao de
-              Dados Pessoais (LGPD - Lei n. 13.709/2018).
+              O DFeAxis, operado por <strong>LINKTI MANUTENCAO EM SISTEMAS DE INFORMATICA LTDA.</strong>, inscrita no CNPJ
+              sob o n. <strong>24.455.871/0001-68</strong>, com sede na Rua Frei Caneca, 640, Consolacao, Sao Paulo/SP,
+              CEP 01307-000, tem o compromisso com a protecao dos dados pessoais de seus usuarios,
+              em conformidade com a Lei Geral de Protecao de Dados Pessoais (LGPD - Lei n. 13.709/2018).
             </p>
             <p className="text-sm text-muted-foreground leading-relaxed mt-2">
               Esta Politica de Privacidade descreve como coletamos, utilizamos, armazenamos

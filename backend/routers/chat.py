@@ -683,3 +683,122 @@ async def escalate_conversation(body: EscalateRequest):
         _send_escalation_email(sb, conv, body)
 
     return {"status": "escalated", "conversation_id": body.conversation_id}
+
+
+# ---------------------------------------------------------------------------
+# Endpoint 3: Landing lead capture (pré-chat)
+# ---------------------------------------------------------------------------
+
+# Lista de domínios públicos conhecidos — email corporativo é exigido
+# pra liberar o chat da landing. Lista conservadora: top provedores BR + global.
+PUBLIC_EMAIL_DOMAINS = frozenset({
+    "gmail.com", "googlemail.com",
+    "hotmail.com", "hotmail.com.br", "outlook.com", "outlook.com.br",
+    "live.com", "live.com.br", "msn.com",
+    "yahoo.com", "yahoo.com.br", "ymail.com",
+    "icloud.com", "me.com", "mac.com",
+    "aol.com", "aim.com",
+    "uol.com.br", "bol.com.br", "terra.com.br", "ig.com.br", "r7.com",
+    "zipmail.com.br", "globo.com",
+    "proton.me", "protonmail.com", "pm.me",
+    "mail.com", "gmx.com", "fastmail.com", "tutanota.com",
+    "qq.com", "163.com", "126.com",
+})
+
+
+class LandingLeadRequest(BaseModel):
+    email: str = Field(..., min_length=5, max_length=200)
+    nome: str = Field(..., min_length=2, max_length=100)
+    empresa: str = Field(..., min_length=2, max_length=120)
+    telefone: Optional[str] = Field(None, max_length=40)
+    cargo: Optional[str] = Field(None, max_length=80)
+    session_id: Optional[str] = Field(None, max_length=64)
+    page_url: Optional[str] = Field(None, max_length=500)
+    utm_data: Optional[dict] = Field(None, description="UTMs/click IDs do localStorage")
+
+
+class LandingLeadResponse(BaseModel):
+    ok: bool
+    conversation_id: str
+
+
+@router.post("/chat/landing/lead", response_model=LandingLeadResponse)
+async def chat_landing_lead(body: LandingLeadRequest, request: Request):
+    """Captura lead antes do chat da landing começar.
+
+    Bloqueia emails de domínios públicos (gmail/hotmail/etc) server-side.
+    Cria uma chat_conversation vinculada ao lead pra que os próximos POST
+    /chat/landing sejam associados à mesma conversa.
+    """
+    email_clean = body.email.strip().lower()
+    if "@" not in email_clean:
+        raise HTTPException(status_code=400, detail="E-mail inválido")
+    local_part, _, domain = email_clean.partition("@")
+    if not local_part or not domain or "." not in domain:
+        raise HTTPException(status_code=400, detail="E-mail inválido")
+
+    is_public = domain in PUBLIC_EMAIL_DOMAINS
+    if is_public:
+        raise HTTPException(
+            status_code=422,
+            detail="Use um e-mail corporativo. Não aceitamos domínios públicos (gmail, hotmail, outlook etc).",
+        )
+
+    sb = get_supabase_client()
+    ip = _get_client_ip(request)
+    ip_hash = _hash_ip(ip)
+    ua = request.headers.get("user-agent", "")[:500]
+
+    # Cria conversa com metadata do lead pra vincular próximas mensagens
+    conv_metadata = {
+        "lead_captured_at": datetime.now(timezone.utc).isoformat(),
+        "lead_email": email_clean,
+        "lead_nome": body.nome.strip(),
+        "lead_empresa": body.empresa.strip(),
+        "page_url": body.page_url,
+    }
+    try:
+        conv_result = sb.table("chat_conversations").insert({
+            "context": "landing",
+            "session_id": body.session_id,
+            "ip_hash": ip_hash,
+            "user_agent": ua,
+            "metadata": conv_metadata,
+        }).execute()
+        conversation_id = conv_result.data[0]["id"]
+    except Exception as exc:
+        logger.error("failed to create conversation for lead: %s", exc)
+        raise HTTPException(status_code=500, detail="Erro ao iniciar conversa")
+
+    # Insere lead
+    try:
+        sb.table("chat_leads").insert({
+            "conversation_id": conversation_id,
+            "email": email_clean,
+            "email_domain": domain,
+            "nome": body.nome.strip(),
+            "empresa": body.empresa.strip(),
+            "telefone": (body.telefone or "").strip() or None,
+            "cargo": (body.cargo or "").strip() or None,
+            "session_id": body.session_id,
+            "ip_hash": ip_hash,
+            "user_agent": ua,
+            "page_url": body.page_url,
+            "utm_data": body.utm_data or {},
+            "is_public_domain": is_public,
+        }).execute()
+    except Exception as exc:
+        logger.error("failed to insert chat lead: %s", exc)
+        # Não derruba a conversa — o lead podia ser duplicado ou ter constraint.
+        # Mesmo sem salvar o lead, a conversa existe e o chat pode seguir.
+
+    logger.info(
+        "Landing lead captured",
+        extra={
+            "conversation_id": conversation_id,
+            "email_domain": domain,
+            "empresa": body.empresa[:80],
+        },
+    )
+
+    return {"ok": True, "conversation_id": conversation_id}
