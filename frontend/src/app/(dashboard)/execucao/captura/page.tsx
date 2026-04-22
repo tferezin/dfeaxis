@@ -811,6 +811,23 @@ export default function CapturaManualPage() {
                   <div className="rounded-lg border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30 p-3">
                     <p className="text-xs text-red-700 dark:text-red-300 font-medium">{nfeStep1Result.error}</p>
                   </div>
+                ) : nfeStep1Result.sefaz_cstat === "656" ? (
+                  <div className="rounded-lg border border-sky-200 bg-sky-50 dark:border-sky-800 dark:bg-sky-950/30 p-3 space-y-2">
+                    <p className="text-xs text-sky-900 dark:text-sky-200 font-medium">
+                      Sem documentos novos no momento
+                    </p>
+                    <p className="text-[11px] text-sky-800 dark:text-sky-300 leading-relaxed">
+                      A SEFAZ libera uma nova consulta a cada hora quando não há documentos pendentes. Aguarde aproximadamente 60 minutos antes de tentar novamente.
+                    </p>
+                    <details className="mt-1">
+                      <summary className="text-[10px] text-sky-700 dark:text-sky-400 cursor-pointer select-none hover:text-sky-900 dark:hover:text-sky-200">
+                        Detalhes técnicos
+                      </summary>
+                      <p className="text-[10px] font-mono text-sky-900/80 dark:text-sky-200/80 mt-1.5 pl-2 border-l-2 border-sky-300 dark:border-sky-700">
+                        SEFAZ cStat {nfeStep1Result.sefaz_cstat}: {nfeStep1Result.sefaz_xmotivo}
+                      </p>
+                    </details>
+                  </div>
                 ) : (
                   <>
                     <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-3 space-y-2">
@@ -829,9 +846,14 @@ export default function CapturaManualPage() {
                       </div>
                       {/* SEFAZ diagnostic — colapsável */}
                       {nfeStep1Result.sefaz_cstat && nfeStep1Result.sefaz_cstat !== "138" && (
-                        <p className="text-[10px] text-amber-700 dark:text-amber-400 border-t border-amber-200 dark:border-amber-700 pt-1.5">
-                          SEFAZ cStat {nfeStep1Result.sefaz_cstat}: {nfeStep1Result.sefaz_xmotivo}
-                        </p>
+                        <details className="pt-1.5 border-t border-amber-200 dark:border-amber-700">
+                          <summary className="text-[10px] text-amber-700 dark:text-amber-400 cursor-pointer select-none hover:text-amber-900 dark:hover:text-amber-200">
+                            Detalhes técnicos SEFAZ
+                          </summary>
+                          <p className="text-[10px] font-mono text-amber-800/80 dark:text-amber-300/80 mt-1 pl-2 border-l-2 border-amber-300 dark:border-amber-700">
+                            cStat {nfeStep1Result.sefaz_cstat}: {nfeStep1Result.sefaz_xmotivo}
+                          </p>
+                        </details>
                       )}
                     </div>
                     {nfeStep1Result.results?.map((r, i) => (
