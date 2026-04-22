@@ -199,7 +199,10 @@ window.DFEAXIS_TRACKING = {
    no fundo aparece verde, não branco. overscroll-behavior corta o
    rubber-band que também mostrava fundo branco ao topo/fundo. */
 html{scroll-behavior:smooth;scroll-padding-top:80px;background:var(--gr);overscroll-behavior:none}
-body{font-family:var(--fs);font-size:15px;line-height:1.55;color:var(--tx);background:var(--bg);-webkit-font-smoothing:antialiased;overflow-x:hidden;padding-bottom:calc(96px + env(safe-area-inset-bottom))}
+/* body vira flex column pra segurar a sticky-bar no fim do layout.
+   Isso deixa a sticky-bar usar position:sticky (mais confiável no iOS
+   que position:fixed, que "desaparece" durante scroll). */
+body{font-family:var(--fs);font-size:15px;line-height:1.55;color:var(--tx);background:var(--bg);-webkit-font-smoothing:antialiased;overflow-x:hidden;display:flex;flex-direction:column;min-height:100vh;min-height:100dvh}
 a{color:inherit;text-decoration:none}
 button{font-family:inherit}
 
@@ -633,12 +636,13 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
 .foot-scope{font-size:11.5px;color:var(--tx3);line-height:1.6}
 
 /* STICKY BAR
-   transform:translateZ(0) + will-change força GPU composite — estabiliza
-   position:fixed no iOS Safari durante scroll (sem isso a barra
-   "desaparece" enquanto o usuário rola e o conteúdo vaza por baixo).
+   position:sticky + bottom:0 + margin-top:auto (last flex item) → gruda
+   no bottom da viewport quando tem conteúdo rolável E fica anexada ao
+   fim da página quando não tem. Mais confiável no iOS que position:fixed
+   (que sofre com descarte de composição durante scroll).
    padding-bottom usa env(safe-area-inset-bottom) pra cobrir o home
    indicator no iOS. */
-#sticky-bar{position:fixed;bottom:0;left:0;right:0;z-index:150;background:var(--gr);border-top:1px solid rgba(255,255,255,.1);padding:12px 32px calc(12px + env(safe-area-inset-bottom));display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;transform:translateZ(0);will-change:transform;-webkit-backface-visibility:hidden;backface-visibility:hidden}
+#sticky-bar{position:sticky;bottom:0;margin-top:auto;z-index:150;background:var(--gr);border-top:1px solid rgba(255,255,255,.1);padding:12px 32px calc(12px + env(safe-area-inset-bottom));display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;width:100%}
 #sticky-bar .st-text{font-size:13.5px;font-weight:600;color:#fff}
 #sticky-bar .st-sub{font-size:12px;color:rgba(255,255,255,.6);margin-top:2px}
 #sticky-bar a{background:#fff;color:var(--gr);padding:10px 22px;border-radius:8px;font-size:13.5px;font-weight:700;text-decoration:none;white-space:nowrap}
