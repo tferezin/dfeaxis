@@ -370,12 +370,26 @@ button{font-family:inherit}
 .diagram-ticker-text em{color:#86efac;font-style:normal;font-weight:600}
 
 @media(max-width:820px){
-  .diagram-stage{min-height:auto;aspect-ratio:auto}
-  .diagram-stage{display:flex;flex-direction:column;gap:10px}
+  .diagram-stage{min-height:auto;aspect-ratio:auto;display:flex;flex-direction:column;gap:10px}
   .dgc{position:static;width:100%}
   .diagram-svg{display:none}
   .dgc.dst::before{left:0;right:auto}
-  .diagram-center-mobile{display:flex;align-items:center;justify-content:center;padding:18px 0;font-family:var(--fd);font-weight:400;color:#86efac;font-size:20px;letter-spacing:-.01em}
+  .diagram-center-mobile{
+    display:flex;align-items:center;justify-content:center;gap:10px;
+    padding:22px 18px;margin:4px 0;
+    background:linear-gradient(135deg,rgba(25,117,80,.22),rgba(25,117,80,.06));
+    border:1px solid rgba(25,117,80,.5);
+    border-radius:14px;
+    backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+    box-shadow:0 12px 32px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.08),0 0 28px rgba(25,117,80,.35);
+    font-family:var(--fd);font-weight:400;color:#fff;font-size:22px;letter-spacing:-.02em
+  }
+  .diagram-center-mobile em{font-style:italic;color:#86efac;font-family:var(--fd);font-weight:400}
+  .diagram-center-mobile::before{
+    content:'';width:10px;height:10px;border-radius:50%;
+    background:#4ade80;box-shadow:0 0 12px #4ade80;
+    animation:pulse 1.8s infinite
+  }
 }
 @media(min-width:821px){
   .diagram-center-mobile{display:none}
@@ -474,6 +488,15 @@ button{font-family:inherit}
 .vs-no{color:var(--tx4);font-size:15px}
 .vs-partial{color:var(--am);font-size:14px;font-weight:600}
 .vs-footnote{text-align:center;font-size:12px;color:var(--tx3);margin-top:16px;font-style:italic}
+.vs-mobile{display:none}
+.vs-mcard{background:var(--sur);border:1px solid var(--bdr);border-radius:14px;padding:18px 18px 16px;margin-bottom:12px;box-shadow:var(--sh)}
+.vs-mcard-title{font-family:var(--fd);font-size:15.5px;font-weight:500;color:var(--tx);line-height:1.35;margin-bottom:12px;letter-spacing:-.01em}
+.vs-mrow{display:flex;gap:10px;padding:10px 0;border-top:1px solid var(--bdr);font-size:13.5px;line-height:1.5}
+.vs-mrow:first-of-type{border-top:none;padding-top:2px}
+.vs-mrow-label{flex:0 0 110px;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--tx3);padding-top:2px}
+.vs-mrow-value{flex:1;color:var(--tx2)}
+.vs-mrow.us .vs-mrow-label{color:var(--gr)}
+.vs-mrow.us .vs-mrow-value{color:var(--gr);font-weight:600}
 
 /* TRUST */
 #trust-section{background:var(--sur);border-top:1px solid var(--bdr);border-bottom:1px solid var(--bdr)}
@@ -607,8 +630,37 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
   .privacy-cards{grid-template-columns:1fr}
   .plans{grid-template-columns:1fr}
   .trust-stats{grid-template-columns:1fr}
-  .steps{grid-template-columns:1fr}
-  #sticky-bar{padding:10px 16px}
+
+  /* FEATURE TABS — vertical stack, full-width */
+  .ft-tabs{flex-direction:column;gap:8px;border-bottom:none;margin-bottom:28px;overflow:visible}
+  .ft-tab{text-align:left;border:1px solid var(--bdr);border-radius:10px;padding:13px 16px;margin-bottom:0;background:var(--sur);white-space:normal;font-size:14px}
+  .ft-tab.active{background:var(--gr-l);border-color:var(--gr);color:var(--gr)}
+  .ft-panels{min-height:auto}
+
+  /* COMO FUNCIONA — steps empilhados, seta pra baixo */
+  .steps{grid-template-columns:1fr;gap:10px}
+  .step{padding:20px 18px}
+  .step::after{content:'↓';right:auto;top:auto;left:50%;bottom:-14px;transform:translateX(-50%);font-size:18px}
+  .step:last-child::after{display:none}
+
+  /* COMPARATIVO — esconde tabela, mostra cards */
+  .vs-table-wrap{display:none}
+  .vs-mobile{display:block;margin-top:8px}
+
+  /* CTA BAND — padding menor, tipografia compactada */
+  .cta-in{padding:44px 20px;gap:18px;justify-content:center;text-align:center}
+  .cta-in h2{font-size:22px;line-height:1.3;max-width:none}
+  .cta-in .cta-p{width:100%;max-width:360px;padding:14px 20px;font-size:14.5px}
+
+  /* FOOTER — padding menor */
+  footer{padding:28px 20px}
+  .foot-top{gap:12px}
+
+  /* STICKY BAR — compacto */
+  #sticky-bar{padding:8px 14px;gap:10px}
+  #sticky-bar .st-text{font-size:12.5px;line-height:1.3}
+  #sticky-bar .st-sub{font-size:10.5px;margin-top:1px}
+  #sticky-bar a{padding:8px 14px;font-size:12.5px}
 }
 </style>
 </head>
@@ -1065,6 +1117,45 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
             <tr><td>Onboarding</td><td>Semanas com consultor comercial</td><td class="us">Self-service · cadastra, sobe .pfx, usa</td></tr>
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- Mobile cards (empilhado, sem swipe horizontal) -->
+    <div class="vs-mobile" aria-hidden="true">
+      <div class="vs-mcard">
+        <div class="vs-mcard-title">Integração com SAP DRC</div>
+        <div class="vs-mrow"><div class="vs-mrow-label">Mercado</div><div class="vs-mrow-value">Via middleware (SAP PI/CPI, MuleSoft)</div></div>
+        <div class="vs-mrow us"><div class="vs-mrow-label">DFeAxis</div><div class="vs-mrow-value">Nativa · RFC Destination HTTP</div></div>
+      </div>
+      <div class="vs-mcard">
+        <div class="vs-mcard-title">Armazenamento dos XMLs</div>
+        <div class="vs-mrow"><div class="vs-mrow-label">Mercado</div><div class="vs-mrow-value">Repositório persistente no SaaS</div></div>
+        <div class="vs-mrow us"><div class="vs-mrow-label">DFeAxis</div><div class="vs-mrow-value">Zero-retention · descarte após entrega</div></div>
+      </div>
+      <div class="vs-mcard">
+        <div class="vs-mcard-title">Pricing no site</div>
+        <div class="vs-mrow"><div class="vs-mrow-label">Mercado</div><div class="vs-mrow-value">"Fale com um consultor"</div></div>
+        <div class="vs-mrow us"><div class="vs-mrow-label">DFeAxis</div><div class="vs-mrow-value">Público · R$ 290 / R$ 690 / R$ 1.490</div></div>
+      </div>
+      <div class="vs-mcard">
+        <div class="vs-mcard-title">Trial</div>
+        <div class="vs-mrow"><div class="vs-mrow-label">Mercado</div><div class="vs-mrow-value">7 dias com cartão ou demo agendada</div></div>
+        <div class="vs-mrow us"><div class="vs-mrow-label">DFeAxis</div><div class="vs-mrow-value">10 dias / 500 docs · sem cartão</div></div>
+      </div>
+      <div class="vs-mcard">
+        <div class="vs-mcard-title">Tipos de documento</div>
+        <div class="vs-mrow"><div class="vs-mrow-label">Mercado</div><div class="vs-mrow-value">Frequentemente por plano</div></div>
+        <div class="vs-mrow us"><div class="vs-mrow-label">DFeAxis</div><div class="vs-mrow-value">NF-e + CT-e + MDF-e + NFS-e em todos</div></div>
+      </div>
+      <div class="vs-mcard">
+        <div class="vs-mcard-title">Consulta retroativa</div>
+        <div class="vs-mrow"><div class="vs-mrow-label">Mercado</div><div class="vs-mrow-value">Cobrada à parte ou indisponível</div></div>
+        <div class="vs-mrow us"><div class="vs-mrow-label">DFeAxis</div><div class="vs-mrow-value">90 dias · inclusa em todos os planos</div></div>
+      </div>
+      <div class="vs-mcard">
+        <div class="vs-mcard-title">Onboarding</div>
+        <div class="vs-mrow"><div class="vs-mrow-label">Mercado</div><div class="vs-mrow-value">Semanas com consultor comercial</div></div>
+        <div class="vs-mrow us"><div class="vs-mrow-label">DFeAxis</div><div class="vs-mrow-value">Self-service · cadastra, sobe .pfx, usa</div></div>
       </div>
     </div>
     <p class="vs-footnote">Baseado no padrão típico de soluções fiscais SaaS no Brasil em 2026. Características variam por fornecedor e por plano.</p>
