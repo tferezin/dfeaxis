@@ -374,21 +374,36 @@ button{font-family:inherit}
   .dgc{position:static;width:100%}
   .diagram-svg{display:none}
   .dgc.dst::before{left:0;right:auto}
+  /* Flow order: src (1-3) → center → dst (1-3) */
+  .dgc.src-1,.dgc.src-2,.dgc.src-3{order:1}
+  .diagram-center-mobile{order:2}
+  .dgc.dst-1,.dgc.dst-2,.dgc.dst-3{order:3}
   .diagram-center-mobile{
-    display:flex;align-items:center;justify-content:center;gap:10px;
-    padding:22px 18px;margin:4px 0;
-    background:linear-gradient(135deg,rgba(25,117,80,.22),rgba(25,117,80,.06));
-    border:1px solid rgba(25,117,80,.5);
-    border-radius:14px;
-    backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
-    box-shadow:0 12px 32px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.08),0 0 28px rgba(25,117,80,.35);
-    font-family:var(--fd);font-weight:400;color:#fff;font-size:22px;letter-spacing:-.02em
+    display:flex;align-items:center;justify-content:center;
+    width:170px;height:170px;margin:20px auto;
+    border-radius:50%;
+    background:radial-gradient(circle at center,rgba(25,117,80,.55) 0%,rgba(25,117,80,.22) 45%,rgba(25,117,80,.05) 75%,transparent 100%);
+    border:1.5px solid rgba(134,239,172,.4);
+    box-shadow:0 0 0 1px rgba(134,239,172,.1),0 0 40px rgba(25,117,80,.45),inset 0 0 30px rgba(74,222,128,.08);
+    font-family:var(--fd);font-weight:400;color:#fff;font-size:26px;letter-spacing:-.02em;line-height:1;
+    position:relative
   }
-  .diagram-center-mobile em{font-style:italic;color:#86efac;font-family:var(--fd);font-weight:400}
+  .diagram-center-mobile em{font-style:italic;color:#86efac;font-family:var(--fd);font-weight:400;margin-left:6px}
+  /* Anel externo 1 */
   .diagram-center-mobile::before{
-    content:'';width:10px;height:10px;border-radius:50%;
-    background:#4ade80;box-shadow:0 0 12px #4ade80;
-    animation:pulse 1.8s infinite
+    content:'';position:absolute;inset:-18px;border-radius:50%;
+    border:1px solid rgba(134,239,172,.18);
+    animation:ringPulse 3s ease-in-out infinite
+  }
+  /* Anel externo 2 */
+  .diagram-center-mobile::after{
+    content:'';position:absolute;inset:-36px;border-radius:50%;
+    border:1px solid rgba(134,239,172,.08);
+    animation:ringPulse 3s ease-in-out infinite .6s
+  }
+  @keyframes ringPulse{
+    0%,100%{opacity:.3;transform:scale(1)}
+    50%{opacity:.7;transform:scale(1.05)}
   }
 }
 @media(min-width:821px){
@@ -592,7 +607,7 @@ button{font-family:inherit}
 footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
 .foot-in{max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
 .foot-top{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px}
-.foot-logo img{height:52px}
+.foot-logo img{height:52px;width:auto;object-fit:contain}
 .foot-links{display:flex;gap:22px;font-size:13px;color:var(--tx3)}
 .foot-links a:hover{color:var(--tx2)}
 .foot-note{font-size:12px;color:var(--tx4)}
@@ -891,7 +906,7 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
       </div>
 
       <!-- Fallback mobile center -->
-      <div class="diagram-center-mobile">DFe<em style="font-style:italic;color:#86efac;font-family:var(--fd)">Axis</em></div>
+      <div class="diagram-center-mobile">DFe<em>Axis</em></div>
     </div>
 
     <!-- Ticker live -->
@@ -1397,6 +1412,48 @@ function openSpecialistChat(source){
     }, 300);
   }
 }
+
+/* ===== AUTO-HIDE CHAT BUTTON near footer =====
+ * No mobile o botão flutuante "Dúvidas?" fica sobre o footer/CTA-band.
+ * Ocultamos via IntersectionObserver quando #cta-band ou <footer> entram no viewport,
+ * restauramos quando saem. Só ativa em <=800px (no desktop o botão fica fixo).
+ */
+(function(){
+  function setup(){
+    if (window.matchMedia('(min-width:801px)').matches) return;
+    var targets = [document.getElementById('cta-band'), document.querySelector('footer')].filter(Boolean);
+    if (!targets.length) return;
+    var hiddenBy = 0;
+    var apply = function(){
+      var b = document.querySelector('.dfeax-chat-btn');
+      if (!b) return;
+      if (hiddenBy > 0) {
+        b.style.opacity = '0';
+        b.style.pointerEvents = 'none';
+        b.style.transform = 'translateY(16px)';
+      } else {
+        b.style.opacity = '';
+        b.style.pointerEvents = '';
+        b.style.transform = '';
+      }
+    };
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){ hiddenBy += (e.isIntersecting ? 1 : -1); });
+      if (hiddenBy < 0) hiddenBy = 0;
+      apply();
+    }, {threshold:0.01});
+    targets.forEach(function(t){ io.observe(t); });
+  }
+  // Espera widget injetar o botão
+  var tries = 0;
+  var wait = setInterval(function(){
+    tries++;
+    if (document.querySelector('.dfeax-chat-btn') || tries > 40) {
+      clearInterval(wait);
+      setup();
+    }
+  }, 200);
+})();
 </script>
 
 <!-- Chat widget (bot comercial) -->
