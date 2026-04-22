@@ -665,7 +665,7 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
           <div class="mck-logo">DFe<b>Axis</b></div>
           <div class="mck-user">TF</div>
         </div>
-        <div class="mck-title">Documentos recebidos · Abril/2026</div>
+        <div class="mck-title">Documentos recebidos · <span style="font-size:11px;color:var(--tx3);font-family:var(--fs);font-weight:500;letter-spacing:.04em;text-transform:uppercase;vertical-align:middle;background:var(--gr-l);color:var(--gr);padding:2px 8px;border-radius:10px;margin-left:6px">exemplo</span></div>
         <div class="mck-stats">
           <div class="mck-stat"><div class="mck-stat-l">NF-e</div><div class="mck-stat-n">1.248 <em>+12</em></div></div>
           <div class="mck-stat"><div class="mck-stat-l">CT-e</div><div class="mck-stat-n">386 <em>+4</em></div></div>
@@ -867,7 +867,7 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
       <div class="ft-panel active" data-tab="0">
         <div class="ft-panel-text">
           <h3>NF-e, CT-e, MDF-e e NFS-e entram direto da SEFAZ.</h3>
-          <p>Consulta sob demanda via API REST + opção de polling programado respeitando os rate limits da SEFAZ. Manifestação automática e circuit breaker pra proteger contra cStat 656 &mdash; se a SEFAZ ficar instável, o DFeAxis tenta de novo sem perder documento.</p>
+          <p><strong>Download automático de NF-e direto da SEFAZ</strong>, sem intervenção manual. Consulta sob demanda via API REST + opção de polling programado respeitando rate limits. Manifestação automática e circuit breaker pra proteger contra cStat 656 &mdash; se a SEFAZ ficar instável, o DFeAxis tenta de novo sem perder documento.</p>
           <div class="ft-bullets">
             <div class="ft-bullet">Captura contínua em background + consulta sob demanda via API</div>
             <div class="ft-bullet">Ciência automática (manifestação) pra liberar o XML completo</div>
@@ -895,7 +895,7 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
           <div class="ft-bullets">
             <div class="ft-bullet">Compatível com S/4HANA OnPremise e DRC Cloud (Public Cloud)</div>
             <div class="ft-bullet">Endpoint único pra pull + confirmação de recebimento</div>
-            <div class="ft-bullet">Autenticação via API Key com rotation automática</div>
+            <div class="ft-bullet">Autenticação via API Key com rotation automática + webhook opcional pra notificação push</div>
             <div class="ft-bullet">Documentação completa pra seu time ABAP/Basis</div>
           </div>
         </div>
@@ -1243,8 +1243,16 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
         <a href="/termos">Termos</a>
         <a href="mailto:contato@dfeaxis.com.br">Contato</a>
       </div>
-      <div class="foot-note">&copy; 2026 DFeAxis &middot; Captura automática de documentos fiscais</div>
+      <div class="foot-note">&copy; 2026 DFeAxis &middot; Plataforma 100% brasileira</div>
     </div>
+
+    <!-- Identificação institucional (trust signal + compliance Google Ads) -->
+    <div style="font-size:12px;color:var(--tx3);line-height:1.7;border-top:1px solid var(--bdr);padding-top:18px;margin-top:6px">
+      DFeAxis é um produto operado por <strong style="color:var(--tx2)">LINKTI MANUTENÇÃO EM SISTEMAS DE INFORMÁTICA LTDA</strong>
+      &middot; CNPJ 24.455.871/0001-68 &middot; Rua Frei Caneca, 640 &middot; Consolação &middot; São Paulo/SP &middot; CEP 01307-000
+      &middot; <a href="mailto:contato@dfeaxis.com.br" style="color:var(--gr-m);font-weight:600">contato@dfeaxis.com.br</a>
+    </div>
+
     <p class="foot-scope">O DFeAxis monitora e distribui documentos fiscais <strong>recebidos</strong> de fornecedores e transportadoras (NF-e, CT-e, MDF-e, NFS-e). Desenvolvido pro SAP DRC, compatível com qualquer ERP via API REST. Documentos emitidos pela sua empresa não são escopo desta solução. Dados são descartados após entrega ao ERP (zero-retention).</p>
   </div>
 </footer>
