@@ -99,9 +99,11 @@
 }
 @media (max-width: 800px) {
   /* Mobile: botão circular compacto com ícone de atendente com headset (line-art).
-     Esconde o texto "Dúvidas?", mantém o SVG maior e centrado. */
+     Esconde o texto "Dúvidas?", mantém o SVG maior e centrado.
+     bottom usa env(safe-area-inset-bottom) pra não colar no sticky-bar
+     quando o iOS deixa safe-area reservada ao home indicator. */
   .dfeax-chat-btn {
-    bottom: 100px;
+    bottom: calc(100px + env(safe-area-inset-bottom));
     right: 16px;
     width: 58px;
     height: 58px;
