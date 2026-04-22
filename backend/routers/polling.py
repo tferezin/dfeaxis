@@ -187,29 +187,22 @@ async def nfe_resumos(
             detail=f"Erro na consulta SEFAZ: {type(exc).__name__}: {exc}",
         )
 
-    # Se 656 com cursor diferente: corrige e retenta automaticamente
+    # Se SEFAZ devolver 656 com ultNSU diferente do que enviamos, ela está
+    # sinalizando que nosso cursor está desatualizado e sugerindo o correto.
+    # Atualizamos o cursor local pra próxima execução já partir do valor
+    # certo, mas NÃO retentamos na mesma request — a NT 2014.002 exige
+    # aguardar 1h após 656. Retentar em milissegundos causa bloqueio do
+    # CNPJ na SEFAZ (confirmado no polling_log em 22/04/2026). O usuário
+    # recebe o cStat honesto e, após o cooldown, sua próxima chamada já
+    # usará o cursor atualizado.
     if response.cstat == "656" and response.ult_nsu and response.ult_nsu != ult_nsu:
-        corrected_nsu = response.ult_nsu
         logger.warning(
-            "nfe-resumos: 656 detectado (cursor %s desatualizado), "
-            "corrigindo para %s e retentando",
-            ult_nsu, corrected_nsu,
+            "nfe-resumos: 656 com ultNSU sugerido cnpj=%s cursor %s -> %s "
+            "(atualizado localmente; sem retry — aguardar cooldown)",
+            mask_cnpj(body.cnpj), ult_nsu, response.ult_nsu,
         )
-        nsu_controller.update_cursor(cert["id"], "nfe", ambiente, corrected_nsu)
-        nsu_controller.update_last_nsu(cert["id"], "nfe", corrected_nsu)
-        ult_nsu = corrected_nsu
-
-        try:
-            response = _call_sefaz(corrected_nsu)
-        except Exception as exc:
-            logger.error(
-                "nfe-resumos: retry after 656 fix failed cnpj=%s: %s",
-                mask_cnpj(body.cnpj), exc,
-            )
-            raise HTTPException(
-                status_code=502,
-                detail=f"Erro na consulta SEFAZ (retry): {type(exc).__name__}: {exc}",
-            )
+        nsu_controller.update_cursor(cert["id"], "nfe", ambiente, response.ult_nsu)
+        nsu_controller.update_last_nsu(cert["id"], "nfe", response.ult_nsu)
 
     docs = list(response.documents)
     results = []
