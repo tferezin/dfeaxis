@@ -98,18 +98,31 @@
   box-shadow: 0 12px 32px rgba(12, 74, 48, 0.4);
 }
 @media (max-width: 800px) {
+  /* Mobile: botão circular com emoji de bot (mais enxuto, menos "tocando" na sticky-bar).
+     Esconde o texto "Dúvidas?" e o SVG, mostra o emoji 🤖 via pseudo-elemento. */
   .dfeax-chat-btn {
-    /* Mobile portrait: sticky-bar empilha em 2 linhas (~90px).
-       Fica logo acima. */
     bottom: 100px;
     right: 16px;
-    padding: 10px 16px;
-    font-size: 13px;
+    width: 58px;
+    height: 58px;
+    padding: 0;
+    gap: 0;
+    border-radius: 50%;
+    justify-content: center;
+    line-height: 1;
+  }
+  .dfeax-chat-btn > svg,
+  .dfeax-chat-btn > span {
+    display: none !important;
+  }
+  .dfeax-chat-btn::before {
+    content: '🤖';
+    font-size: 26px;
+    line-height: 1;
   }
 }
 @media (max-width: 800px) and (orientation: landscape) {
   .dfeax-chat-btn {
-    /* Landscape: sticky-bar volta a ser 1 linha, ~60px. */
     bottom: 76px;
   }
 }
