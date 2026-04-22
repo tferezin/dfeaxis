@@ -144,18 +144,54 @@
   overflow: hidden;
 }
 @media (max-width: 800px) {
-  /* Mobile: painel fullscreen, sem strip da landing aparecendo por baixo.
-     A sticky-bar e o chat-btn ficam atrás do painel (z-index 9999 vence tudo). */
+  /* Mobile: painel fullscreen — 100dvh pra cobrir mesmo quando o iOS
+     Safari colapsa/expande toolbars. border-radius zerado pra encaixar
+     perfeito nas bordas da tela. */
   .dfeax-chat-panel {
     top: 0;
     right: 0;
     bottom: 0;
     left: 0;
-    width: 100%;
-    height: 100%;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
     max-width: none;
     max-height: none;
     border-radius: 0;
+  }
+  /* Compacta o form de lead pra caber sem scroll em telas pequenas */
+  .dfeax-chat-lead {
+    padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+    gap: 6px;
+  }
+  .dfeax-chat-lead h3 {
+    font-size: 15px;
+  }
+  .dfeax-chat-lead p {
+    font-size: 12px;
+    margin: 0 0 6px 0;
+    line-height: 1.4;
+  }
+  .dfeax-chat-lead label {
+    margin: 2px 0 2px;
+    font-size: 10.5px;
+  }
+  .dfeax-chat-lead input {
+    padding: 8px 10px;
+    font-size: 14px;  /* iOS não dá zoom em inputs >= 14px */
+  }
+  .dfeax-chat-lead-btn {
+    margin-top: 10px;
+    padding: 12px;
+    font-size: 14px;
+  }
+  .dfeax-chat-lead-note {
+    font-size: 10.5px;
+    margin-top: 6px;
+    line-height: 1.35;
+  }
+  .dfeax-chat-header {
+    padding: 12px 16px;
   }
 }
 .dfeax-chat-header {
