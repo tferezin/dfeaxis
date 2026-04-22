@@ -91,6 +91,15 @@
   cursor: pointer;
   box-shadow: 0 8px 24px rgba(12, 74, 48, 0.3);
   transition: all 0.2s;
+  /* iOS: remove delay de 300ms e garante que tap sempre registra como click. */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* SVG/span interno não captura o clique — o alvo é sempre o botão. */
+.dfeax-chat-btn > * {
+  pointer-events: none;
 }
 .dfeax-chat-btn:hover {
   background: #197550;
@@ -601,6 +610,12 @@
 
   function openPanel() {
     state.open = true;
+    // Sempre abre com a página alinhada ao topo — independente da posição do scroll.
+    try {
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    } catch (e) {
+      window.scrollTo(0, 0);
+    }
     elements.btn.style.display = "none";
     elements.panel.style.display = "flex";
     if (!state.leadCaptured) {
