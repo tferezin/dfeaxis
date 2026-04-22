@@ -143,23 +143,9 @@
   font-family: -apple-system, BlinkMacSystemFont, 'Outfit', 'Segoe UI', sans-serif;
   overflow: hidden;
 }
-@media (max-width: 800px) {
-  /* Mobile: painel fullscreen — 100dvh pra cobrir mesmo quando o iOS
-     Safari colapsa/expande toolbars. border-radius zerado pra encaixar
-     perfeito nas bordas da tela. */
-  .dfeax-chat-panel {
-    top: 0;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    height: 100dvh;
-    max-width: none;
-    max-height: none;
-    border-radius: 0;
-  }
-  /* Compacta o form de lead pra caber sem scroll em telas pequenas */
+/* Tablet + mobile (<=1024px): compacta o form de lead pra caber sem
+   scroll no painel (iPad + celular sofriam com o form muito alto). */
+@media (max-width: 1024px) {
   .dfeax-chat-lead {
     padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
     gap: 6px;
@@ -192,6 +178,23 @@
   }
   .dfeax-chat-header {
     padding: 12px 16px;
+  }
+}
+/* Mobile apenas (<=800px): painel fullscreen — 100dvh pra cobrir mesmo
+   quando o iOS Safari colapsa/expande toolbars. No iPad o painel
+   continua suspenso (card flutuante). */
+@media (max-width: 800px) {
+  .dfeax-chat-panel {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    max-width: none;
+    max-height: none;
+    border-radius: 0;
   }
 }
 .dfeax-chat-header {
