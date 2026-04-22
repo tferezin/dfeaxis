@@ -143,46 +143,9 @@
   font-family: -apple-system, BlinkMacSystemFont, 'Outfit', 'Segoe UI', sans-serif;
   overflow: hidden;
 }
-/* Tablet + mobile (<=1024px): compacta o form de lead pra caber sem
-   scroll no painel (iPad + celular sofriam com o form muito alto). */
-@media (max-width: 1024px) {
-  .dfeax-chat-lead {
-    padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
-    gap: 6px;
-  }
-  .dfeax-chat-lead h3 {
-    font-size: 15px;
-  }
-  .dfeax-chat-lead p {
-    font-size: 12px;
-    margin: 0 0 6px 0;
-    line-height: 1.4;
-  }
-  .dfeax-chat-lead label {
-    margin: 2px 0 2px;
-    font-size: 10.5px;
-  }
-  .dfeax-chat-lead input {
-    padding: 8px 10px;
-    font-size: 14px;  /* iOS não dá zoom em inputs >= 14px */
-  }
-  .dfeax-chat-lead-btn {
-    margin-top: 10px;
-    padding: 12px;
-    font-size: 14px;
-  }
-  .dfeax-chat-lead-note {
-    font-size: 10.5px;
-    margin-top: 6px;
-    line-height: 1.35;
-  }
-  .dfeax-chat-header {
-    padding: 12px 16px;
-  }
-}
-/* Mobile apenas (<=800px): painel fullscreen — 100dvh pra cobrir mesmo
-   quando o iOS Safari colapsa/expande toolbars. No iPad o painel
-   continua suspenso (card flutuante). */
+/* Mobile (<=800px): painel fullscreen + padding-bottom respeitando
+   safe-area. No iPad/desktop o painel continua suspenso (card flutuante
+   de 560px) e o form já está compacto por default. */
 @media (max-width: 800px) {
   .dfeax-chat-panel {
     top: 0;
@@ -196,11 +159,14 @@
     max-height: none;
     border-radius: 0;
   }
+  .dfeax-chat-lead {
+    padding-bottom: calc(14px + env(safe-area-inset-bottom));
+  }
 }
 .dfeax-chat-header {
   background: #0c4a30;
   color: #fff;
-  padding: 14px 18px;
+  padding: 12px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -313,45 +279,47 @@
   text-align: center;
 }
 
-/* Lead capture form (pré-chat) */
+/* Lead capture form (pré-chat) — compacto por default em todo viewport
+   (o painel é sempre ~560px no desktop/tablet, então espaçamento tem
+   que ser apertado pra tudo caber sem scroll interno). */
 .dfeax-chat-lead {
   flex: 1;
   overflow-y: auto;
-  padding: 18px 18px 16px;
+  padding: 14px 16px;
   background: #f7f9fb;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
 }
 .dfeax-chat-lead h3 {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: #111d2e;
   margin: 0 0 2px 0;
 }
 .dfeax-chat-lead p {
-  font-size: 12.5px;
+  font-size: 12px;
   color: #4a5670;
-  line-height: 1.5;
-  margin: 0 0 10px 0;
+  line-height: 1.4;
+  margin: 0 0 6px 0;
 }
 .dfeax-chat-lead label {
   display: block;
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 600;
   color: #4a5670;
   letter-spacing: 0.02em;
-  margin: 6px 0 4px;
+  margin: 2px 0 2px;
 }
 .dfeax-chat-lead label .req { color: #a81a1a; }
 .dfeax-chat-lead input {
   width: 100%;
   box-sizing: border-box;
-  padding: 9px 11px;
+  padding: 8px 10px;
   border: 1px solid #d1d9e6;
   border-radius: 8px;
   font-family: inherit;
-  font-size: 13.5px;
+  font-size: 14px;  /* iOS não dá zoom em inputs >= 14px */
   color: #111d2e;
   outline: none;
   background: #fff;
@@ -371,8 +339,8 @@
   line-height: 1.4;
 }
 .dfeax-chat-lead-btn {
-  margin-top: 14px;
-  padding: 11px;
+  margin-top: 10px;
+  padding: 12px;
   background: #0c4a30;
   color: #fff;
   border: none;
@@ -394,8 +362,8 @@
   font-size: 10.5px;
   color: #8898b0;
   text-align: center;
-  margin-top: 8px;
-  line-height: 1.5;
+  margin-top: 6px;
+  line-height: 1.35;
 }
 `;
 
