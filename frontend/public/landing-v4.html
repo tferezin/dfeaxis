@@ -4,13 +4,120 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>DFeAxis — A camada de recebimento fiscal que o SAP DRC não tem</title>
-<meta name="description" content="Captura automática de NF-e, CT-e, MDF-e e NFS-e direto da SEFAZ com entrega via API REST. Integração nativa com SAP DRC, TOTVS, Oracle e qualquer ERP. Zero armazenamento. Preço público. Trial 10 dias sem cartão.">
+<meta name="description" content="Captura automática de NF-e, CT-e, MDF-e e NFS-e na SEFAZ com entrega via API REST. Integração nativa SAP DRC e qualquer ERP. Trial 10 dias, sem cartão.">
 <meta name="robots" content="index, follow">
-<link rel="canonical" href="https://www.dfeaxis.com.br/landing-v4.html">
+<meta name="author" content="DFeAxis">
+<meta name="geo.region" content="BR">
+<meta name="geo.placename" content="São Paulo">
+<link rel="canonical" href="https://www.dfeaxis.com.br/">
+
+<!-- Preconnect pra hosts de terceiros (reduz LCP) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://www.googletagmanager.com">
+<link rel="preconnect" href="https://www.clarity.ms">
+<link rel="preload" as="image" href="/logo-dfeaxis.png">
+
+<!-- Open Graph / Facebook -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="DFeAxis">
+<meta property="og:locale" content="pt_BR">
 <meta property="og:title" content="DFeAxis — A camada de recebimento fiscal que o SAP DRC não tem">
-<meta property="og:description" content="Captura automática de NF-e, CT-e, MDF-e e NFS-e direto da SEFAZ. Integração nativa SAP DRC. Zero armazenamento.">
+<meta property="og:description" content="Captura automática de NF-e, CT-e, MDF-e e NFS-e na SEFAZ com entrega via API REST. Integração nativa SAP DRC.">
 <meta property="og:image" content="https://www.dfeaxis.com.br/og-image.jpg">
-<meta property="og:url" content="https://www.dfeaxis.com.br/landing-v4.html">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:url" content="https://www.dfeaxis.com.br/">
+
+<!-- Twitter / X -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="DFeAxis — A camada de recebimento fiscal que o SAP DRC não tem">
+<meta name="twitter:description" content="Captura automática de NF-e, CT-e, MDF-e e NFS-e na SEFAZ com entrega via API REST. Integração nativa SAP DRC.">
+<meta name="twitter:image" content="https://www.dfeaxis.com.br/og-image.jpg">
+
+<!-- Structured data (JSON-LD) -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "DFeAxis",
+  "legalName": "LINKTI MANUTENCAO EM SISTEMAS DE INFORMATICA LTDA",
+  "url": "https://www.dfeaxis.com.br/",
+  "logo": "https://www.dfeaxis.com.br/logo-dfeaxis.png",
+  "description": "Plataforma SaaS de captura automática de documentos fiscais (NF-e, CT-e, MDF-e, NFS-e) na SEFAZ com entrega via API REST. Integração nativa com SAP DRC e qualquer ERP.",
+  "foundingDate": "2026",
+  "address": {
+    "@type": "PostalAddress",
+    "streetAddress": "Rua Frei Caneca, 640",
+    "addressLocality": "São Paulo",
+    "addressRegion": "SP",
+    "postalCode": "01307-000",
+    "addressCountry": "BR"
+  },
+  "contactPoint": {
+    "@type": "ContactPoint",
+    "email": "contato@dfeaxis.com.br",
+    "contactType": "sales",
+    "availableLanguage": ["Portuguese"],
+    "areaServed": "BR"
+  },
+  "taxID": "24.455.871/0001-68"
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "DFeAxis",
+  "applicationCategory": "BusinessApplication",
+  "applicationSubCategory": "Fiscal automation / SaaS",
+  "operatingSystem": "Web",
+  "url": "https://www.dfeaxis.com.br/",
+  "description": "Captura automática de NF-e, CT-e, MDF-e e NFS-e na SEFAZ com entrega via API REST. Integração nativa SAP DRC via RFC Destination HTTP e compatível com TOTVS, Oracle, Senior, Sankhya. Zero retenção de XMLs.",
+  "inLanguage": "pt-BR",
+  "offers": {
+    "@type": "AggregateOffer",
+    "priceCurrency": "BRL",
+    "lowPrice": "290",
+    "highPrice": "1490",
+    "offerCount": "3",
+    "availability": "https://schema.org/InStock",
+    "offers": [
+      {"@type": "Offer", "name": "Starter", "price": "290", "priceCurrency": "BRL", "description": "1 CNPJ · 3.000 docs/mês · NF-e + CT-e + MDF-e + NFS-e"},
+      {"@type": "Offer", "name": "Business", "price": "690", "priceCurrency": "BRL", "description": "Até 5 CNPJs · 8.000 docs/mês · SAP DRC nativo"},
+      {"@type": "Offer", "name": "Enterprise", "price": "1490", "priceCurrency": "BRL", "description": "Até 50 CNPJs · 20.000 docs/mês · SLA + suporte prioritário"}
+    ]
+  },
+  "featureList": [
+    "Captura automática de NF-e, CT-e, MDF-e e NFS-e na SEFAZ",
+    "Integração nativa com SAP DRC via RFC Destination HTTP",
+    "API REST para TOTVS, Oracle, Senior, Sankhya e qualquer ERP",
+    "Manifestação de ciência automática",
+    "Zero-retention: XML descartado após entrega ao ERP",
+    "Consulta retroativa de até 90 dias",
+    "Certificado digital A1 criptografado AES-256",
+    "Trial 10 dias ou 500 documentos sem cartão de crédito"
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {"@type":"Question","name":"Funciona com qualquer ERP ou só SAP?","acceptedAnswer":{"@type":"Answer","text":"Funciona com qualquer ERP que consuma API REST — TOTVS, Oracle, Senior, Sankhya ou sistema próprio. Pra SAP DRC, oferecemos integração nativa via RFC Destination HTTP, o que elimina a necessidade de middleware."}},
+    {"@type":"Question","name":"Meus XMLs ficam armazenados em servidores de terceiros?","acceptedAnswer":{"@type":"Answer","text":"Não. O DFeAxis opera com zero-retention por design. O XML é capturado na SEFAZ, entregue ao seu ERP e descartado imediatamente após a confirmação."}},
+    {"@type":"Question","name":"Posso testar 10 dias sem cartão?","acceptedAnswer":{"@type":"Answer","text":"Sim. Nenhum cartão é solicitado no cadastro. O trial dura 10 dias ou 500 documentos capturados (o que vier primeiro). Ao final, você escolhe um plano pra continuar."}},
+    {"@type":"Question","name":"O certificado digital A1 fica seguro?","acceptedAnswer":{"@type":"Answer","text":"Sim. O .pfx é cifrado com AES-256 com chave exclusiva derivada por tenant. Nunca é gravado em disco em texto claro. Isolamento total entre empresas."}},
+    {"@type":"Question","name":"Preciso de middleware (SAP PI, CPI, MuleSoft) pra integrar?","acceptedAnswer":{"@type":"Answer","text":"Não. O DFeAxis se conecta diretamente ao seu ERP via API REST. Sem SAP PI, sem CPI, sem MuleSoft. Pra SAP DRC, basta configurar uma RFC Destination HTTP nativa."}},
+    {"@type":"Question","name":"Migramos do SAP GRC NFe pro DRC e perdemos a automação. O DFeAxis resolve?","acceptedAnswer":{"@type":"Answer","text":"Exatamente. O GRC fazia polling automático via SAP PI a cada 15-30 min. O DRC não tem esse mecanismo nativo. O DFeAxis foi criado especificamente pra resolver essa lacuna."}},
+    {"@type":"Question","name":"Funciona com SAP DRC Cloud (Public Cloud)?","acceptedAnswer":{"@type":"Answer","text":"Sim. O DFeAxis expõe uma API REST pública acessível por qualquer ambiente SAP com acesso à internet via Communication Arrangement ou RFC Destination HTTP."}},
+    {"@type":"Question","name":"Vocês atendem solicitação de InfoSec / procurement enterprise?","acceptedAnswer":{"@type":"Answer","text":"Sim. Respondemos solicitações de avaliação de segurança (questionários, DPA, evidências técnicas) conforme contrato nos planos Business e Enterprise."}},
+    {"@type":"Question","name":"E se a SEFAZ cair? Meus documentos somem?","acceptedAnswer":{"@type":"Answer","text":"Não. Temos circuit breaker + retry automático + dead letter queue. Se a SEFAZ retornar erro (cStat 108/109/656), o DFeAxis aguarda janela de estabilização e reprocessa."}},
+    {"@type":"Question","name":"Vocês têm preço público no site?","acceptedAnswer":{"@type":"Answer","text":"Sim. Nosso pricing está publicado: R$ 290 / R$ 690 / R$ 1.490 por mês, por faixa de volume. Transparência de preço é um diferencial declarado — boa parte do mercado fiscal brasileiro ainda trabalha com proposta individual."}}
+  ]
+}
+</script>
 
 <!-- Tracking (mesmo bloco da V3) -->
 <script>
@@ -509,7 +616,7 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
 
 <!-- NAV -->
 <nav id="nav">
-  <div class="logo"><img src="/logo-dfeaxis.png" alt="DFeAxis"></div>
+  <div class="logo"><img src="/logo-dfeaxis.png" alt="DFeAxis" width="136" height="52" fetchpriority="high" decoding="async"></div>
   <button class="hamburger" id="menuBtn" onclick="toggleMenu()" aria-label="Menu">
     <svg viewBox="0 0 24 24" fill="none"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
   </button>
@@ -1130,11 +1237,10 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
 <footer>
   <div class="foot-in">
     <div class="foot-top">
-      <div class="foot-logo"><img src="/logo-dfeaxis.png" alt="DFeAxis"></div>
+      <div class="foot-logo"><img src="/logo-dfeaxis.png" alt="DFeAxis" width="136" height="52" loading="lazy" decoding="async"></div>
       <div class="foot-links">
         <a href="/privacidade">Privacidade</a>
         <a href="/termos">Termos</a>
-        <a href="/docs">API Docs</a>
         <a href="mailto:contato@dfeaxis.com.br">Contato</a>
       </div>
       <div class="foot-note">&copy; 2026 DFeAxis &middot; Captura automática de documentos fiscais</div>
