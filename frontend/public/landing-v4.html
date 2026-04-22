@@ -374,10 +374,25 @@ button{font-family:inherit}
   .dgc{position:static;width:100%}
   .diagram-svg{display:none}
   .dgc.dst::before{left:0;right:auto}
-  /* Flow order: src (1-3) → center → dst (1-3) */
+  /* Flow order: src (1) → arrow-top (2) → center (3) → arrow-bottom (4) → dst (5) */
   .dgc.src-1,.dgc.src-2,.dgc.src-3{order:1}
-  .diagram-center-mobile{order:2}
-  .dgc.dst-1,.dgc.dst-2,.dgc.dst-3{order:3}
+  .diagram-flow-arrow.top{order:2}
+  .diagram-center-mobile{order:3}
+  .diagram-flow-arrow.bottom{order:4}
+  .dgc.dst-1,.dgc.dst-2,.dgc.dst-3{order:5}
+  /* Linha tracejada animada entre grupos (src → center → dst) */
+  .diagram-flow-arrow{
+    display:block;height:42px;width:2px;margin:2px auto;position:relative;
+    background-image:linear-gradient(to bottom,#86efac 50%,transparent 50%);
+    background-size:100% 10px;background-repeat:repeat-y;
+    animation:flowDash .7s linear infinite;opacity:.75
+  }
+  .diagram-flow-arrow::after{
+    content:'';position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);
+    width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;
+    border-top:7px solid rgba(134,239,172,.9)
+  }
+  @keyframes flowDash{from{background-position:0 0}to{background-position:0 10px}}
   .diagram-center-mobile{
     display:flex;align-items:center;justify-content:center;
     width:170px;height:170px;margin:20px auto;
@@ -407,7 +422,7 @@ button{font-family:inherit}
   }
 }
 @media(min-width:821px){
-  .diagram-center-mobile{display:none}
+  .diagram-center-mobile,.diagram-flow-arrow{display:none}
 }
 
 /* TABS FEATURES */
@@ -671,6 +686,10 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
   footer{padding:28px 20px}
   .foot-top{gap:12px}
 
+  /* CHAT FAB — escondido no mobile (redundante com sticky-bar CTA)
+     Os botões "Falar com especialista" no conteúdo continuam abrindo o chat via openSpecialistChat(). */
+  .dfeax-chat-btn{display:none!important}
+
   /* STICKY BAR — compacto */
   #sticky-bar{padding:8px 14px;gap:10px}
   #sticky-bar .st-text{font-size:12.5px;line-height:1.3}
@@ -905,8 +924,10 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
         <div class="dgc-icon"><svg viewBox="0 0 24 24"><polyline points="8 17 4 21 4 3 20 3 20 21 16 17"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="16" y2="13"/></svg></div>
       </div>
 
-      <!-- Fallback mobile center -->
+      <!-- Fallback mobile center + linhas de fluxo (só no mobile) -->
+      <div class="diagram-flow-arrow top" aria-hidden="true"></div>
       <div class="diagram-center-mobile">DFe<em>Axis</em></div>
+      <div class="diagram-flow-arrow bottom" aria-hidden="true"></div>
     </div>
 
     <!-- Ticker live -->
