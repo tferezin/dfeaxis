@@ -19,8 +19,8 @@ export default function TermosPage() {
           <section>
             <h2 className="text-xl font-semibold mb-3">1. Aceitacao dos Termos</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Ao acessar ou utilizar a plataforma DFeAxis, operada por <strong>[RAZAO SOCIAL A DEFINIR]</strong>,
-              inscrita no CNPJ sob o n. <strong>[CNPJ A DEFINIR]</strong>, com sede em <strong>[ENDERECO A DEFINIR]</strong>,
+              Ao acessar ou utilizar a plataforma DFeAxis, operada por <strong>LINKTI MANUTENCAO EM SISTEMAS DE INFORMATICA LTDA.</strong>,
+              inscrita no CNPJ sob o n. <strong>24.455.871/0001-68</strong>, com sede na <strong>Rua Frei Caneca, 640, Consolacao, Sao Paulo/SP, CEP 01307-000</strong>,
               voce declara que leu, compreendeu e concorda integralmente com estes Termos de Uso.
               Caso nao concorde com qualquer disposicao, nao utilize o servico.
             </p>
@@ -170,7 +170,7 @@ export default function TermosPage() {
             <h2 className="text-xl font-semibold mb-3">14. Foro</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
               Para dirimir quaisquer controversias oriundas destes Termos, fica eleito o
-              foro da comarca de <strong>[FORO A DEFINIR]</strong>, com exclusao de qualquer outro,
+              foro da comarca de <strong>Sao Paulo/SP</strong>, com exclusao de qualquer outro,
               por mais privilegiado que seja.
             </p>
           </section>
