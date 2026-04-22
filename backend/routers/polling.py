@@ -209,6 +209,12 @@ async def nfe_resumos(
     resumos_found = 0
     ciencia_sent = 0
     completos_found = 0
+    # Cursor transacional: só avança se TODOS os docs do lote forem persistidos
+    # com sucesso. Falha de infra (DB error, exception no upsert) marca essa
+    # flag e bloqueia o avanço — próxima rodada re-traz o lote, upsert dedupa
+    # via (tenant_id, chave_acesso). Ciência rejeitada pela SEFAZ (cstat ≠ 135)
+    # NÃO bloqueia o cursor — é resposta negativa legítima, já registrada.
+    batch_had_persistence_error = False
 
     for doc in docs:
         is_resumo = doc.schema.startswith("res")
@@ -241,6 +247,7 @@ async def nfe_resumos(
                     on_conflict="tenant_id,chave_acesso",
                 ).execute()
             except Exception as exc:
+                batch_had_persistence_error = True
                 results.append({
                     "chave": doc.chave,
                     "nsu": doc.nsu,
@@ -325,6 +332,7 @@ async def nfe_resumos(
                         "xmotivo": manif_result.xmotivo,
                     })
             except Exception as exc:
+                batch_had_persistence_error = True
                 results.append({
                     "chave": doc.chave,
                     "nsu": doc.nsu,
@@ -346,15 +354,25 @@ async def nfe_resumos(
                 manif_status="ciencia",
             )
             if row is not None:
-                sb.table("documents").upsert(
-                    row, on_conflict="tenant_id,chave_acesso"
-                ).execute()
-                results.append({
-                    "chave": doc.chave,
-                    "nsu": doc.nsu,
-                    "tipo": "procNFe",
-                    "status": "saved",
-                })
+                try:
+                    sb.table("documents").upsert(
+                        row, on_conflict="tenant_id,chave_acesso"
+                    ).execute()
+                    results.append({
+                        "chave": doc.chave,
+                        "nsu": doc.nsu,
+                        "tipo": "procNFe",
+                        "status": "saved",
+                    })
+                except Exception as exc:
+                    batch_had_persistence_error = True
+                    results.append({
+                        "chave": doc.chave,
+                        "nsu": doc.nsu,
+                        "tipo": "procNFe",
+                        "status": "error",
+                        "detail": f"Upsert documents falhou: {type(exc).__name__}: {exc}",
+                    })
             else:
                 results.append({
                     "chave": doc.chave,
@@ -364,13 +382,22 @@ async def nfe_resumos(
                     "detail": "Evento SEFAZ, nao documento fiscal",
                 })
 
-    # Advance NSU cursor
-    if docs:
+    # Cursor transacional: só avança se nenhum doc do lote teve falha de
+    # persistência. Se algo quebrou (DB error, upsert exception), cursor
+    # fica onde estava — próxima rodada re-traz o lote completo e upsert
+    # dedupa via (tenant_id, chave_acesso). Proteção contra perda silenciosa.
+    if docs and not batch_had_persistence_error:
         nsu_controller.update_cursor(
             cert["id"], "nfe", ambiente, response.ult_nsu,
             response.max_nsu or response.ult_nsu,
         )
         nsu_controller.update_last_nsu(cert["id"], "nfe", response.ult_nsu)
+    elif docs and batch_had_persistence_error:
+        logger.warning(
+            "nfe-resumos: %d docs no lote mas houve falha de persistência — "
+            "cursor NÃO avança (próxima rodada re-traz e re-tenta) cnpj=%s",
+            len(docs), mask_cnpj(body.cnpj),
+        )
 
     # Log
     sb.table("polling_log").insert({
