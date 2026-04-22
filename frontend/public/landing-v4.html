@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>DFeAxis — A camada de recebimento fiscal que o SAP DRC não tem</title>
 <meta name="description" content="Captura automática de NF-e, CT-e, MDF-e e NFS-e na SEFAZ com entrega via API REST. Integração nativa SAP DRC e qualquer ERP. Trial 10 dias, sem cartão.">
 <meta name="robots" content="index, follow">
@@ -194,7 +194,11 @@ window.DFEAXIS_TRACKING = {
   --sh-xl:0 24px 64px rgba(18,32,72,.18);
 }
 *{margin:0;padding:0;box-sizing:border-box}
-html{scroll-behavior:smooth;scroll-padding-top:80px}
+/* html bg = mesma cor do sticky-bar: se o iOS Safari desencontrar o
+   position:fixed (layout viewport vs visual viewport), o que "vazar"
+   no fundo aparece verde, não branco. overscroll-behavior corta o
+   rubber-band que também mostrava fundo branco ao topo/fundo. */
+html{scroll-behavior:smooth;scroll-padding-top:80px;background:var(--gr);overscroll-behavior:none}
 body{font-family:var(--fs);font-size:15px;line-height:1.55;color:var(--tx);background:var(--bg);-webkit-font-smoothing:antialiased;overflow-x:hidden;padding-bottom:72px}
 a{color:inherit;text-decoration:none}
 button{font-family:inherit}
