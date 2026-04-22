@@ -97,13 +97,12 @@
   transform: translateY(-2px);
   box-shadow: 0 12px 32px rgba(12, 74, 48, 0.4);
 }
-@media (max-width: 800px) {
-  /* Mobile: botão circular compacto com ícone de atendente com headset (line-art).
-     Esconde o texto "Dúvidas?", mantém o SVG maior e centrado.
-     bottom usa env(safe-area-inset-bottom) pra não colar no sticky-bar
-     quando o iOS deixa safe-area reservada ao home indicator. */
+@media (max-width: 1024px) {
+  /* Mobile + tablet (iPad portrait): botão circular com ícone de atendente.
+     Sem sticky-bar aqui (escondida), então o FAB senta no canto inferior
+     direito com respeito ao home indicator do iOS. */
   .dfeax-chat-btn {
-    bottom: calc(100px + env(safe-area-inset-bottom));
+    bottom: calc(20px + env(safe-area-inset-bottom));
     right: 16px;
     width: 58px;
     height: 58px;
@@ -121,9 +120,9 @@
     height: 30px;
   }
 }
-@media (max-width: 800px) and (orientation: landscape) {
+@media (max-width: 1024px) and (orientation: landscape) {
   .dfeax-chat-btn {
-    bottom: 76px;
+    bottom: calc(16px + env(safe-area-inset-bottom));
   }
 }
 .dfeax-chat-panel {
