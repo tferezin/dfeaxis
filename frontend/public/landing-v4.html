@@ -686,10 +686,6 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
   footer{padding:28px 20px}
   .foot-top{gap:12px}
 
-  /* CHAT FAB — escondido no mobile (redundante com sticky-bar CTA)
-     Os botões "Falar com especialista" no conteúdo continuam abrindo o chat via openSpecialistChat(). */
-  .dfeax-chat-btn{display:none!important}
-
   /* STICKY BAR — compacto */
   #sticky-bar{padding:8px 14px;gap:10px}
   #sticky-bar .st-text{font-size:12.5px;line-height:1.3}
@@ -1434,47 +1430,6 @@ function openSpecialistChat(source){
   }
 }
 
-/* ===== AUTO-HIDE CHAT BUTTON near footer =====
- * No mobile o botão flutuante "Dúvidas?" fica sobre o footer/CTA-band.
- * Ocultamos via IntersectionObserver quando #cta-band ou <footer> entram no viewport,
- * restauramos quando saem. Só ativa em <=800px (no desktop o botão fica fixo).
- */
-(function(){
-  function setup(){
-    if (window.matchMedia('(min-width:801px)').matches) return;
-    var targets = [document.getElementById('cta-band'), document.querySelector('footer')].filter(Boolean);
-    if (!targets.length) return;
-    var hiddenBy = 0;
-    var apply = function(){
-      var b = document.querySelector('.dfeax-chat-btn');
-      if (!b) return;
-      if (hiddenBy > 0) {
-        b.style.opacity = '0';
-        b.style.pointerEvents = 'none';
-        b.style.transform = 'translateY(16px)';
-      } else {
-        b.style.opacity = '';
-        b.style.pointerEvents = '';
-        b.style.transform = '';
-      }
-    };
-    var io = new IntersectionObserver(function(entries){
-      entries.forEach(function(e){ hiddenBy += (e.isIntersecting ? 1 : -1); });
-      if (hiddenBy < 0) hiddenBy = 0;
-      apply();
-    }, {threshold:0.01});
-    targets.forEach(function(t){ io.observe(t); });
-  }
-  // Espera widget injetar o botão
-  var tries = 0;
-  var wait = setInterval(function(){
-    tries++;
-    if (document.querySelector('.dfeax-chat-btn') || tries > 40) {
-      clearInterval(wait);
-      setup();
-    }
-  }, 200);
-})();
 </script>
 
 <!-- Chat widget (bot comercial) -->

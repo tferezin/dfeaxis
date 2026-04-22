@@ -132,17 +132,18 @@
   overflow: hidden;
 }
 @media (max-width: 800px) {
+  /* Mobile: painel fullscreen, sem strip da landing aparecendo por baixo.
+     A sticky-bar e o chat-btn ficam atrás do painel (z-index 9999 vence tudo). */
   .dfeax-chat-panel {
-    bottom: 130px;
-    right: 16px;
-    max-width: calc(100vw - 32px);
-    max-height: calc(100vh - 160px);
-  }
-}
-@media (max-width: 800px) and (orientation: landscape) {
-  .dfeax-chat-panel {
-    bottom: 76px;
-    max-height: calc(100vh - 100px);
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    border-radius: 0;
   }
 }
 .dfeax-chat-header {
