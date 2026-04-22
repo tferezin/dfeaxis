@@ -98,8 +98,8 @@
   box-shadow: 0 12px 32px rgba(12, 74, 48, 0.4);
 }
 @media (max-width: 800px) {
-  /* Mobile: botão circular com emoji de bot (mais enxuto, menos "tocando" na sticky-bar).
-     Esconde o texto "Dúvidas?" e o SVG, mostra o emoji 🤖 via pseudo-elemento. */
+  /* Mobile: botão circular compacto com ícone de atendente com headset (line-art).
+     Esconde o texto "Dúvidas?", mantém o SVG maior e centrado. */
   .dfeax-chat-btn {
     bottom: 100px;
     right: 16px;
@@ -111,14 +111,12 @@
     justify-content: center;
     line-height: 1;
   }
-  .dfeax-chat-btn > svg,
   .dfeax-chat-btn > span {
     display: none !important;
   }
-  .dfeax-chat-btn::before {
-    content: '🤖';
-    font-size: 26px;
-    line-height: 1;
+  .dfeax-chat-btn > svg {
+    width: 30px;
+    height: 30px;
   }
 }
 @media (max-width: 800px) and (orientation: landscape) {
@@ -376,7 +374,14 @@
     btn.type = "button";
     btn.setAttribute("aria-label", "Abrir chat");
     btn.innerHTML =
-      '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>Dúvidas?</span>';
+      '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<path d="M4 22c0-4 4-7 8-7s8 3 8 7"/>' +
+      '<circle cx="12" cy="8" r="4"/>' +
+      '<path d="M4 10.5a8 8 0 0 1 16 0"/>' +
+      '<path d="M4 10.5v3a.8.8 0 0 0 .8.8h.7a.8.8 0 0 0 .8-.8v-3"/>' +
+      '<path d="M20 10.5v3a.8.8 0 0 1-.8.8h-.7a.8.8 0 0 1-.8-.8v-3"/>' +
+      '<path d="M19 14.3v1.7a2 2 0 0 1-2 2h-3"/>' +
+      '</svg><span>Dúvidas?</span>';
     btn.addEventListener("click", openPanel);
     return btn;
   }
