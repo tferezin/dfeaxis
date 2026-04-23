@@ -1,5 +1,6 @@
 """Endpoints de tenant/onboarding."""
 
+import os
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Body, Depends, HTTPException
@@ -10,6 +11,17 @@ from middleware.security import verify_jwt_token
 from models.schemas import TenantRegisterRequest
 
 router = APIRouter()
+
+
+def _is_prod_access_allowed_globally() -> bool:
+    """Flag global — se PROD_ACCESS_ALLOWED='true' no env, qualquer tenant
+    pode virar sefaz_ambiente='1' sem precisar de approval individual.
+
+    Durante soft launch (primeiros clientes), fica 'false' → só tenants
+    com prod_access_approved=true conseguem. Quando amadurecer, seta
+    'true' no Railway pra liberar geral sem deploy.
+    """
+    return os.getenv("PROD_ACCESS_ALLOWED", "false").strip().lower() == "true"
 
 
 @router.post("/tenants/register", status_code=201)
@@ -125,11 +137,16 @@ async def update_settings(
     if not updates:
         raise HTTPException(status_code=400, detail="Nenhum campo para atualizar")
 
-    # Guard: se está pedindo produção, verifica se a conta logada
-    # está na blacklist hardcoded (admin_guards.py). Protege contra
-    # admin/dev virar prod por acidente — bloqueio é pela identidade
-    # da conta, não pelo cert cadastrado.
+    sb = get_supabase_client()
+
+    # Guard 1 (commit 047dfb0): conta admin (LINKTI/BEIERSDORF) NUNCA
+    # pode ir pra prod — identidade hardcoded no admin_guards.py.
+    # Guard 2 (commit atual): outros tenants só podem ir pra prod se
+    # (flag global PROD_ACCESS_ALLOWED=true) OU (prod_access_approved=true
+    # no row do tenant). Durante soft launch, default é TRAVADO pra evitar
+    # cliente novo virar prod sem aprovação manual nossa.
     if updates.get("sefaz_ambiente") == "1":
+        # Guard 1: identidade admin
         blocked, reason = should_block_prod(
             user_id=auth.get("user_id"),
             tenant_id=auth.get("tenant_id"),
@@ -138,7 +155,25 @@ async def update_settings(
         if blocked:
             raise HTTPException(status_code=403, detail=reason)
 
-    sb = get_supabase_client()
+        # Guard 2: flag global OU allowlist individual
+        if not _is_prod_access_allowed_globally():
+            tenant_row = sb.table("tenants").select(
+                "prod_access_approved"
+            ).eq("id", auth["tenant_id"]).single().execute()
+            approved = bool(
+                tenant_row.data and tenant_row.data.get("prod_access_approved")
+            )
+            if not approved:
+                raise HTTPException(
+                    status_code=403,
+                    detail=(
+                        "Acesso à produção SEFAZ ainda não liberado pra esta "
+                        "conta. Entre em contato com o suporte DFeAxis para "
+                        "concluir o onboarding técnico antes de ativar "
+                        "produção. (contato@dfeaxis.com.br)"
+                    ),
+                )
+
     result = sb.table("tenants").update(updates).eq(
         "id", auth["tenant_id"]
     ).execute()
