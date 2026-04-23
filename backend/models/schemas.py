@@ -307,6 +307,14 @@ class DocumentoPendenteOut(BaseModel):
     valor_total: Optional[float] = None     # vNF/vTPrest
     manifestacao_status: str
     fetched_at: datetime
+    # Contexto da última tentativa de manifestação definitiva (210200/210220/210240)
+    # — permite UI mostrar "Rejeitado cStat XXX" em docs cuja tentativa
+    # falhou e o usuário precisa reenviar.
+    ultima_tentativa_tipo: Optional[str] = None      # 210200/210220/210240
+    ultima_tentativa_cstat: Optional[str] = None     # 135/573/596/...
+    ultima_tentativa_xmotivo: Optional[str] = None
+    ultima_tentativa_sucesso: Optional[bool] = None  # True se cstat em (135,136)
+    ultima_tentativa_at: Optional[datetime] = None
 
 
 # --- SEFAZ Status ---

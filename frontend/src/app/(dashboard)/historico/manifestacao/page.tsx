@@ -68,6 +68,11 @@ interface DocumentoPendente {
   valor_total: number | null
   manifestacao_status: string
   fetched_at: string
+  ultima_tentativa_tipo: string | null
+  ultima_tentativa_cstat: string | null
+  ultima_tentativa_xmotivo: string | null
+  ultima_tentativa_sucesso: boolean | null
+  ultima_tentativa_at: string | null
 }
 
 interface ManifestacaoEvent {
@@ -183,10 +188,12 @@ function PendentesTab() {
   // Seleção múltipla
   const [selectedChaves, setSelectedChaves] = useState<Set<string>>(new Set())
 
-  // Modal de confirmação — agora o tipo é pré-selecionado pelos 3 botões de ação
+  // Modal robusto — tipo do evento escolhido via radio dentro do modal
   const [modalOpen, setModalOpen] = useState(false)
   const [modalEvento, setModalEvento] = useState<TipoEventoDefinitivo>("210200")
   const [modalJustificativa, setModalJustificativa] = useState("")
+  const [cienteChecked, setCienteChecked] = useState(false)
+  const [showDocsList, setShowDocsList] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [batchResult, setBatchResult] = useState<BatchResponse | null>(null)
 
@@ -253,13 +260,6 @@ function PendentesTab() {
     }
   }
 
-  // Abrir modal com evento pré-selecionado pelos 3 botões de ação
-  const openModalComEvento = (evento: TipoEventoDefinitivo) => {
-    setModalEvento(evento)
-    setModalJustificativa("")
-    setBatchResult(null)
-    setModalOpen(true)
-  }
 
   const eventoConfig = EVENTO_DEFINITIVO_OPTIONS.find(
     (o) => o.value === modalEvento,
@@ -273,8 +273,32 @@ function PendentesTab() {
     ) {
       return false
     }
+    if (!cienteChecked) return false
     return true
-  }, [selectedChaves.size, eventoConfig, modalJustificativa])
+  }, [
+    selectedChaves.size,
+    eventoConfig,
+    modalJustificativa,
+    cienteChecked,
+  ])
+
+  // Docs selecionados que têm tentativa anterior rejeitada — destaca no modal
+  // pra usuário saber que é um reenvio.
+  const docsComTentativaFalha = useMemo(
+    () =>
+      pendentes.filter(
+        (p) =>
+          selectedChaves.has(p.chave) &&
+          p.ultima_tentativa_cstat !== null &&
+          p.ultima_tentativa_sucesso === false,
+      ),
+    [pendentes, selectedChaves],
+  )
+
+  const selectedDocs = useMemo(
+    () => pendentes.filter((p) => selectedChaves.has(p.chave)),
+    [pendentes, selectedChaves],
+  )
 
   const applyBatch = async () => {
     setSubmitting(true)
@@ -311,6 +335,8 @@ function PendentesTab() {
     setTimeout(() => {
       setModalJustificativa("")
       setBatchResult(null)
+      setCienteChecked(false)
+      setShowDocsList(false)
     }, 200)
   }
 
@@ -355,38 +381,26 @@ function PendentesTab() {
             />
           </div>
 
-          {/* Barra de ação — 3 botões diretos quando há seleção */}
+          {/* Barra de ação — 1 botão Manifestar que abre modal robusto */}
           {selectedChaves.size > 0 && (
-            <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 p-3">
+            <div className="flex items-center gap-2 rounded-lg border bg-primary/5 p-3">
               <span className="text-sm font-medium mr-auto">
                 {selectedChaves.size} selecionada
-                {selectedChaves.size === 1 ? "" : "s"} — manifestar como:
+                {selectedChaves.size === 1 ? "" : "s"}
               </span>
               <Button
                 size="sm"
-                onClick={() => openModalComEvento("210200")}
-                className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
+                onClick={() => {
+                  setModalEvento("210200")
+                  setModalJustificativa("")
+                  setBatchResult(null)
+                  setCienteChecked(false)
+                  setModalOpen(true)
+                }}
+                className="gap-1.5"
               >
-                <CheckCircle2 className="size-4" />
-                Confirmar Operação
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => openModalComEvento("210220")}
-                className="gap-1.5 border-amber-500 text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/30"
-              >
-                <AlertTriangle className="size-4" />
-                Desconhecer
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => openModalComEvento("210240")}
-                className="gap-1.5 border-red-500 text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30"
-              >
-                <AlertTriangle className="size-4" />
-                Não Realizada
+                <Send className="size-4" />
+                Manifestar {selectedChaves.size === 1 ? "selecionada" : "selecionadas"}
               </Button>
             </div>
           )}
@@ -455,12 +469,16 @@ function PendentesTab() {
                   <TableHead>NF-e</TableHead>
                   <TableHead>Emissão</TableHead>
                   <TableHead>Valor</TableHead>
+                  <TableHead>Status SEFAZ</TableHead>
                   <TableHead className="pr-4">Chave</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.map((doc) => {
                   const checked = selectedChaves.has(doc.chave)
+                  const temTentativaFalha =
+                    doc.ultima_tentativa_cstat !== null &&
+                    doc.ultima_tentativa_sucesso === false
                   return (
                     <TableRow
                       key={doc.chave}
@@ -503,6 +521,25 @@ function PendentesTab() {
                       <TableCell className="text-sm font-medium">
                         {formatCurrency(doc.valor_total)}
                       </TableCell>
+                      <TableCell>
+                        {temTentativaFalha ? (
+                          <div
+                            className="inline-flex flex-col gap-0.5"
+                            title={doc.ultima_tentativa_xmotivo || ""}
+                          >
+                            <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-700 ring-1 ring-inset ring-red-600/20 dark:bg-red-950/30 dark:text-red-400">
+                              Rejeitado · cStat {doc.ultima_tentativa_cstat}
+                            </span>
+                            <p className="text-[9px] text-muted-foreground max-w-[180px] truncate">
+                              {doc.ultima_tentativa_xmotivo}
+                            </p>
+                          </div>
+                        ) : (
+                          <span className="inline-flex items-center rounded-full bg-gray-50 px-2 py-0.5 text-[10px] font-medium text-gray-700 ring-1 ring-inset ring-gray-600/20 dark:bg-gray-800/50 dark:text-gray-400">
+                            Aguardando
+                          </span>
+                        )}
+                      </TableCell>
                       <TableCell className="font-mono text-[10px] text-muted-foreground pr-4">
                         {doc.chave.slice(0, 14)}...{doc.chave.slice(-6)}
                       </TableCell>
@@ -521,30 +558,94 @@ function PendentesTab() {
           {!batchResult ? (
             <>
               <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                  {eventoConfig.tone === "emerald" && (
-                    <CheckCircle2 className="size-5 text-emerald-600" />
-                  )}
-                  {eventoConfig.tone !== "emerald" && (
-                    <AlertTriangle
-                      className={cn(
-                        "size-5",
-                        eventoConfig.tone === "amber"
-                          ? "text-amber-600"
-                          : "text-red-600",
-                      )}
-                    />
-                  )}
-                  {eventoConfig.label}
+                <DialogTitle>
+                  Manifestar {selectedChaves.size} NF-e
                 </DialogTitle>
                 <DialogDescription>
-                  Você está prestes a <strong>{eventoConfig.label.toLowerCase()}</strong>{" "}
-                  {selectedChaves.size} NF-e.{" "}
-                  <span className="block mt-1">{eventoConfig.description}</span>
+                  Escolha o tipo de manifestação e confirme o envio à SEFAZ.
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="space-y-4">
+              {/* Alerta — irreversibilidade */}
+              <div className="rounded-lg border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30 p-3 flex gap-3">
+                <AlertTriangle className="size-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                <div className="text-xs text-red-900 dark:text-red-100 leading-relaxed">
+                  <strong>Ação IRREVERSÍVEL após aceitação SEFAZ.</strong> Uma
+                  vez registrado com sucesso, não é possível corrigir. Revise
+                  os documentos selecionados antes de confirmar.
+                </div>
+              </div>
+
+              <div className="space-y-4 max-h-[55vh] overflow-y-auto pr-1">
+                {/* Tipo de manifestação — 3 radios com descrição */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">
+                    Tipo de manifestação
+                  </label>
+                  <div className="grid gap-2">
+                    {EVENTO_DEFINITIVO_OPTIONS.map((opt) => {
+                      const toneClass =
+                        modalEvento === opt.value
+                          ? opt.tone === "emerald"
+                            ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30"
+                            : opt.tone === "amber"
+                              ? "border-amber-500 bg-amber-50 dark:bg-amber-950/30"
+                              : "border-red-500 bg-red-50 dark:bg-red-950/30"
+                          : "hover:bg-muted/50"
+                      return (
+                        <label
+                          key={opt.value}
+                          className={cn(
+                            "flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors",
+                            toneClass,
+                          )}
+                        >
+                          <input
+                            type="radio"
+                            name="tipo_evento"
+                            value={opt.value}
+                            checked={modalEvento === opt.value}
+                            onChange={() => setModalEvento(opt.value)}
+                            className="mt-0.5"
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium">
+                                {opt.label}
+                              </span>
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] font-mono"
+                              >
+                                {opt.value}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {opt.description}
+                            </p>
+                          </div>
+                        </label>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Aviso de reenvio — se algum doc tem tentativa rejeitada */}
+                {docsComTentativaFalha.length > 0 && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-3">
+                    <p className="text-xs text-amber-900 dark:text-amber-100">
+                      <strong>
+                        ⚠️ {docsComTentativaFalha.length}{" "}
+                        {docsComTentativaFalha.length === 1 ? "doc" : "docs"}{" "}
+                        com tentativa anterior rejeitada pela SEFAZ.
+                      </strong>{" "}
+                      Este envio funciona como reenvio/correção. Confira que a
+                      causa da rejeição anterior foi resolvida (ex: cStat 596
+                      = fora do prazo → não adianta reenviar).
+                    </p>
+                  </div>
+                )}
+
                 {/* Justificativa (obrigatória pra 210220/210240) */}
                 {eventoConfig.requiresJustification && (
                   <div className="space-y-2">
@@ -557,7 +658,7 @@ function PendentesTab() {
                     </label>
                     <textarea
                       className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[80px] resize-none"
-                      placeholder="Explique o motivo (ex: mercadoria não foi entregue, nota emitida indevidamente...)"
+                      placeholder="Explique o motivo (ex: mercadoria não foi entregue, nota emitida indevidamente, operação cancelada antes da entrega...)"
                       maxLength={255}
                       value={modalJustificativa}
                       onChange={(e) => setModalJustificativa(e.target.value)}
@@ -568,15 +669,75 @@ function PendentesTab() {
                   </div>
                 )}
 
-                {/* Aviso final */}
-                <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 dark:bg-amber-950/30 dark:border-amber-800">
-                  <p className="text-xs text-amber-900 dark:text-amber-100">
-                    <strong>Confirmação:</strong> esta ação será enviada à
-                    SEFAZ e não pode ser revertida. Total de{" "}
-                    <strong>{selectedChaves.size}</strong> NF-e será{" "}
-                    <strong>{eventoConfig.label.toLowerCase()}</strong>.
-                  </p>
+                {/* Preview — docs que serão afetados */}
+                <div className="rounded-lg border">
+                  <button
+                    type="button"
+                    onClick={() => setShowDocsList(!showDocsList)}
+                    className="w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-muted/50 rounded-lg"
+                  >
+                    <span className="font-medium">
+                      Ver {selectedChaves.size}{" "}
+                      {selectedChaves.size === 1
+                        ? "NF-e selecionada"
+                        : "NF-e selecionadas"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {showDocsList ? "ocultar" : "expandir"}
+                    </span>
+                  </button>
+                  {showDocsList && (
+                    <div className="border-t px-3 py-2 space-y-2 max-h-[180px] overflow-y-auto">
+                      {selectedDocs.map((doc) => (
+                        <div
+                          key={doc.chave}
+                          className="text-xs flex items-center justify-between gap-2 py-1"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">
+                              {doc.razao_social_emitente || "—"}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground">
+                              NF-e {doc.numero_documento || "—"} ·{" "}
+                              {doc.data_emissao
+                                ? new Date(
+                                    doc.data_emissao,
+                                  ).toLocaleDateString("pt-BR")
+                                : "—"}
+                            </p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="font-medium">
+                              {formatCurrency(doc.valor_total)}
+                            </p>
+                            {doc.ultima_tentativa_cstat &&
+                              !doc.ultima_tentativa_sucesso && (
+                                <p className="text-[10px] text-red-600">
+                                  Rejeitado: cStat {doc.ultima_tentativa_cstat}
+                                </p>
+                              )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
+
+                {/* Checkbox de ciência — obrigatório pra habilitar envio */}
+                <label className="flex items-start gap-2 rounded-lg border border-primary/30 bg-primary/5 p-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={cienteChecked}
+                    onChange={(e) => setCienteChecked(e.target.checked)}
+                    className="mt-0.5 size-4"
+                  />
+                  <span className="text-xs leading-relaxed">
+                    <strong>Estou ciente</strong> que esta manifestação é
+                    enviada à SEFAZ em nome da minha empresa, é responsabilidade
+                    minha, e{" "}
+                    <strong>não pode ser revertida após aceitação</strong>.
+                  </span>
+                </label>
               </div>
 
               <DialogFooter>
@@ -600,7 +761,7 @@ function PendentesTab() {
                   ) : (
                     <>
                       <Send className="size-4" />
-                      Confirmar envio
+                      Enviar à SEFAZ
                     </>
                   )}
                 </Button>

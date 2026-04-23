@@ -92,8 +92,40 @@ async def listar_pendentes(
 
     result = query.order("fetched_at", desc=True).execute()
 
+    if not result.data:
+        return []
+
+    # Enrichment: pra cada doc, buscar a ÚLTIMA tentativa de manifestação
+    # definitiva (210200/210220/210240). Usado pra mostrar status "Rejeitado
+    # cStat XXX" em docs com tentativa falha que precisam ser reenviados.
+    chaves = [doc["chave_acesso"] for doc in result.data]
+    eventos_res = sb.table("manifestacao_events").select(
+        "chave_acesso, tipo_evento, cstat, xmotivo, created_at"
+    ).eq(
+        "tenant_id", tenant_id,
+    ).in_("chave_acesso", chaves).in_(
+        "tipo_evento", ["210200", "210220", "210240"],
+    ).order("created_at", desc=True).execute()
+
+    # Reduz pra 1 evento por chave (o mais recente) — Supabase não tem
+    # DISTINCT ON, então fazemos em memória. Volume baixo por design
+    # (máximo ~100 docs pendentes por tenant na UI).
+    ultima_por_chave: dict[str, dict] = {}
+    for ev in eventos_res.data or []:
+        chave = ev["chave_acesso"]
+        if chave not in ultima_por_chave:
+            ultima_por_chave[chave] = ev  # desc order → primeiro = mais recente
+
     pendentes = []
     for doc in result.data:
+        ev = ultima_por_chave.get(doc["chave_acesso"])
+        ultima_sucesso = None
+        if ev:
+            # cStat 135 = evento registrado, 136 = vinculado, 573 = duplicidade
+            # (tecnicamente "sucesso" mas repetição — tratamos como bem-sucedido
+            # pra não insistir num reenvio desnecessário).
+            ultima_sucesso = ev.get("cstat") in ("135", "136", "573")
+
         pendentes.append(DocumentoPendenteOut(
             chave=doc["chave_acesso"],
             nsu=doc["nsu"],
@@ -106,6 +138,11 @@ async def listar_pendentes(
             valor_total=doc.get("valor_total"),
             manifestacao_status=doc.get("manifestacao_status", "pendente"),
             fetched_at=doc["fetched_at"],
+            ultima_tentativa_tipo=ev.get("tipo_evento") if ev else None,
+            ultima_tentativa_cstat=ev.get("cstat") if ev else None,
+            ultima_tentativa_xmotivo=ev.get("xmotivo") if ev else None,
+            ultima_tentativa_sucesso=ultima_sucesso,
+            ultima_tentativa_at=ev.get("created_at") if ev else None,
         ))
 
     return pendentes
