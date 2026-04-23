@@ -27,7 +27,7 @@ import { Label } from "@/components/ui/label"
 import { getSupabase } from "@/lib/supabase"
 
 const cteDocTypes = [
-  { key: "cte", label: "CT-e", icon: Truck },
+  { key: "cte", label: "CT-e / CT-e OS", icon: Truck },
   { key: "mdfe", label: "MDF-e", icon: FileStack },
   { key: "nfse", label: "NFS-e", icon: Building2 },
 ]
@@ -296,7 +296,7 @@ export default function CapturaManualPage() {
         setCaptureAllProgress(`Processando certificado ${i + 1}/${registeredCerts.length}: ${cert.company_name || cert.cnpj}...`)
 
         try {
-          // Trigger CT-e/MDF-e/NFS-e
+          // Trigger CT-e/CT-e OS/MDF-e/NFS-e
           const triggerRes = await fetch(`${backendUrl}/polling/trigger`, {
             method: "POST",
             headers: {
@@ -335,12 +335,12 @@ export default function CapturaManualPage() {
             company_name: cert.company_name || cert.cnpj,
             success: triggerOk || nfeOk,
             message: triggerOk && nfeOk
-              ? `CT-e/MDF-e/NFS-e: ${triggerDocs} doc(s) | NF-e: ${nfeResumos} resumo(s)`
+              ? `CT-e/CT-e OS/MDF-e/NFS-e: ${triggerDocs} doc(s) | NF-e: ${nfeResumos} resumo(s)`
               : !triggerOk && !nfeOk
                 ? "Erro em ambas as capturas"
                 : !triggerOk
-                  ? `Erro CT-e/MDF-e/NFS-e | NF-e: ${nfeResumos} resumo(s)`
-                  : `CT-e/MDF-e/NFS-e: ${triggerDocs} doc(s) | Erro NF-e`,
+                  ? `Erro CT-e/CT-e OS/MDF-e/NFS-e | NF-e: ${nfeResumos} resumo(s)`
+                  : `CT-e/CT-e OS/MDF-e/NFS-e: ${triggerDocs} doc(s) | Erro NF-e`,
           })
         } catch (err) {
           allResults.push({
@@ -665,9 +665,9 @@ export default function CapturaManualPage() {
       {/* CT-e / MDF-e / NFS-e - Direct capture (AFTER NF-e section) */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">CT-e / MDF-e / NFS-e — Captura direta</CardTitle>
+          <CardTitle className="text-base">CT-e / CT-e OS / MDF-e / NFS-e — Captura direta</CardTitle>
           <p className="text-xs text-muted-foreground">
-            Estes documentos vêm completos da SEFAZ em uma única consulta.
+            Estes documentos vêm completos da SEFAZ em uma única consulta. CT-e e CT-e OS compartilham o mesmo Web Service, então são capturados juntos.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">

@@ -122,9 +122,22 @@ async def trigger_polling(
 
     total_docs = 0
     results = []
-    for tipo in body.tipos:
+    # CT-e OS (cteos) compartilha o mesmo Web Service CteDistribuicaoDFe que
+    # o CT-e 57. Se o ERP mandar ambos ("cte" e "cteos") ou só "cteos", a
+    # gente deduplica aqui — uma única chamada SEFAZ retorna os dois, e o
+    # _refine_tipo_by_schema separa por schema do docZip.
+    seen: set[str] = set()
+    normalized_tipos: list[str] = []
+    for raw_tipo in body.tipos:
+        tipo = "cte" if raw_tipo == "cteos" else raw_tipo
         if tipo not in ("nfe", "cte", "mdfe", "nfse"):
             continue
+        if tipo in seen:
+            continue
+        seen.add(tipo)
+        normalized_tipos.append(tipo)
+
+    for tipo in normalized_tipos:
 
         # NFe uses background polling v2 (resumo → ciência → wait → XML).
         # The trigger endpoint does NOT call SEFAZ for NFe; instead it
