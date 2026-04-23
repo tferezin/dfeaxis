@@ -143,7 +143,12 @@ async def baixar_xml_documento(
     confirmados (status=delivered) retornam 410 porque o XML foi descartado
     propositalmente (zero-retention).
     """
-    if len(chave) != 44 or not chave.isdigit():
+    # NFE/CTE/CTEOS/MDFE usam chave 44-digitos; NFSe ADN Nacional usa
+    # identificador de 50 chars alfanumericos. Aceita ambos formatos.
+    if not (
+        (len(chave) == 44 and chave.isdigit())
+        or (len(chave) == 50 and chave.isalnum())
+    ):
         raise HTTPException(status_code=400, detail="Chave de acesso invalida")
 
     sb = get_supabase_client()

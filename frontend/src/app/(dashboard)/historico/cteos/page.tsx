@@ -102,6 +102,70 @@ export default function HistoricoCtePage() {
   const [realData, setRealData] = useState<any[]>([])
   const [realLoading, setRealLoading] = useState(false)
 
+  const getBackendUrl = () => {
+    const raw = process.env.NEXT_PUBLIC_API_URL || "https://dfeaxis-production.up.railway.app"
+    return raw.endsWith("/api/v1") ? raw : `${raw}/api/v1`
+  }
+
+  const getAuthToken = async () => {
+    const sb = getSupabase()
+    const { data: { session } } = await sb.auth.getSession()
+    return session?.access_token ?? null
+  }
+
+  const fetchXmlBlob = async (chave: string): Promise<Blob | null> => {
+    const chaveLimpa = chave.replace(/\s/g, "")
+    const token = await getAuthToken()
+    if (!token) {
+      toast.error("Sessão expirada. Faça login novamente.")
+      return null
+    }
+    try {
+      const res = await fetch(`${getBackendUrl()}/documentos/${chaveLimpa}/xml`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (res.status === 410) {
+        toast.error("XML já descartado após confirmação")
+        return null
+      }
+      if (res.status === 404) {
+        toast.error("XML não disponível")
+        return null
+      }
+      if (!res.ok) {
+        toast.error(`Erro ao obter XML (HTTP ${res.status})`)
+        return null
+      }
+      return await res.blob()
+    } catch (e) {
+      console.error("[DFeAxis] fetchXmlBlob error:", e)
+      toast.error("Falha ao conectar ao servidor")
+      return null
+    }
+  }
+
+  const handleVisualizarXML = async (chave: string) => {
+    const blob = await fetchXmlBlob(chave)
+    if (!blob) return
+    const url = URL.createObjectURL(new Blob([blob], { type: "application/xml" }))
+    window.open(url, "_blank", "noopener,noreferrer")
+    setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  }
+
+  const handleDownloadXML = async (chave: string) => {
+    const blob = await fetchXmlBlob(chave)
+    if (!blob) return
+    const chaveLimpa = chave.replace(/\s/g, "")
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `cteos-${chaveLimpa}.xml`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 10_000)
+  }
+
   const loadRealData = useCallback(async () => {
     setRealLoading(true)
     try {
@@ -274,10 +338,10 @@ export default function HistoricoCtePage() {
                       <TableCell className="text-xs">{row.fetchedAt}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="icon-xs" title="Visualizar XML" onClick={() => toast.info("Visualização de XML em breve")}>
+                          <Button variant="ghost" size="icon-xs" title="Visualizar XML" onClick={() => handleVisualizarXML(row.chave.replace(/\s/g, ""))}>
                             <Eye className="size-3.5" />
                           </Button>
-                          <Button variant="ghost" size="icon-xs" title="Download" onClick={() => toast.info("Download do XML em breve")}>
+                          <Button variant="ghost" size="icon-xs" title="Download" onClick={() => handleDownloadXML(row.chave.replace(/\s/g, ""))}>
                             <Download className="size-3.5" />
                           </Button>
                         </div>
@@ -438,10 +502,10 @@ export default function HistoricoCtePage() {
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon-xs" title="Visualizar XML" onClick={() => toast.info("Visualização de XML em breve")}>
+                    <Button variant="ghost" size="icon-xs" title="Visualizar XML" onClick={() => handleVisualizarXML(row.chave.replace(/\s/g, ""))}>
                       <Eye className="size-3.5" />
                     </Button>
-                    <Button variant="ghost" size="icon-xs" title="Download" onClick={() => toast.info("Download do XML em breve")}>
+                    <Button variant="ghost" size="icon-xs" title="Download" onClick={() => handleDownloadXML(row.chave.replace(/\s/g, ""))}>
                       <Download className="size-3.5" />
                     </Button>
                   </div>

@@ -105,6 +105,93 @@ export default function HistoricoNfsePage() {
   const [realData, setRealData] = useState<any[]>([])
   const [realLoading, setRealLoading] = useState(false)
 
+  const getBackendUrl = () => {
+    const raw = process.env.NEXT_PUBLIC_API_URL || "https://dfeaxis-production.up.railway.app"
+    return raw.endsWith("/api/v1") ? raw : `${raw}/api/v1`
+  }
+
+  const getAuthToken = async () => {
+    const sb = getSupabase()
+    const { data: { session } } = await sb.auth.getSession()
+    return session?.access_token ?? null
+  }
+
+  const fetchXML = async (chave: string): Promise<string | null> => {
+    const chaveNormalizada = chave.replace(/\s/g, "")
+    const token = await getAuthToken()
+    if (!token) {
+      toast.error("Sessão expirada. Faça login novamente.")
+      return null
+    }
+
+    const res = await fetch(`${getBackendUrl()}/documentos/${chaveNormalizada}/xml`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    if (res.status === 410) {
+      toast.warning("XML já foi descartado após confirmação (zero-retention).")
+      return null
+    }
+    if (res.status === 404) {
+      toast.warning("XML não disponível para este documento.")
+      return null
+    }
+    if (res.status === 400) {
+      toast.error("Chave inválida para este documento NFS-e.")
+      return null
+    }
+    if (!res.ok) {
+      toast.error(`Erro ao obter XML (HTTP ${res.status}).`)
+      return null
+    }
+
+    return await res.text()
+  }
+
+  const handleVisualizarXML = async (chave: string) => {
+    const id = toast.loading("Carregando XML...")
+    try {
+      const xml = await fetchXML(chave)
+      if (!xml) {
+        toast.dismiss(id)
+        return
+      }
+      const blob = new Blob([xml], { type: "application/xml" })
+      const url = URL.createObjectURL(blob)
+      window.open(url, "_blank", "noopener,noreferrer")
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+      toast.success("XML aberto em nova aba.", { id })
+    } catch (e) {
+      console.error("[DFeAxis] handleVisualizarXML error:", e)
+      toast.error("Falha ao visualizar XML.", { id })
+    }
+  }
+
+  const handleDownloadXML = async (chave: string) => {
+    const id = toast.loading("Preparando download...")
+    try {
+      const xml = await fetchXML(chave)
+      if (!xml) {
+        toast.dismiss(id)
+        return
+      }
+      const chaveNormalizada = chave.replace(/\s/g, "")
+      const blob = new Blob([xml], { type: "application/xml" })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `nfse-${chaveNormalizada}.xml`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      setTimeout(() => URL.revokeObjectURL(url), 10_000)
+      toast.success("Download iniciado.", { id })
+    } catch (e) {
+      console.error("[DFeAxis] handleDownloadXML error:", e)
+      toast.error("Falha ao baixar XML.", { id })
+    }
+  }
+
   const loadRealData = useCallback(async () => {
     setRealLoading(true)
     try {
@@ -305,10 +392,10 @@ export default function HistoricoNfsePage() {
                       <TableCell className="text-xs">{row.fetchedAt}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="icon-xs" title="Visualizar" onClick={() => toast.info("Visualização de XML em breve")}>
+                          <Button variant="ghost" size="icon-xs" title="Visualizar" onClick={() => handleVisualizarXML(row.chave)}>
                             <Eye className="size-3.5" />
                           </Button>
-                          <Button variant="ghost" size="icon-xs" title="Download" onClick={() => toast.info("Download do XML em breve")}>
+                          <Button variant="ghost" size="icon-xs" title="Download" onClick={() => handleDownloadXML(row.chave)}>
                             <Download className="size-3.5" />
                           </Button>
                         </div>
@@ -512,10 +599,10 @@ export default function HistoricoNfsePage() {
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon-xs" title="Visualizar" onClick={() => toast.info("Visualização de XML em breve")}>
+                    <Button variant="ghost" size="icon-xs" title="Visualizar" onClick={() => handleVisualizarXML(row.numero)}>
                       <Eye className="size-3.5" />
                     </Button>
-                    <Button variant="ghost" size="icon-xs" title="Download" onClick={() => toast.info("Download do XML em breve")}>
+                    <Button variant="ghost" size="icon-xs" title="Download" onClick={() => handleDownloadXML(row.numero)}>
                       <Download className="size-3.5" />
                     </Button>
                   </div>

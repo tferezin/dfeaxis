@@ -1104,7 +1104,16 @@ footer{background:var(--sur);border-top:1px solid var(--bdr);padding:36px 52px}
       <div class="persona">
         <div class="persona-icon">ERP</div>
         <h3>Pra quem tem TOTVS, Oracle ou ERP próprio</h3>
-        <p>Nosso endpoint é REST puro. Se seu ERP consome JSON, ele integra. TOTVS via Smart Link, Oracle via REST, ERPs próprios via HTTP. Documentação completa.</p>
+        <p>Nosso endpoint é REST puro. Se seu ERP consome JSON, ele integra — use a linguagem nativa do seu ambiente:</p>
+        <ul style="font-size:13px;line-height:1.6;margin:8px 0 10px 0;padding-left:18px;color:var(--muted)">
+          <li><strong>TOTVS Protheus</strong> — ADVPL (<code style="font-family:var(--mn);font-size:11px">FWRest</code>)</li>
+          <li><strong>TOTVS Datasul / RM</strong> — Progress 4GL (OpenEdge ABL)</li>
+          <li><strong>Oracle EBS</strong> — PL/SQL (<code style="font-family:var(--mn);font-size:11px">UTL_HTTP</code>)</li>
+          <li><strong>Oracle NetSuite / Fusion</strong> — SuiteScript (JavaScript)</li>
+          <li><strong>Sankhya</strong> — JavaScript (MGE Workspace)</li>
+          <li><strong>Senior G5 / Senior X</strong> — LSP ou REST direto</li>
+        </ul>
+        <p style="font-size:12px;color:var(--muted);margin-top:6px"><em>Kit de integração com código pronto apenas pro SAP DRC (ABAP). Nos demais ERPs, fornecemos orientação técnica e exemplos de chamada REST — seu time adapta pra linguagem nativa.</em></p>
         <button class="persona-link" onclick="document.getElementById('features-tabs').scrollIntoView({behavior:'smooth'});">Ver endpoints da API</button>
       </div>
       <div class="persona">
