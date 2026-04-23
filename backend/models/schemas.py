@@ -298,9 +298,13 @@ class ManifestacaoBatchResponse(BaseModel):
 class DocumentoPendenteOut(BaseModel):
     chave: str
     nsu: str
-    cnpj_emitente: Optional[str] = None
+    tipo: Optional[str] = None              # NFE/CTE/MDFE/NFSE
+    cnpj_emitente: Optional[str] = None     # fornecedor
     razao_social_emitente: Optional[str] = None
-    valor: Optional[str] = None
+    cnpj_destinatario: Optional[str] = None # cliente
+    numero_documento: Optional[str] = None  # nNF/nCT
+    data_emissao: Optional[datetime] = None
+    valor_total: Optional[float] = None     # vNF/vTPrest
     manifestacao_status: str
     fetched_at: datetime
 

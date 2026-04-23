@@ -55,27 +55,55 @@ def _get_cert_and_password(tenant_id: str, cnpj: str) -> tuple:
 
 @router.get("/manifestacao/pendentes", response_model=list[DocumentoPendenteOut])
 async def listar_pendentes(
-    cnpj: str = Query(..., min_length=14, max_length=14),
+    cnpj: str | None = Query(
+        None, min_length=14, max_length=14,
+        description="Filtrar por CNPJ específico. Se omitido, retorna todos os CNPJs do tenant.",
+    ),
+    status: str = Query(
+        "pendente", pattern=r"^(pendente|ciencia)$",
+        description=(
+            "pendente = ciência ainda não enviada. "
+            "ciencia = ciência aceita, aguardando decisão definitiva "
+            "(confirmar/desconhecer/não realizada). Default: pendente."
+        ),
+    ),
     auth: dict = Depends(verify_jwt_or_api_key),
 ):
-    """Lista documentos NF-e pendentes de manifestação.
+    """Lista documentos NF-e pendentes de uma etapa de manifestação.
 
-    Retorna resumos (resNFe) que ainda não receberam Ciência.
+    Usado pela aba "Pendentes" da UI de Manifestação:
+    - status=pendente → ciência ainda não enviada (raro, captura nova)
+    - status=ciencia → ciência OK, cliente precisa decidir manifestação
+      definitiva (210200/210220/210240) — aqui aparecem as NF-e que o
+      scheduler cientificou automaticamente e que aguardam aprovação final.
     """
     sb = get_supabase_client()
     tenant_id = auth["tenant_id"]
 
-    result = sb.table("documents").select("*").eq(
+    query = sb.table("documents").select("*").eq(
         "tenant_id", tenant_id
-    ).eq("cnpj", cnpj).eq(
-        "manifestacao_status", "pendente"
-    ).order("fetched_at", desc=True).execute()
+    ).eq("tipo", "NFE").eq(
+        "manifestacao_status", status,
+    ).eq(
+        "status", "available",
+    )
+    if cnpj:
+        query = query.eq("cnpj", cnpj)
+
+    result = query.order("fetched_at", desc=True).execute()
 
     pendentes = []
     for doc in result.data:
         pendentes.append(DocumentoPendenteOut(
             chave=doc["chave_acesso"],
             nsu=doc["nsu"],
+            tipo=doc.get("tipo"),
+            cnpj_emitente=doc.get("cnpj_emitente"),
+            razao_social_emitente=doc.get("razao_social_emitente"),
+            cnpj_destinatario=doc.get("cnpj_destinatario"),
+            numero_documento=doc.get("numero_documento"),
+            data_emissao=doc.get("data_emissao"),
+            valor_total=doc.get("valor_total"),
             manifestacao_status=doc.get("manifestacao_status", "pendente"),
             fetched_at=doc["fetched_at"],
         ))

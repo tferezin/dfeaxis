@@ -120,15 +120,15 @@ const navigation: NavSection[] = [
     ],
   },
   {
-    label: "Financeiro",
-    items: [
-      { title: "Assinatura", href: "/financeiro/creditos", icon: Receipt },
-    ],
-  },
-  {
     label: "Monitoramento",
     items: [
       { title: "Logs de Captura", href: "/logs", icon: ScrollText },
+    ],
+  },
+  {
+    label: "Financeiro",
+    items: [
+      { title: "Assinatura", href: "/financeiro/creditos", icon: Receipt },
     ],
   },
 ]
