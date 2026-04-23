@@ -7,11 +7,15 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
 from db.supabase import get_supabase_client
 from middleware.lgpd import mask_cnpj
-from middleware.security import verify_api_key, verify_api_key_with_trial
+from middleware.security import (
+    verify_api_key,
+    verify_api_key_with_trial,
+    verify_jwt_or_api_key,
+)
 from models.schemas import (
     ConfirmarResponse,
     DocumentoOut,
@@ -123,6 +127,63 @@ async def listar_documentos(
     )
 
 
+@router.get("/documentos/{chave}/xml")
+async def baixar_xml_documento(
+    chave: str,
+    auth: dict = Depends(verify_jwt_or_api_key),
+):
+    """Baixa o XML completo de um documento capturado.
+
+    Aceita JWT (dashboard) ou X-API-Key (ERP externo). Retorna o XML cru com
+    Content-Type application/xml — frontend pode passar direto pra <pre> de
+    visualizacao ou triggar download via Blob.
+
+    Serve pros 5 tipos (NFE, CTE, CTEOS, MDFE, NFSE) — o conteudo vem da
+    coluna xml_content populada no momento da captura. Documentos ja
+    confirmados (status=delivered) retornam 410 porque o XML foi descartado
+    propositalmente (zero-retention).
+    """
+    if len(chave) != 44 or not chave.isdigit():
+        raise HTTPException(status_code=400, detail="Chave de acesso invalida")
+
+    sb = get_supabase_client()
+    tenant_id = auth["tenant_id"]
+
+    result = sb.table("documents").select(
+        "xml_content, status, tipo"
+    ).eq(
+        "chave_acesso", chave
+    ).eq(
+        "tenant_id", tenant_id
+    ).execute()
+
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Documento nao encontrado")
+
+    doc = result.data[0]
+    xml_content = doc.get("xml_content")
+
+    if not xml_content:
+        if doc.get("status") == "delivered":
+            raise HTTPException(
+                status_code=410,
+                detail="XML ja descartado apos confirmacao (zero-retention).",
+            )
+        raise HTTPException(
+            status_code=404,
+            detail="XML nao disponivel — documento pode estar como resumo pendente",
+        )
+
+    tipo = (doc.get("tipo") or "documento").lower()
+    filename = f"{tipo}-{chave}.xml"
+
+    return Response(
+        content=xml_content,
+        media_type="application/xml",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.post("/documentos/{chave}/confirmar", response_model=ConfirmarResponse)
 async def confirmar_documento(
     chave: str,
@@ -198,16 +259,9 @@ async def consulta_retroativa(
     if not cert.data:
         raise HTTPException(status_code=403, detail="CNPJ não cadastrado")
 
-    # Verifica se tenant tem plano com retroativa
-    tenant = sb.table("tenants").select("plan").eq(
-        "id", tenant_id
-    ).single().execute()
-
-    if tenant.data.get("plan") == "starter":
-        raise HTTPException(
-            status_code=403,
-            detail="Consulta retroativa não disponível no plano Starter",
-        )
+    # Consulta retroativa 90d esta liberada pra TODOS os planos (inclusive
+    # Starter). Antes havia um gate 403 pro Starter mas isso contradizia o
+    # que a landing anuncia. Removido — todos os planos tem acesso.
 
     job_id = f"retro_{uuid.uuid4().hex[:12]}"
 
