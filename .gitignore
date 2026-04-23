@@ -24,6 +24,9 @@ logs/
 .vscode/
 *.swp
 
+# Claude Code runtime state (per-session locks, not meant for repo)
+.claude/
+
 # OS
 .DS_Store
 Thumbs.db
