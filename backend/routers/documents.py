@@ -65,7 +65,7 @@ async def listar_documentos(
     if not cert.data:
         raise HTTPException(
             status_code=403,
-            detail=f"CNPJ {mask_cnpj(cnpj)} nao cadastrado para este tenant",
+            detail=f"CNPJ {mask_cnpj(cnpj)} não cadastrado para este tenant",
         )
 
     # Busca documentos disponíveis + pendentes de manifestação

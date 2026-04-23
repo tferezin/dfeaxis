@@ -24,8 +24,8 @@ router = APIRouter()
 
 # Aviso sobre cobertura parcial do ADN
 ADN_DISCLAIMER = (
-    "O Ambiente Nacional de NFS-e (ADN) nao cobre todos os municipios. "
-    "Resultados podem estar incompletos para municipios nao integrados."
+    "O Ambiente Nacional de NFS-e (ADN) não cobre todos os municípios. "
+    "Resultados podem estar incompletos para municípios não integrados."
 )
 
 
@@ -44,7 +44,7 @@ def _get_cert_and_password(tenant_id: str, cnpj: str) -> tuple[dict, str]:
     if not cert_result.data:
         raise HTTPException(
             status_code=404,
-            detail=f"Certificado ativo nao encontrado para CNPJ {mask_cnpj(cnpj)}",
+            detail=f"Certificado ativo não encontrado para CNPJ {mask_cnpj(cnpj)}",
         )
 
     cert = cert_result.data[0]
@@ -190,7 +190,7 @@ async def consultar_nfse_por_chave(
         )
 
     if not response.documents:
-        raise HTTPException(status_code=404, detail="NFS-e nao encontrada")
+        raise HTTPException(status_code=404, detail="NFS-e não encontrada")
 
     doc = response.documents[0]
     return NfseOut(

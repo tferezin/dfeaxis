@@ -485,10 +485,10 @@ export default function HistoricoNfePage() {
                 <span className="text-sm font-medium">{selectedChaves.size} selecionada(s)</span>
                 <Button size="sm" className="h-7 gap-1.5 text-xs" disabled={manifLoading} onClick={handleBatchCiencia}>
                   <CheckCircle2 className="size-3.5" />
-                  {manifLoading ? "Enviando..." : `Dar Ciencia em Lote (${selectedChaves.size})`}
+                  {manifLoading ? "Enviando..." : `Dar Ciência em Lote (${selectedChaves.size})`}
                 </Button>
                 <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setSelectedChaves(new Set())}>
-                  Limpar selecao
+                  Limpar seleção
                 </Button>
               </div>
             )}

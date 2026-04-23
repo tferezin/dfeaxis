@@ -31,7 +31,7 @@ def _get_cert_and_password(tenant_id: str, cnpj: str) -> tuple:
     ).eq("tenant_id", tenant_id).eq("cnpj", cnpj).eq("is_active", True).execute()
 
     if not cert.data:
-        raise HTTPException(status_code=404, detail=f"Certificado nao encontrado para CNPJ {mask_cnpj(cnpj)}")
+        raise HTTPException(status_code=404, detail=f"Certificado não encontrado para CNPJ {mask_cnpj(cnpj)}")
 
     row = cert.data[0]
 

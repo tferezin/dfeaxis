@@ -287,7 +287,7 @@ class NfseClient:
             return NfseResponse(
                 success=True,
                 status_code=404,
-                message="Nenhuma NFS-e encontrada. O municipio pode nao estar integrado ao ADN.",
+                message="Nenhuma NFS-e encontrada. O município pode não estar integrado ao ADN.",
                 ult_nsu="000000000000000",
                 latency_ms=latency_ms,
             )
@@ -321,7 +321,7 @@ class NfseClient:
             return NfseResponse(
                 success=True,
                 status_code=404,
-                message="NFS-e nao encontrada.",
+                message="NFS-e não encontrada.",
                 ult_nsu="000000000000000",
                 latency_ms=latency_ms,
             )

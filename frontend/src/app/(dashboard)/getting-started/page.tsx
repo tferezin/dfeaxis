@@ -160,7 +160,7 @@ cl_http_client=>create_by_destination(
   EXCEPTIONS OTHERS      = 1 ).
 
 IF sy-subrc <> 0.
-  WRITE: / 'Erro ao criar conexao HTTP. Verifique a RFC Destination:', gc_rfc_dest.
+  WRITE: / 'Erro ao criar conexão HTTP. Verifique a RFC Destination:', gc_rfc_dest.
   RETURN.
 ENDIF.
 
@@ -280,7 +280,7 @@ ENDLOOP.
 *----------------------------------------------------------------------*
 lo_http_client->close( ).
 
-WRITE: / '=== Processamento concluido ==='.
+WRITE: / '=== Processamento concluído ==='.
 WRITE: / 'Documentos processados:', lines( ls_response-documentos ).`
 
 const rfcConfig = `*----------------------------------------------------------------------*

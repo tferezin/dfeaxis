@@ -112,7 +112,7 @@ async def revoke_api_key(
     ).eq("id", key_id).eq("tenant_id", tenant_id).execute()
 
     if not result.data:
-        raise HTTPException(status_code=404, detail="API key nao encontrada")
+        raise HTTPException(status_code=404, detail="API key não encontrada")
 
     # Audit log
     revoked_prefix = result.data[0].get("key_prefix", "") if result.data else ""

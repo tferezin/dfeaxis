@@ -55,7 +55,7 @@ async def upload_certificate(
     if not filename.lower().endswith(".pfx"):
         raise HTTPException(
             status_code=400,
-            detail="Arquivo deve ter extensao .pfx",
+            detail="Arquivo deve ter extensão .pfx",
         )
 
     # Content type check (relaxed — browsers may send various types for .pfx)
@@ -72,7 +72,7 @@ async def upload_certificate(
     except Exception as e:
         raise HTTPException(
             status_code=400,
-            detail=f"Certificado invalido ou senha incorreta: {e}",
+            detail=f"Certificado inválido ou senha incorreta: {e}",
         )
 
     # Anti-fraude: o CNPJ informado no form deve bater com o do certificado.
@@ -309,7 +309,7 @@ async def delete_certificate(
     ).eq("tenant_id", tenant_id).execute()
 
     if not result.data:
-        raise HTTPException(status_code=404, detail="Certificado nao encontrado")
+        raise HTTPException(status_code=404, detail="Certificado não encontrado")
 
     # Audit log
     deleted_cnpj = result.data[0].get("cnpj", "") if result.data else ""
