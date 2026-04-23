@@ -177,10 +177,13 @@ function PendentesTab() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Filtro de busca (fornecedor: razão social ou CNPJ)
+  const [searchTerm, setSearchTerm] = useState("")
+
   // Seleção múltipla
   const [selectedChaves, setSelectedChaves] = useState<Set<string>>(new Set())
 
-  // Modal de aplicar manifestação
+  // Modal de confirmação — agora o tipo é pré-selecionado pelos 3 botões de ação
   const [modalOpen, setModalOpen] = useState(false)
   const [modalEvento, setModalEvento] = useState<TipoEventoDefinitivo>("210200")
   const [modalJustificativa, setModalJustificativa] = useState("")
@@ -210,6 +213,21 @@ function PendentesTab() {
     loadPendentes()
   }, [loadPendentes])
 
+  // Lista filtrada por fornecedor (razão social ou CNPJ)
+  const filtered = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase()
+    if (!term) return pendentes
+    const termDigits = term.replace(/\D/g, "")
+    return pendentes.filter((p) => {
+      const nomeMatch = p.razao_social_emitente
+        ?.toLowerCase()
+        .includes(term)
+      const cnpjMatch =
+        termDigits.length > 0 && p.cnpj_emitente?.includes(termDigits)
+      return Boolean(nomeMatch || cnpjMatch)
+    })
+  }, [pendentes, searchTerm])
+
   // Seleção
   const toggleChave = (chave: string) => {
     const copy = new Set(selectedChaves)
@@ -219,11 +237,28 @@ function PendentesTab() {
   }
 
   const toggleAll = () => {
-    if (selectedChaves.size === pendentes.length) {
-      setSelectedChaves(new Set())
+    const allFilteredSelected = filtered.every((p) =>
+      selectedChaves.has(p.chave),
+    )
+    if (allFilteredSelected && filtered.length > 0) {
+      // Desseleciona só os filtrados
+      const copy = new Set(selectedChaves)
+      filtered.forEach((p) => copy.delete(p.chave))
+      setSelectedChaves(copy)
     } else {
-      setSelectedChaves(new Set(pendentes.map((p) => p.chave)))
+      // Seleciona todos os filtrados (mantém outros que já estavam)
+      const copy = new Set(selectedChaves)
+      filtered.forEach((p) => copy.add(p.chave))
+      setSelectedChaves(copy)
     }
+  }
+
+  // Abrir modal com evento pré-selecionado pelos 3 botões de ação
+  const openModalComEvento = (evento: TipoEventoDefinitivo) => {
+    setModalEvento(evento)
+    setModalJustificativa("")
+    setBatchResult(null)
+    setModalOpen(true)
   }
 
   const eventoConfig = EVENTO_DEFINITIVO_OPTIONS.find(
@@ -297,30 +332,64 @@ function PendentesTab() {
       </Card>
 
       <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <CardTitle className="text-base">
-                NF-e aguardando manifestação definitiva
-              </CardTitle>
-              <CardDescription>
-                Ciência já foi enviada à SEFAZ. Selecione os documentos e
-                aplique <strong>Confirmar</strong>, <strong>Desconhecer</strong> ou{" "}
-                <strong>Operação não Realizada</strong>.
-              </CardDescription>
-            </div>
-            {selectedChaves.size > 0 && (
-              <Button
-                onClick={() => setModalOpen(true)}
-                className="gap-2"
-                size="sm"
-              >
-                <Send className="size-4" />
-                Manifestar {selectedChaves.size} selecionada
-                {selectedChaves.size === 1 ? "" : "s"}
-              </Button>
-            )}
+        <CardHeader className="pb-3 space-y-3">
+          <div>
+            <CardTitle className="text-base">
+              NF-e aguardando manifestação definitiva
+            </CardTitle>
+            <CardDescription>
+              Ciência já foi enviada à SEFAZ. Selecione os documentos e
+              escolha o tipo de manifestação abaixo.
+            </CardDescription>
           </div>
+
+          {/* Filtro de busca por fornecedor */}
+          <div className="relative max-w-md">
+            <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Filtrar por fornecedor (razão social ou CNPJ)"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 text-sm"
+            />
+          </div>
+
+          {/* Barra de ação — 3 botões diretos quando há seleção */}
+          {selectedChaves.size > 0 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 p-3">
+              <span className="text-sm font-medium mr-auto">
+                {selectedChaves.size} selecionada
+                {selectedChaves.size === 1 ? "" : "s"} — manifestar como:
+              </span>
+              <Button
+                size="sm"
+                onClick={() => openModalComEvento("210200")}
+                className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                <CheckCircle2 className="size-4" />
+                Confirmar Operação
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => openModalComEvento("210220")}
+                className="gap-1.5 border-amber-500 text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/30"
+              >
+                <AlertTriangle className="size-4" />
+                Desconhecer
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => openModalComEvento("210240")}
+                className="gap-1.5 border-red-500 text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30"
+              >
+                <AlertTriangle className="size-4" />
+                Não Realizada
+              </Button>
+            </div>
+          )}
         </CardHeader>
         <CardContent className="px-0">
           {error ? (
@@ -351,6 +420,21 @@ function PendentesTab() {
                 desconhecer ou declarar não realizada.
               </p>
             </div>
+          ) : filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center px-4">
+              <Search className="size-8 text-muted-foreground/40 mb-2" />
+              <p className="text-sm text-muted-foreground">
+                Nenhum fornecedor encontrado para "{searchTerm}".
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSearchTerm("")}
+                className="mt-3"
+              >
+                Limpar filtro
+              </Button>
+            </div>
           ) : (
             <Table>
               <TableHeader>
@@ -360,8 +444,8 @@ function PendentesTab() {
                       type="checkbox"
                       className="size-4 rounded border-input"
                       checked={
-                        selectedChaves.size === pendentes.length &&
-                        pendentes.length > 0
+                        filtered.length > 0 &&
+                        filtered.every((p) => selectedChaves.has(p.chave))
                       }
                       onChange={toggleAll}
                       aria-label="Selecionar todos"
@@ -375,7 +459,7 @@ function PendentesTab() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {pendentes.map((doc) => {
+                {filtered.map((doc) => {
                   const checked = selectedChaves.has(doc.chave)
                   return (
                     <TableRow
@@ -437,60 +521,30 @@ function PendentesTab() {
           {!batchResult ? (
             <>
               <DialogHeader>
-                <DialogTitle>Aplicar manifestação em lote</DialogTitle>
+                <DialogTitle className="flex items-center gap-2">
+                  {eventoConfig.tone === "emerald" && (
+                    <CheckCircle2 className="size-5 text-emerald-600" />
+                  )}
+                  {eventoConfig.tone !== "emerald" && (
+                    <AlertTriangle
+                      className={cn(
+                        "size-5",
+                        eventoConfig.tone === "amber"
+                          ? "text-amber-600"
+                          : "text-red-600",
+                      )}
+                    />
+                  )}
+                  {eventoConfig.label}
+                </DialogTitle>
                 <DialogDescription>
-                  {selectedChaves.size} NF-e{" "}
-                  {selectedChaves.size === 1 ? "selecionada" : "selecionadas"}.
-                  Escolha o tipo de evento e confirme.
+                  Você está prestes a <strong>{eventoConfig.label.toLowerCase()}</strong>{" "}
+                  {selectedChaves.size} NF-e.{" "}
+                  <span className="block mt-1">{eventoConfig.description}</span>
                 </DialogDescription>
               </DialogHeader>
 
               <div className="space-y-4">
-                {/* Dropdown de evento */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">
-                    Tipo de manifestação
-                  </label>
-                  <div className="grid gap-2">
-                    {EVENTO_DEFINITIVO_OPTIONS.map((opt) => (
-                      <label
-                        key={opt.value}
-                        className={cn(
-                          "flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors",
-                          modalEvento === opt.value
-                            ? "border-primary bg-primary/5"
-                            : "hover:bg-muted/50",
-                        )}
-                      >
-                        <input
-                          type="radio"
-                          name="tipo_evento"
-                          value={opt.value}
-                          checked={modalEvento === opt.value}
-                          onChange={() => setModalEvento(opt.value)}
-                          className="mt-0.5"
-                        />
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">
-                              {opt.label}
-                            </span>
-                            <Badge
-                              variant="outline"
-                              className="text-[10px] font-mono"
-                            >
-                              {opt.value}
-                            </Badge>
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {opt.description}
-                          </p>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
                 {/* Justificativa (obrigatória pra 210220/210240) */}
                 {eventoConfig.requiresJustification && (
                   <div className="space-y-2">

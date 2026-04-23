@@ -273,10 +273,14 @@ export function AppSidebar() {
 
       <SidebarSeparator />
 
+      {/* SidebarContent com gap-0 + grupos com padding reduzido pra caber
+          todo o menu sem scroll em 1080p. Antes cada SidebarGroup tinha p-2
+          (padrão) + SidebarGroupLabel com h-8, causando overflow no menu
+          inteiro. Reduzimos pra py-1 (4px) + label compacto. */}
       <SidebarContent>
         {navigation.map((section) => (
-          <SidebarGroup key={section.label}>
-            <SidebarGroupLabel>{section.label}</SidebarGroupLabel>
+          <SidebarGroup key={section.label} className="py-1">
+            <SidebarGroupLabel className="h-6">{section.label}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {section.items.map((item) => {
@@ -297,8 +301,8 @@ export function AppSidebar() {
 
         {/* Admin — only visible for admin users */}
         {isAdmin && (
-          <SidebarGroup>
-            <SidebarGroupLabel>Administração</SidebarGroupLabel>
+          <SidebarGroup className="py-1">
+            <SidebarGroupLabel className="h-6">Administração</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
