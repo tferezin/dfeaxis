@@ -1,13 +1,13 @@
 # DFeAxis
 
 ## O que é
-DFeAxis é um SaaS B2B brasileiro que automatiza a captura de documentos fiscais eletrônicos (NF-e, CT-e, MDF-e, NFS-e) recebidos de fornecedores na SEFAZ e entrega direto ao ERP do cliente via API REST. Oferece integração nativa com SAP DRC (via RFC Destination HTTP) e compatibilidade total com TOTVS, Oracle, Senior, Sankhya e sistemas próprios. Opera com zero-retention — o XML é descartado após confirmação de entrega.
+DFeAxis é um SaaS B2B brasileiro que automatiza a captura de documentos fiscais eletrônicos (NF-e, CT-e, CT-e OS, MDF-e, NFS-e) recebidos de fornecedores na SEFAZ e entrega direto ao ERP do cliente via API REST. Oferece integração nativa com SAP DRC (via RFC Destination HTTP) e compatibilidade total com TOTVS, Oracle, Senior, Sankhya e sistemas próprios. Opera com zero-retention — o XML é descartado após confirmação de entrega.
 
 ## Problema que resolve
 Times fiscais em todo tipo de empresa ainda baixam XMLs manualmente do portal da SEFAZ, correndo risco de perder créditos fiscais por não manifestar dentro do prazo de 180 dias. O DFeAxis automatiza o processo de ponta a ponta. Um caso específico de grande demanda: empresas que migraram do SAP GRC NFe para o SAP DRC perderam a automação de captura de documentos de entrada (o DRC não tem mecanismo nativo de polling na SEFAZ), e o DFeAxis preenche essa lacuna sem SAP PI, sem CPI e sem ABAP customizado.
 
 ## Principais funcionalidades
-- Captura automática de NF-e, CT-e, MDF-e e NFS-e na SEFAZ via certificado A1
+- Captura automática de NF-e, CT-e, CT-e OS, MDF-e e NFS-e na SEFAZ via certificado A1
 - Entrega de NF-e e CT-e ao SAP DRC via RFC Destination HTTP (SM59)
 - NFS-e disponível via API REST (consumida pelo Ambiente Nacional)
 - Captura é SEMPRE on-demand: o ERP do cliente dispara a consulta SEFAZ via API REST quando quiser (POST /polling/trigger). Não existe polling automático — o DFeAxis só consulta a SEFAZ quando há demanda explícita do cliente. Isso evita consumo indevido da SEFAZ e coloca o cliente no controle da frequência.

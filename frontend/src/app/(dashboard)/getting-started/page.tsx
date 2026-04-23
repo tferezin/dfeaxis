@@ -1320,7 +1320,7 @@ export default function GettingStartedPage() {
       <Card className="bg-muted/30">
         <CardContent className="py-4">
           <p className="text-sm text-muted-foreground">
-            <strong>Tipos de documento suportados:</strong> NF-e (modelo 55), CT-e (modelo 57), MDF-e (modelo 58), NFS-e (ADN Nacional). O SAP pode buscar cada tipo separadamente usando o parâmetro <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">tipo</code> no endpoint de documentos.
+            <strong>Tipos de documento suportados:</strong> NF-e (modelo 55), CT-e (modelo 57), CT-e OS (modelo 67), MDF-e (modelo 58), NFS-e (ADN Nacional). O SAP pode buscar cada tipo separadamente usando o parâmetro <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">tipo</code> no endpoint de documentos.
           </p>
         </CardContent>
       </Card>

@@ -63,7 +63,7 @@ Se o usuário fizer uma pergunta que depende desses dados e o campo estiver vazi
 
 # Produto: DFeAxis (visão técnica)
 
-DFeAxis é SaaS B2B que automatiza captura de documentos fiscais eletrônicos (NF-e, CT-e, MDF-e, NFS-e) recebidos de fornecedores na SEFAZ e entrega via API REST ao ERP do cliente. Diferenciais:
+DFeAxis é SaaS B2B que automatiza captura de documentos fiscais eletrônicos (NF-e, CT-e, CT-e OS, MDF-e, NFS-e) recebidos de fornecedores na SEFAZ e entrega via API REST ao ERP do cliente. Diferenciais:
 
 - Integração nativa **SAP DRC** via RFC Destination HTTP (SM59), sem SAP PI/CPI.
 - Compatibilidade multi-ERP (TOTVS, Oracle, Senior, Sankhya, próprios).

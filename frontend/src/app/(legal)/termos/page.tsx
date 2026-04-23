@@ -30,7 +30,7 @@ export default function TermosPage() {
             <h2 className="text-xl font-semibold mb-3">2. Descrição do Serviço</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
               O DFeAxis é uma plataforma SaaS (Software as a Service) de captura automática de documentos fiscais
-              eletrônicos (NF-e, CT-e, MDF-e, NFS-e) diretamente na SEFAZ, com entrega via API REST.
+              eletrônicos (NF-e, CT-e, CT-e OS, MDF-e, NFS-e) diretamente na SEFAZ, com entrega via API REST.
               O serviço é compatível com SAP DRC, TOTVS, Oracle e qualquer ERP que consuma APIs REST.
             </p>
             <p className="text-sm text-muted-foreground leading-relaxed mt-2">

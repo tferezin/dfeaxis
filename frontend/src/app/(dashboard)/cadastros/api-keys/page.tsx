@@ -241,7 +241,7 @@ export default function ApiKeysPage() {
             <div className="flex gap-2">
               <AlertTriangle className="size-4 text-amber-600 mt-0.5 shrink-0" />
               <p className="text-xs text-amber-800">
-                <strong>Tipos suportados:</strong> <code>nfe</code>, <code>cte</code>, <code>mdfe</code>, <code>nfse</code>. O XML é retornado em base64 no campo <code>xml_b64</code>. Após processar no seu ERP, chame <code>/confirmar</code> para limpar do DFeAxis.
+                <strong>Tipos suportados:</strong> <code>nfe</code>, <code>cte</code>, <code>cteos</code>, <code>mdfe</code>, <code>nfse</code>. O XML é retornado em base64 no campo <code>xml_b64</code>. Após processar no seu ERP, chame <code>/confirmar</code> para limpar do DFeAxis.
               </p>
             </div>
           </div>

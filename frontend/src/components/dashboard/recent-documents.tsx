@@ -154,10 +154,11 @@ interface RealDocument {
   manifestacao_status?: string | null
 }
 
-const tipoLabels: Record<string, string> = { NFE: "NF-e", CTE: "CT-e", MDFE: "MDF-e", NFSE: "NFS-e" }
+const tipoLabels: Record<string, string> = { NFE: "NF-e", CTE: "CT-e", CTEOS: "CT-e OS", MDFE: "MDF-e", NFSE: "NFS-e" }
 const tipoColors: Record<string, string> = {
   NFE: "bg-blue-50 text-blue-700",
   CTE: "bg-violet-50 text-violet-700",
+  CTEOS: "bg-violet-50 text-violet-700",
   MDFE: "bg-emerald-50 text-emerald-700",
   NFSE: "bg-amber-50 text-amber-700",
 }

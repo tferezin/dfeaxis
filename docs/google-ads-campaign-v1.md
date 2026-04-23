@@ -65,7 +65,7 @@ Account: DFeAxis
 
 **Headlines (15)**:
 1. DFeAxis — Captura Fiscal Automática
-2. NF-e, CT-e, MDF-e e NFS-e
+2. NF-e, CT-e, CT-e OS, MDF-e e NFS-e
 3. API REST para SAP, TOTVS, Oracle
 4. 10 Dias Grátis, Sem Cartão
 5. Zero Armazenamento de XMLs
@@ -81,7 +81,7 @@ Account: DFeAxis
 15. Conformidade SEFAZ Homolog
 
 **Descriptions (4)**:
-1. Captura automática de NF-e, CT-e, MDF-e e NFS-e na SEFAZ. Entrega via API REST no seu ERP. Zero armazenamento.
+1. Captura automática de NF-e, CT-e, CT-e OS, MDF-e e NFS-e na SEFAZ. Entrega via API REST no seu ERP. Zero armazenamento.
 2. Integração nativa com SAP DRC via RFC Destination. Compatível com TOTVS, Oracle, Senior, Sankhya e qualquer ERP.
 3. Trial 10 dias grátis, sem cartão. 500 documentos inclusos no teste. Planos a partir de R$ 290/mês.
 4. Feito pra resolver a lacuna do SAP GRC NFe descontinuado. Comece hoje e capture em produção em horas.
