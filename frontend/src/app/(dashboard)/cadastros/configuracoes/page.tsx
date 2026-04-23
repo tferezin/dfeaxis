@@ -98,20 +98,20 @@ export default function ConfiguracoesPage() {
           </CardHeader>
           <CardContent className="space-y-3 pt-0 text-sm text-muted-foreground">
             <div className="flex gap-2">
-              <span className="font-medium text-foreground shrink-0">On-demand:</span>
-              <span>Toda captura é iniciada pelo seu ERP via <code className="text-[11px] bg-muted px-1 py-0.5 rounded">POST /api/v1/polling/trigger</code>. Você controla a frequência — não fazemos polling automático na SEFAZ.</span>
-            </div>
-            <div className="flex gap-2">
               <span className="font-medium text-foreground shrink-0">Ciência automática:</span>
-              <span>Durante cada captura acionada pelo cliente, o DFeAxis envia a Ciência da Operação (evento 210210) automaticamente. É obrigatório pela SEFAZ pra liberar o XML completo.</span>
+              <span>DFeAxis envia a Ciência da Operação (evento 210210) automaticamente em cada captura de NF-e. É obrigatório pela SEFAZ pra liberar o XML completo — você não precisa configurar nada.</span>
             </div>
             <div className="flex gap-2">
-              <span className="font-medium text-foreground shrink-0">Frequência recomendada:</span>
-              <span>Agende um job no seu SAP/TOTVS/ERP pra chamar a captura a cada 30 min, 1h, ou conforme o volume da sua operação. Evita consumo indevido SEFAZ e otimiza custo.</span>
+              <span className="font-medium text-foreground shrink-0">Polling adaptativo:</span>
+              <span>DFeAxis consulta a SEFAZ automaticamente a cada ~15 min respeitando a NT 2014.002 (backoff após cStat 137/656). Requer ativação por tenant — fale com nosso time se quiser ligar pro seu CNPJ.</span>
+            </div>
+            <div className="flex gap-2">
+              <span className="font-medium text-foreground shrink-0">On-demand via API:</span>
+              <span>Seu ERP também pode disparar captura extra a qualquer momento via <code className="text-[11px] bg-muted px-1 py-0.5 rounded">POST /api/v1/polling/trigger</code>. Útil pra rodadas sob demanda ou em janelas específicas.</span>
             </div>
             <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 mt-3">
               <p className="text-xs text-blue-800">
-                Pra testar manualmente a captura agora, use <strong>Captura Manual</strong> no menu lateral. Em produção, deixe seu ERP disparar via API.
+                Pra testar manualmente agora, use <strong>Captura Manual</strong> no menu lateral. Em produção, o polling adaptativo + on-demand via ERP cobrem os dois modos.
               </p>
             </div>
           </CardContent>
