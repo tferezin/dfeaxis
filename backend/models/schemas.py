@@ -182,6 +182,11 @@ class PollingTipoResult(BaseModel):
     latency_ms: int = 0
     error: Optional[str] = None
     saved_to_db: bool = False
+    # Friendly status pra ERP externo (X-API-Key): abstração do cStat SEFAZ
+    # em termos neutros (no_new_documents, rate_limited, sefaz_error). JWT
+    # dashboard continua vendo cstat/xmotivo crus pra diagnóstico.
+    friendly_status: str | None = None
+    retry_after_seconds: int | None = None
 
 class PollingTriggerResponse(BaseModel):
     status: str
@@ -208,6 +213,13 @@ class NfeResumosResponse(BaseModel):
     ult_nsu_returned: str | None = None
     max_nsu: str | None = None
     total_docs_in_response: int | None = None
+    # Gate adaptativo (NT 2014.002): se tenant opted-in e proxima_chamada_
+    # elegivel_em ainda nao chegou, endpoint NAO chama SEFAZ e retorna payload
+    # com status="rate_limited_by_sefaz" + retry_after_seconds. UX honesta
+    # baseada no estado compartilhado com o scheduler adaptativo.
+    status: str | None = None  # "success" | "rate_limited_by_sefaz"
+    retry_after_seconds: int | None = None
+    message: str | None = None
 
 
 class NfeRetryCienciaResponse(BaseModel):

@@ -28,6 +28,12 @@ from scheduler.polling_job import (
     _normalize_pfx_blob,
     _poll_single_detailed,
 )
+from services.adaptive_scheduler import (
+    adaptive_scheduler,
+    BACKOFF_137_SEC,
+    BACKOFF_656_SEC,
+    BACKOFF_ERROR_SEC,
+)
 from services.manifestacao import manifestacao_service
 from services.nsu_controller import nsu_controller
 from services.sefaz_client import sefaz_client
@@ -37,15 +43,65 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _friendly_status_from_cstat(cstat: str) -> tuple[str, int | None]:
+    """Converte cStat SEFAZ em `friendly_status` pro ERP externo.
+
+    Retorna (friendly_status, retry_after_seconds). ERP consumidor nunca vê
+    'Consumo Indevido' ou códigos SEFAZ — só termos operacionais neutros.
+    """
+    if cstat == "138":
+        return ("documents_available", None)
+    if cstat == "137":
+        return ("no_new_documents", 3660)  # 61 min (NT 2014.002)
+    if cstat == "656":
+        return ("rate_limited", 3720)  # 62 min
+    if cstat in ("", "0"):
+        return ("unknown", None)
+    # Outros códigos (215, 542, 999, etc): erro genérico
+    return ("sefaz_error", 900)
+
+
+def _sanitize_result_for_erp(result: dict) -> dict:
+    """Remove cStat/xmotivo SEFAZ e substitui por friendly_status pro ERP.
+
+    Mantém tipo, docs_found, saved_to_db, latency_ms. Apaga cstat/xmotivo.
+    """
+    friendly, retry = _friendly_status_from_cstat(result.get("cstat", ""))
+    sanitized = {
+        "tipo": result.get("tipo", ""),
+        "status": result.get("status", ""),
+        "docs_found": result.get("docs_found", 0),
+        "latency_ms": result.get("latency_ms", 0),
+        "saved_to_db": result.get("saved_to_db", False),
+        "cstat": "",  # mascarado
+        "xmotivo": "",  # mascarado
+        "friendly_status": friendly,
+        "retry_after_seconds": retry,
+    }
+    # Preserva error genérico (sem colar xmotivo cru)
+    if result.get("error"):
+        sanitized["error"] = str(result["error"])[:200]
+    return sanitized
+
+
 @router.post("/polling/trigger", response_model=PollingTriggerResponse)
 async def trigger_polling(
     body: PollingTriggerRequest,
     auth: dict = Depends(verify_jwt_or_api_key),
 ):
     """Dispara polling on-demand pro CNPJ. Aceita JWT Bearer (dashboard
-    nativo) ou X-API-Key (ERP externo, padrão SAP DRC/TOTVS)."""
+    nativo) ou X-API-Key (ERP externo, padrão SAP DRC/TOTVS).
+
+    ERP externo recebe response com cStat/xmotivo mascarados — em vez do
+    código SEFAZ cru, retorna `friendly_status` (documents_available,
+    no_new_documents, rate_limited, sefaz_error) + retry_after_seconds.
+    Dashboard (JWT) continua vendo cStat/xmotivo pra diagnóstico interno.
+    """
     sb = get_supabase_client()
     tenant_id = auth["tenant_id"]
+    # ERP externo se autentica via X-API-Key (auth tem api_key_id).
+    # Dashboard interno autentica via JWT (auth tem user_id).
+    is_external_erp = bool(auth.get("api_key_id"))
 
     # Busca certificado
     cert_result = sb.table("certificates").select("*").eq(
@@ -101,6 +157,17 @@ async def trigger_polling(
         results.append(result)
         total_docs += result["docs_found"]
 
+    # Mascara cStat/xmotivo pra ERP externo. Dashboard (JWT) vê crus.
+    if is_external_erp:
+        results = [_sanitize_result_for_erp(r) for r in results]
+    else:
+        # Dashboard: adiciona friendly_status como metadata adicional (sem
+        # remover cstat/xmotivo) pra permitir UI amigável também se quiser.
+        for r in results:
+            friendly, retry = _friendly_status_from_cstat(r.get("cstat", ""))
+            r["friendly_status"] = friendly
+            r["retry_after_seconds"] = retry
+
     return PollingTriggerResponse(
         status="completed",
         cnpj=body.cnpj,
@@ -137,7 +204,7 @@ async def nfe_resumos(
     tenant_res = sb.table("tenants").select(
         "id, polling_mode, manifestacao_mode, credits, sefaz_ambiente, "
         "subscription_status, docs_consumidos_trial, trial_cap, "
-        "trial_blocked_at, trial_blocked_reason"
+        "trial_blocked_at, trial_blocked_reason, adaptive_polling_enabled"
     ).eq("id", tenant_id).single().execute()
 
     if not tenant_res.data:
@@ -145,6 +212,30 @@ async def nfe_resumos(
 
     tenant_data = tenant_res.data
     ambiente = tenant_data.get("sefaz_ambiente", "2")
+    adaptive_on = bool(tenant_data.get("adaptive_polling_enabled"))
+
+    # Gate adaptativo (NT 2014.002): se tenant opted-in, respeita
+    # proxima_chamada_elegivel_em do estado compartilhado com o scheduler.
+    # Sem opt-in, comportamento legado (sem gate) segue como antes.
+    if adaptive_on and not body.force_reset_nsu:
+        adaptive_scheduler.ensure_row(cert["id"], "nfe", ambiente)
+        eligible, wait_s = adaptive_scheduler.is_eligible_for_call(
+            cert["id"], "nfe", ambiente,
+        )
+        if not eligible:
+            logger.info(
+                "nfe-resumos: bloqueado pelo gate adaptativo cnpj=%s wait=%ss",
+                mask_cnpj(body.cnpj), wait_s,
+            )
+            minutes = max(1, ((wait_s or 0) + 59) // 60)
+            return NfeResumosResponse(
+                status="rate_limited_by_sefaz",
+                retry_after_seconds=wait_s,
+                message=(
+                    f"SEFAZ exige aguardar antes da proxima consulta "
+                    f"(NT 2014.002). Proxima janela em cerca de {minutes} min."
+                ),
+            )
 
     pfx_password = _get_pfx_password(cert["id"], tenant_id)
     if not pfx_password:
@@ -412,7 +503,35 @@ async def nfe_resumos(
         "error_message": response.xmotivo if response.cstat not in ("137", "138") else None,
     }).execute()
 
+    # Sincroniza estado adaptativo se tenant opted-in. Garante que o clique
+    # manual respeita o mesmo gate das próximas chamadas (scheduler ou nova
+    # tentativa manual). Se batch teve erro, NÃO atualiza — deixa elegível
+    # pra próxima rodada re-tentar (cursor transacional manda).
+    if adaptive_on and not batch_had_persistence_error:
+        if response.cstat == "656":
+            next_sec = BACKOFF_656_SEC
+        elif response.cstat in ("137", "138"):
+            next_sec = BACKOFF_137_SEC
+        else:
+            next_sec = BACKOFF_ERROR_SEC
+        try:
+            adaptive_scheduler.schedule_next(
+                certificate_id=cert["id"], tipo="nfe", ambiente=ambiente,
+                cstat=response.cstat, xmotivo=response.xmotivo,
+                ult_nsu=response.ult_nsu, max_nsu=response.max_nsu,
+                latency_ms=response.latency_ms,
+                seconds_until_next=next_sec,
+                drain_iteracoes=1,
+                drain_docs=len(docs),
+            )
+        except Exception as sched_exc:
+            logger.warning(
+                "nfe-resumos: falha ao atualizar estado adaptativo cnpj=%s: %s",
+                mask_cnpj(body.cnpj), sched_exc,
+            )
+
     return NfeResumosResponse(
+        status="success",
         resumos_found=resumos_found,
         ciencia_sent=ciencia_sent,
         completos_found=completos_found,
