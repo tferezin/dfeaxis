@@ -73,6 +73,10 @@ type NavSection = {
   items: NavItem[]
 }
 
+// Ordem deliberada: cliente novo começa pelo Dashboard, vê documentos
+// recebidos, lê Ajuda (onboarding) ANTES de mexer em Cadastros. Execução
+// logo após cadastros (precisa ter certificado + API key antes). Financeiro
+// e Monitoramento no final — suporte operacional.
 const navigation: NavSection[] = [
   {
     label: "Menu",
@@ -94,6 +98,12 @@ const navigation: NavSection[] = [
     ],
   },
   {
+    label: "Ajuda",
+    items: [
+      { title: "Primeiros Passos", href: "/getting-started", icon: Rocket },
+    ],
+  },
+  {
     label: "Cadastros",
     items: [
       { title: "Certificados A1", href: "/cadastros/certificados", icon: ShieldCheck },
@@ -103,9 +113,10 @@ const navigation: NavSection[] = [
     ],
   },
   {
-    label: "Monitoramento",
+    label: "Execução",
     items: [
-      { title: "Logs de Captura", href: "/logs", icon: ScrollText },
+      { title: "Captura Manual", href: "/execucao/captura", icon: Play },
+      { title: "Manifestação", href: "/historico/manifestacao", icon: FileCheck },
     ],
   },
   {
@@ -115,9 +126,9 @@ const navigation: NavSection[] = [
     ],
   },
   {
-    label: "Ajuda",
+    label: "Monitoramento",
     items: [
-      { title: "Primeiros Passos", href: "/getting-started", icon: Rocket },
+      { title: "Logs de Captura", href: "/logs", icon: ScrollText },
     ],
   },
 ]
@@ -283,33 +294,6 @@ export function AppSidebar() {
             </SidebarGroupContent>
           </SidebarGroup>
         ))}
-
-        {/* Captura — sempre sob demanda */}
-        <SidebarGroup>
-          <SidebarGroupLabel>Execução</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  isActive={pathname === "/execucao/captura"}
-                  render={<Link href="/execucao/captura" />}
-                >
-                  <Play className="size-4" />
-                  <span>Captura Manual</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  isActive={pathname === "/historico/manifestacao"}
-                  render={<Link href="/historico/manifestacao" />}
-                >
-                  <FileCheck className="size-4" />
-                  <span>Manifestação</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
 
         {/* Admin — only visible for admin users */}
         {isAdmin && (

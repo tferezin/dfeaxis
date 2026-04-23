@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { FileCheck, Loader2, Search, Filter } from "lucide-react"
+import { FileCheck, Loader2, Search, Filter, ChevronLeft, ChevronRight } from "lucide-react"
 import {
   Card,
   CardContent,
@@ -81,6 +81,12 @@ export default function HistoricoManifestacaoPage() {
   const [filterTipo, setFilterTipo] = useState<TipoEvento>("")
   const [limit] = useState(100)
 
+  // Paginação client-side: backend já limita a 100 eventos; aqui dividimos
+  // em páginas de 20 pra facilitar a leitura. Filtro no backend reduz o
+  // dataset antes da paginação local.
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 20
+
   const chaveTrimmed = filterChave.trim()
   const chaveInvalida = chaveTrimmed.length > 0 && chaveTrimmed.length !== 44
 
@@ -100,6 +106,7 @@ export default function HistoricoManifestacaoPage() {
       )
       setEvents(res.events || [])
       setTotal(res.total || 0)
+      setCurrentPage(1)  // reset paginação ao aplicar novo filtro
     } catch (e) {
       console.error("[DFeAxis] historico manifestacao error:", e)
       setError(
@@ -238,7 +245,10 @@ export default function HistoricoManifestacaoPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {events.map((ev, i) => {
+                {events.slice(
+                  (currentPage - 1) * itemsPerPage,
+                  currentPage * itemsPerPage,
+                ).map((ev, i) => {
                   const eventMeta = TIPO_EVENTO_LABELS[ev.tipo_evento] || {
                     label: ev.tipo_evento,
                     color: "bg-gray-50 text-gray-700 ring-gray-600/20",
@@ -303,6 +313,50 @@ export default function HistoricoManifestacaoPage() {
                 })}
               </TableBody>
             </Table>
+          )}
+
+          {/* Pagination — só renderiza se houver mais de 1 página */}
+          {!loading && !error && events.length > itemsPerPage && (
+            <div className="flex items-center justify-between px-4 py-3 border-t">
+              <p className="text-sm text-muted-foreground">
+                Mostrando {(currentPage - 1) * itemsPerPage + 1} a{" "}
+                {Math.min(currentPage * itemsPerPage, events.length)} de{" "}
+                {events.length} eventos
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage((p) => p - 1)}
+                >
+                  <ChevronLeft className="size-4" />
+                </Button>
+                {Array.from(
+                  { length: Math.ceil(events.length / itemsPerPage) },
+                  (_, i) => i + 1,
+                ).map((page) => (
+                  <Button
+                    key={page}
+                    variant={page === currentPage ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCurrentPage(page)}
+                  >
+                    {page}
+                  </Button>
+                ))}
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  disabled={
+                    currentPage === Math.ceil(events.length / itemsPerPage)
+                  }
+                  onClick={() => setCurrentPage((p) => p + 1)}
+                >
+                  <ChevronRight className="size-4" />
+                </Button>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>

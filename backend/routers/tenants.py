@@ -51,7 +51,11 @@ async def register_tenant(
         "email": body.email,
         "plan": "starter",  # placeholder até Stripe confirmar upgrade
         "max_cnpjs": 1,
-        "manifestacao_mode": "manual",
+        # Ciência automática é o comportamento padrão do DFeAxis — o evento
+        # 210210 é disparado na própria captura. Antes o onboarding criava
+        # como "manual" (override do default auto_ciencia da migration 002),
+        # o que gerava confusão no getting-started. Alinhado 2026-04-23.
+        "manifestacao_mode": "auto_ciencia",
         "trial_expires_at": trial_expires,
         "trial_active": True,
         "subscription_status": "trial",

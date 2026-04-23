@@ -90,10 +90,14 @@ export default function LogsCaptura() {
   const [statusFilter, setStatusFilter] = useState("Todos")
   const [tipoFilter, setTipoFilter] = useState("Todos")
   const [cnpjFilter, setCnpjFilter] = useState("Todos")
-  // Dynamic defaults: 1st of current month to today
+  // Default: últimos 7 dias. Antes era "1º do mês até hoje" — com muitos
+  // logs por dia no futuro, isso carregava centenas de registros por default
+  // degradando performance. Forçamos janela menor + o usuário pode ampliar
+  // manualmente se precisar.
   const [dateFrom, setDateFrom] = useState(() => {
-    const now = new Date()
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`
+    const d = new Date()
+    d.setDate(d.getDate() - 7)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
   })
   const [dateTo, setDateTo] = useState(() => {
     const now = new Date()
@@ -120,13 +124,16 @@ export default function LogsCaptura() {
       const startISO = `${dateFrom}T00:00:00.000Z`
       const endISO = `${dateTo}T23:59:59.999Z`
 
+      // Limit 50: proteção de performance. Se o cliente precisar de mais,
+      // estreita o filtro (CNPJ, período menor, status específico). Aviso
+      // na UI sinaliza quando o período é muito amplo.
       const { data, error } = await sb
         .from('polling_log')
         .select('id, tipo, cnpj, status, docs_found, latency_ms, error_message, created_at, triggered_by')
         .gte('created_at', startISO)
         .lte('created_at', endISO)
         .order('created_at', { ascending: false })
-        .limit(200)
+        .limit(50)
 
       if (!error && data) {
         const mapped: LogRow[] = data.map((row: any, i: number) => ({
@@ -241,6 +248,35 @@ export default function LogsCaptura() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Warning — período muito amplo OU limit atingido */}
+      {(() => {
+        const diffDays = Math.ceil(
+          (new Date(dateTo).getTime() - new Date(dateFrom).getTime()) /
+            (1000 * 60 * 60 * 24),
+        )
+        const hitLimit = realLogs.length === 50
+        if (diffDays > 30 || hitLimit) {
+          return (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-3">
+              <p className="text-xs text-amber-800 dark:text-amber-300">
+                {hitLimit ? (
+                  <>
+                    <strong>Mostrando os 50 registros mais recentes.</strong>{" "}
+                    Use os filtros (CNPJ, período menor, status específico) pra ver registros mais antigos.
+                  </>
+                ) : (
+                  <>
+                    <strong>Período amplo selecionado ({diffDays} dias).</strong>{" "}
+                    Pra melhor performance, filtre por CNPJ ou reduza o intervalo.
+                  </>
+                )}
+              </p>
+            </div>
+          )
+        }
+        return null
+      })()}
 
       {/* Filters */}
       <div className="flex flex-wrap items-end gap-3 rounded-lg border p-4">

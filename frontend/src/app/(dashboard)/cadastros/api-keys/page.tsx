@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import Link from "next/link"
 import { getSupabase } from "@/lib/supabase"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -167,6 +168,10 @@ export default function ApiKeysPage() {
             <Server className="size-5" />
             Dados de Integração
           </CardTitle>
+          <p className="text-xs text-muted-foreground mt-1">
+            Informações essenciais pra configurar seu ERP agora. Pra ver todos os endpoints disponíveis (manifestação, histórico, SAP DRC nativo), consulte{" "}
+            <Link href="/getting-started" className="text-primary hover:underline">Ajuda → Primeiros Passos</Link>.
+          </p>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3">
@@ -227,7 +232,7 @@ export default function ApiKeysPage() {
             <div className="flex gap-2">
               <Shield className="size-4 text-blue-600 mt-0.5 shrink-0" />
               <p className="text-xs text-blue-800">
-                <strong>Multi-CNPJ:</strong> Uma única API Key dá acesso a <strong>todos os CNPJs</strong> cadastrados na sua conta. O SAP escolhe qual CNPJ consultar via parâmetro <code>?cnpj=XXXXX</code>. Cada CNPJ deve ter seu certificado A1 cadastrado em <strong>Cadastros &gt; Certificados A1</strong>.
+                <strong>Multi-CNPJ:</strong> Uma única API Key dá acesso a <strong>todos os CNPJs</strong> cadastrados na sua conta. O seu ERP escolhe qual CNPJ consultar via parâmetro <code>?cnpj=XXXXX</code>. Cada CNPJ deve ter seu certificado A1 cadastrado em <strong>Cadastros &gt; Certificados A1</strong>.
               </p>
             </div>
           </div>
@@ -236,7 +241,7 @@ export default function ApiKeysPage() {
             <div className="flex gap-2">
               <AlertTriangle className="size-4 text-amber-600 mt-0.5 shrink-0" />
               <p className="text-xs text-amber-800">
-                <strong>Tipos suportados:</strong> <code>nfe</code>, <code>cte</code>, <code>mdfe</code>, <code>nfse</code>. O XML é retornado em base64 no campo <code>xml_b64</code>. Após processar no SAP, chame <code>/confirmar</code> para limpar do DFeAxis.
+                <strong>Tipos suportados:</strong> <code>nfe</code>, <code>cte</code>, <code>mdfe</code>, <code>nfse</code>. O XML é retornado em base64 no campo <code>xml_b64</code>. Após processar no seu ERP, chame <code>/confirmar</code> para limpar do DFeAxis.
               </p>
             </div>
           </div>
@@ -250,6 +255,9 @@ export default function ApiKeysPage() {
             <Shield className="size-5" />
             Sua Chave de Acesso
           </CardTitle>
+          <p className="text-xs text-muted-foreground mt-1">
+            Ao gerar uma nova chave, as anteriores <strong>continuam ativas</strong> — útil pra ter chaves separadas por ERP ou ambiente. Revogue manualmente as que não usa mais.
+          </p>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* New key form */}
@@ -257,7 +265,7 @@ export default function ApiKeysPage() {
             <div className="flex gap-3">
               <div className="flex-1">
                 <Input
-                  placeholder="Descrição (ex: SAP Produção - ERP Principal)"
+                  placeholder="Descrição (ex: ERP Produção, ambiente de testes)"
                   value={newKeyDesc}
                   onChange={(e) => setNewKeyDesc(e.target.value)}
                 />

@@ -11,6 +11,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 
+// Tour guiado pós-upload do certificado. Cobre validação do setup
+// antes de passar pra parte técnica da integração. O upload do .pfx
+// é tratado como pré-requisito separado (bloco verde acima) e não
+// se repete aqui pra evitar confusão de numeração.
 const steps = [
   {
     number: 1,
@@ -22,14 +26,6 @@ const steps = [
   },
   {
     number: 2,
-    title: "Cadastre um Certificado A1",
-    description: "Faça o upload do arquivo .pfx do certificado digital da empresa. O DFeAxis usará ele para se conectar à SEFAZ via mTLS.",
-    icon: ShieldCheck,
-    href: "/cadastros/certificados",
-    color: "text-emerald-600 bg-emerald-100 border-emerald-200",
-  },
-  {
-    number: 3,
     title: "Execute uma Captura Manual",
     description: "Acesse a captura manual, selecione o CNPJ e clique em Capturar. O DFeAxis vai consultar a SEFAZ e trazer os documentos recebidos.",
     icon: Play,
@@ -37,7 +33,7 @@ const steps = [
     color: "text-amber-600 bg-amber-100 border-amber-200",
   },
   {
-    number: 4,
+    number: 3,
     title: "Confira os Resultados",
     description: "Vá em NF-e Recebidas para ver os documentos capturados. Se estiver em homologação e não houver documentos, é normal — a base de testes pode estar vazia.",
     icon: FileText,
@@ -617,7 +613,7 @@ export default function GettingStartedPage() {
               <span className="shrink-0 size-6 rounded-full bg-primary/15 text-primary font-bold text-xs flex items-center justify-center">1</span>
               <div>
                 <strong>Captura sob demanda</strong> — seu ERP dispara a consulta SEFAZ via <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">POST /api/v1/polling/trigger</code> quando
-                quiser (tipicamente em job agendado no SAP/TOTVS a cada 30min, 1h ou conforme sua operação). Não há polling
+                quiser (tipicamente em job agendado no seu ERP a cada 30min, 1h ou conforme sua operação). Não há polling
                 automático pela plataforma — você controla a frequência. Durante a captura, a Ciência da Operação é enviada
                 automaticamente à SEFAZ (obrigatório para liberar o XML completo).
               </div>
@@ -632,8 +628,8 @@ export default function GettingStartedPage() {
             <li className="flex gap-3">
               <span className="shrink-0 size-6 rounded-full bg-primary/15 text-primary font-bold text-xs flex items-center justify-center">3</span>
               <div>
-                <strong>Cliente processa o XML</strong> — decodifica o base64 e grava no ERP
-                (MIRO, DRC, tabela Z, etc), conforme a regra de negócio.
+                <strong>Cliente processa o XML</strong> — decodifica o base64 e grava no seu ERP
+                conforme a regra de negócio (lançamento da fatura, entrada de estoque, escrituração, etc).
               </div>
             </li>
             <li className="flex gap-3">
@@ -646,7 +642,7 @@ export default function GettingStartedPage() {
             <li className="flex gap-3">
               <span className="shrink-0 size-6 rounded-full bg-primary/15 text-primary font-bold text-xs flex items-center justify-center">5</span>
               <div>
-                <strong>Manifestação definitiva</strong> — após a MIRO no SAP, o cliente envia
+                <strong>Manifestação definitiva</strong> — após o lançamento da fatura e geração do contas a pagar no seu ERP, o cliente envia
                 {" "}<code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">POST /api/v1/manifestacao</code>
                 {" "}com <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">tipo_evento=210200</code> (Confirmação da Operação).
                 Outros eventos: 210210 (Ciência), 210220 (Desconhecer), 210240 (Não Realizada).
@@ -655,17 +651,22 @@ export default function GettingStartedPage() {
           </ol>
           <div className="mt-4 rounded-lg bg-background/60 border p-3">
             <p className="text-xs text-muted-foreground leading-relaxed">
-              <strong>Ciência automática:</strong> se o tenant estiver com <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">manifestacao_mode=auto_ciencia</code>,
-              o DFeAxis já envia o evento 210210 durante a captura. Nesse caso, o cliente só precisa se preocupar
-              com a <strong>manifestação definitiva</strong> (confirmar, desconhecer ou não realizada) — que é sempre explícita,
-              feita manualmente pelo dashboard ou via API pelo ERP após a MIRO.
+              <strong>Ciência automática por padrão:</strong> o DFeAxis envia o evento
+              {" "}<code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">210210</code> (Ciência da Operação) durante cada captura —
+              você não precisa tratar disso no seu ERP. A única manifestação que fica sob responsabilidade do cliente é a
+              {" "}<strong>definitiva</strong> (confirmar, desconhecer ou não realizada) após o lançamento da fatura no ERP.
             </p>
           </div>
         </CardContent>
       </Card>
 
-      {/* STEPS */}
-      <div className="grid gap-4">
+      {/* STEPS — tour guiado de validação pós-upload do certificado */}
+      <div>
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+          Tour guiado — valide sua configuração
+        </h3>
+      </div>
+      <div className="grid gap-4 -mt-4">
         {steps.map((step) => {
           const Icon = step.icon
           return (
@@ -677,7 +678,7 @@ export default function GettingStartedPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Passo {step.number}</span>
+                      <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Validação {step.number}</span>
                     </div>
                     <p className="text-base font-semibold mt-0.5">{step.title}</p>
                     <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
