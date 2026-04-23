@@ -17,6 +17,7 @@ from lxml import etree
 from zeep import Client as ZeepClient
 from zeep.transports import Transport
 
+from admin_guards import safe_ambiente
 from middleware.lgpd import mask_cnpj
 from services.cert_manager import decrypt_pfx, temp_cert_files
 from services.circuit_breaker import circuit_breaker
@@ -123,7 +124,11 @@ class SefazClient:
             iv_bytes = bytes.fromhex(pfx_iv) if isinstance(pfx_iv, str) else pfx_iv
             pfx_bytes = decrypt_pfx(enc_bytes, iv_bytes, tenant_id)
 
-        effective_ambiente = ambiente or self.ambiente
+        # Defesa em profundidade: força homolog se cert está na blacklist
+        # hardcoded (admin_guards.py). Se chegar aqui com ambiente='1'
+        # pra cert bloqueado, significa que a camada do endpoint falhou —
+        # emite logger.error pra investigação.
+        effective_ambiente = safe_ambiente(ambiente or self.ambiente, cert_cnpj=cnpj)
 
         start_time = time.time()
         try:
@@ -182,7 +187,9 @@ class SefazClient:
             iv_bytes = bytes.fromhex(pfx_iv) if isinstance(pfx_iv, str) else pfx_iv
             pfx_bytes = decrypt_pfx(enc_bytes, iv_bytes, tenant_id)
 
-        effective_ambiente = ambiente or self.ambiente
+        # Defesa em profundidade: força homolog se cert está na blacklist
+        # hardcoded (admin_guards.py). Mesmo guard do consultar_distribuicao.
+        effective_ambiente = safe_ambiente(ambiente or self.ambiente, cert_cnpj=cnpj)
 
         start_time = time.time()
         try:

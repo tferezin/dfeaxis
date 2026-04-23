@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 
+from admin_guards import should_block_prod
 from db.supabase import get_supabase_client
 from middleware.security import verify_jwt_token
 from models.schemas import TenantRegisterRequest
@@ -121,6 +122,28 @@ async def update_settings(
         raise HTTPException(status_code=400, detail="Nenhum campo para atualizar")
 
     sb = get_supabase_client()
+
+    # Guard: se está pedindo produção, verifica se algum cert/usuário
+    # está na blacklist hardcoded (admin_guards.py). Protege contra
+    # tenant admin virar prod com cert de terceiro emprestado pra dev.
+    if updates.get("sefaz_ambiente") == "1":
+        certs = sb.table("certificates").select("cnpj").eq(
+            "tenant_id", auth["tenant_id"],
+        ).execute()
+        user_email = auth.get("email")
+        for cert_row in (certs.data or []):
+            blocked, reason = should_block_prod(
+                cert_cnpj=cert_row.get("cnpj"),
+                user_email=user_email,
+            )
+            if blocked:
+                raise HTTPException(status_code=403, detail=reason)
+        # Checa email mesmo se não houver certs cadastrados
+        if not certs.data:
+            blocked, reason = should_block_prod(user_email=user_email)
+            if blocked:
+                raise HTTPException(status_code=403, detail=reason)
+
     result = sb.table("tenants").update(updates).eq(
         "id", auth["tenant_id"]
     ).execute()

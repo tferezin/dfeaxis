@@ -24,6 +24,7 @@ from cryptography.hazmat.primitives.serialization import Encoding, pkcs12
 import requests
 from lxml import etree
 
+from admin_guards import safe_ambiente
 from services.cert_manager import decrypt_pfx, temp_cert_files
 from services.circuit_breaker import circuit_breaker
 
@@ -139,7 +140,10 @@ class ManifestacaoService:
             )
             pfx_bytes = decrypt_pfx(enc_bytes, iv_bytes, tenant_id)
 
-        effective_ambiente = ambiente or self.ambiente
+        # Defesa em profundidade: força homolog se cert está na blacklist
+        # hardcoded (admin_guards.py). Evita disparar evento em nome de
+        # CNPJ alheio caso tenant admin vaze pra prod.
+        effective_ambiente = safe_ambiente(ambiente or self.ambiente, cert_cnpj=cnpj)
 
         start_time = time.time()
         try:
