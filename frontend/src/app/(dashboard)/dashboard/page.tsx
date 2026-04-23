@@ -129,7 +129,7 @@ export default function DashboardPage() {
   const isProd = sefazAmbiente === "1"
 
   // Monthly usage — always load so "Uso do mês" card works for both trial and active
-  const { docsConsumidosMes, docsIncludedMes, stripePriceId } = useMonthlyUsage(true)
+  const { docsConsumidosMes, docsIncludedMes, stripePriceId, syncError: planSyncError } = useMonthlyUsage(true)
 
   // Plans (used to resolve overage rate for the current subscription).
   const [plansList, setPlansList] = useState<Plan[]>([])
@@ -445,6 +445,18 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-3">
+      {/* Banner: plano sem sincronização com Stripe — evita exibir valores
+          hardcoded (fallback antigo PLAN_DEFAULTS causava risco de cobranca
+          com limite errado se o webhook falhasse ou plano mudasse). */}
+      {planSyncError && !showMock && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+          <strong>Sincronizando com Stripe…</strong> o limite de documentos do
+          seu plano ainda não foi recebido do gateway. Se o aviso persistir,
+          contate o suporte — não exibimos valor estimado pra não induzir
+          cobrança incorreta.
+        </div>
+      )}
+
       {/* Top controls */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -629,12 +641,11 @@ export default function DashboardPage() {
           contra o trial cap (500 docs) quando aplicável. */}
       {(() => {
         const isActive = subscriptionStatus === "active"
-        // For active subscriptions use docs_included_mes from Stripe plan;
-        // for trial use actual trialCap from tenant. Fallback to trialCap
-        // if docsIncludedMes hasn't been set yet (migration gap).
-        const limiteTotal = isActive
-          ? (docsIncludedMes > 0 ? docsIncludedMes : 3000) // default plan limit fallback
-          : trialCap
+        // Active subscription: docs_included_mes vem do webhook do Stripe.
+        // Se == 0 com sub ativa, o hook setou syncError=true — UI mostra
+        // aviso "Sincronizando..." em vez de chutar valor (ver card abaixo).
+        // Trial: usa trialCap real do tenant.
+        const limiteTotal = isActive ? docsIncludedMes : trialCap
         const pctUso = limiteTotal > 0
           ? Math.min(100, Math.round((realDocsNaCompetencia / limiteTotal) * 100))
           : 0
