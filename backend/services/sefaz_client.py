@@ -124,11 +124,13 @@ class SefazClient:
             iv_bytes = bytes.fromhex(pfx_iv) if isinstance(pfx_iv, str) else pfx_iv
             pfx_bytes = decrypt_pfx(enc_bytes, iv_bytes, tenant_id)
 
-        # Defesa em profundidade: força homolog se cert está na blacklist
-        # hardcoded (admin_guards.py). Se chegar aqui com ambiente='1'
-        # pra cert bloqueado, significa que a camada do endpoint falhou —
-        # emite logger.error pra investigação.
-        effective_ambiente = safe_ambiente(ambiente or self.ambiente, cert_cnpj=cnpj)
+        # Defesa em profundidade: força homolog se a conta (tenant_id)
+        # está na blacklist hardcoded (admin_guards.py). Se chegar aqui
+        # com ambiente='1' pra conta bloqueada, a camada do endpoint
+        # falhou — logger.error sinaliza pra investigação.
+        effective_ambiente = safe_ambiente(
+            ambiente or self.ambiente, tenant_id=tenant_id,
+        )
 
         start_time = time.time()
         try:
@@ -187,9 +189,12 @@ class SefazClient:
             iv_bytes = bytes.fromhex(pfx_iv) if isinstance(pfx_iv, str) else pfx_iv
             pfx_bytes = decrypt_pfx(enc_bytes, iv_bytes, tenant_id)
 
-        # Defesa em profundidade: força homolog se cert está na blacklist
-        # hardcoded (admin_guards.py). Mesmo guard do consultar_distribuicao.
-        effective_ambiente = safe_ambiente(ambiente or self.ambiente, cert_cnpj=cnpj)
+        # Defesa em profundidade: força homolog se a conta (tenant_id) está
+        # na blacklist hardcoded (admin_guards.py). Mesmo guard do
+        # consultar_distribuicao.
+        effective_ambiente = safe_ambiente(
+            ambiente or self.ambiente, tenant_id=tenant_id,
+        )
 
         start_time = time.time()
         try:

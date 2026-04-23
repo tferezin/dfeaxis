@@ -140,10 +140,12 @@ class ManifestacaoService:
             )
             pfx_bytes = decrypt_pfx(enc_bytes, iv_bytes, tenant_id)
 
-        # Defesa em profundidade: força homolog se cert está na blacklist
-        # hardcoded (admin_guards.py). Evita disparar evento em nome de
-        # CNPJ alheio caso tenant admin vaze pra prod.
-        effective_ambiente = safe_ambiente(ambiente or self.ambiente, cert_cnpj=cnpj)
+        # Defesa em profundidade: força homolog se a conta (tenant_id) está
+        # na blacklist hardcoded (admin_guards.py). Evita disparar evento
+        # em nome de CNPJ alheio caso conta admin vaze pra prod.
+        effective_ambiente = safe_ambiente(
+            ambiente or self.ambiente, tenant_id=tenant_id,
+        )
 
         start_time = time.time()
         try:

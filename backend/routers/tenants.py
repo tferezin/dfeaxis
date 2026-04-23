@@ -121,29 +121,20 @@ async def update_settings(
     if not updates:
         raise HTTPException(status_code=400, detail="Nenhum campo para atualizar")
 
-    sb = get_supabase_client()
-
-    # Guard: se está pedindo produção, verifica se algum cert/usuário
+    # Guard: se está pedindo produção, verifica se a conta logada
     # está na blacklist hardcoded (admin_guards.py). Protege contra
-    # tenant admin virar prod com cert de terceiro emprestado pra dev.
+    # admin/dev virar prod por acidente — bloqueio é pela identidade
+    # da conta, não pelo cert cadastrado.
     if updates.get("sefaz_ambiente") == "1":
-        certs = sb.table("certificates").select("cnpj").eq(
-            "tenant_id", auth["tenant_id"],
-        ).execute()
-        user_email = auth.get("email")
-        for cert_row in (certs.data or []):
-            blocked, reason = should_block_prod(
-                cert_cnpj=cert_row.get("cnpj"),
-                user_email=user_email,
-            )
-            if blocked:
-                raise HTTPException(status_code=403, detail=reason)
-        # Checa email mesmo se não houver certs cadastrados
-        if not certs.data:
-            blocked, reason = should_block_prod(user_email=user_email)
-            if blocked:
-                raise HTTPException(status_code=403, detail=reason)
+        blocked, reason = should_block_prod(
+            user_id=auth.get("user_id"),
+            tenant_id=auth.get("tenant_id"),
+            user_email=auth.get("email"),
+        )
+        if blocked:
+            raise HTTPException(status_code=403, detail=reason)
 
+    sb = get_supabase_client()
     result = sb.table("tenants").update(updates).eq(
         "id", auth["tenant_id"]
     ).execute()
