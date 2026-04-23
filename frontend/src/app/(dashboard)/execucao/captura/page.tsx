@@ -130,6 +130,10 @@ export default function CapturaManualPage() {
     ult_nsu_returned?: string
     max_nsu?: string
     total_docs_in_response?: number
+    // Gate adaptativo (opt-in): retorno friendly quando backoff SEFAZ ativo
+    status?: string
+    retry_after_seconds?: number
+    message?: string
     results?: Array<{
       chave?: string
       nsu?: string
@@ -811,8 +815,24 @@ export default function CapturaManualPage() {
                   <div className="rounded-lg border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30 p-3">
                     <p className="text-xs text-red-700 dark:text-red-300 font-medium">{nfeStep1Result.error}</p>
                   </div>
+                ) : nfeStep1Result.status === "rate_limited_by_sefaz" ? (
+                  <div
+                    className="rounded-lg border border-sky-200 bg-sky-50 dark:border-sky-800 dark:bg-sky-950/30 p-3 space-y-1"
+                    data-testid="nfe-rate-limited"
+                  >
+                    <p className="text-xs text-sky-900 dark:text-sky-200 font-medium">
+                      Aguardando janela SEFAZ
+                    </p>
+                    <p className="text-[11px] text-sky-800 dark:text-sky-300 leading-relaxed">
+                      {nfeStep1Result.message ||
+                        "SEFAZ exige aguardar entre consultas (NT 2014.002). Tente novamente em breve."}
+                    </p>
+                  </div>
                 ) : nfeStep1Result.sefaz_cstat === "656" ? (
-                  <div className="rounded-lg border border-sky-200 bg-sky-50 dark:border-sky-800 dark:bg-sky-950/30 p-3 space-y-2">
+                  <div
+                    className="rounded-lg border border-sky-200 bg-sky-50 dark:border-sky-800 dark:bg-sky-950/30 p-3 space-y-2"
+                    data-testid="nfe-card-656"
+                  >
                     <p className="text-xs text-sky-900 dark:text-sky-200 font-medium">
                       Sem documentos novos no momento
                     </p>
@@ -830,7 +850,10 @@ export default function CapturaManualPage() {
                   </div>
                 ) : (
                   <>
-                    <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-3 space-y-2">
+                    <div
+                      className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-3 space-y-2"
+                      data-testid="nfe-card-summary"
+                    >
                       <div className="flex gap-4 text-xs flex-wrap">
                         <span className="text-amber-800 dark:text-amber-300">
                           <strong>{nfeStep1Result.resumos_found ?? 0}</strong> resumo(s) encontrado(s)
