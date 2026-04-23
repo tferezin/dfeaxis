@@ -5,7 +5,7 @@ import Link from "next/link"
 import {
   Settings, ShieldCheck, Play, FileText, CheckCircle2, ArrowRight,
   Code2, Copy, Check, Server, Key, FileCode, ChevronDown, ChevronUp,
-  Send, Workflow, Search, History,
+  Send, Workflow, Search, History, AlertCircle,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -814,54 +814,124 @@ export default function GettingStartedPage() {
             </CardContent>
           </Card>
 
-          <CollapsibleSection title="Passo a passo — Communication Arrangement" icon={Settings} defaultOpen>
+          {/* Fluxo end-to-end */}
+          <CollapsibleSection title="Fluxo completo SAP DRC ↔ DFeAxis" icon={Workflow} defaultOpen>
             <ol className="space-y-3 text-sm list-decimal list-inside">
-              <li>No SAP S/4HANA Cloud, acesse <strong>Communication Arrangements</strong> e escolha o scenario <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">SAP_COM_0708</code> (Electronic Invoice — Inbound) ou equivalente do seu release.</li>
-              <li>Crie um <strong>Communication System</strong> apontando pra <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">https://api.dfeaxis.com.br</code> (porta 443, TLS ativo).</li>
-              <li>Crie um <strong>Communication User</strong> do tipo <em>API Key</em> e use sua chave gerada no DFeAxis como credencial (header <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">X-API-Key</code>).</li>
-              <li>Ative os serviços <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">retrieveInboundInvoices</code>, <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">downloadOfficialDocument</code>, <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">receiveOfficialDocument</code> e <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">deleteInboundInvoices</code>.</li>
-              <li>Pronto — o SAP DRC vai buscar os documentos periodicamente conforme o job já configurado no seu ambiente.</li>
+              <li>
+                <strong>SAP chama</strong> <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">retrieveInboundInvoices</code>
+                {" "}— descobre quais NF-e novas o DFeAxis capturou pros CNPJs da conta.
+              </li>
+              <li>
+                <strong>SAP chama</strong> <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">downloadOfficialDocument</code>
+                {" "}pra cada chave retornada — baixa o XML autorizado (procNFe).
+              </li>
+              <li>
+                <strong>SAP processa o XML</strong> — MIRO, lançamento contábil, entrada de estoque, etc.
+              </li>
+              <li>
+                <strong>SAP chama</strong> <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">receiveOfficialDocument</code>
+                {" "}com o evento de manifestação definitiva (confirmar/desconhecer/não realizada).
+              </li>
+              <li>
+                <strong>SAP chama</strong> <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">deleteInboundInvoices</code>
+                {" "}— confirma recebimento e libera o DFeAxis a descartar o XML (padrão zero-retention).
+              </li>
             </ol>
+            <p className="text-xs text-muted-foreground mt-3">
+              A <strong>ciência da operação (210210)</strong> é enviada automaticamente pelo DFeAxis durante a captura — o SAP DRC nunca precisa chamar ciência.
+            </p>
           </CollapsibleSection>
 
-          <CollapsibleSection title="Endpoints SAP DRC — referência" icon={Server} badge="4 endpoints" defaultOpen>
-            <div className="space-y-3">
-              <div className="rounded-lg bg-muted/50 p-4 space-y-1">
-                <p className="text-sm font-medium">Autenticação</p>
-                <p className="text-xs text-muted-foreground">
-                  Header <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">X-API-Key</code> com a chave gerada no upload do certificado.
+          {/* Configuração SAP */}
+          <CollapsibleSection title="1. Configurar Communication Arrangement no SAP" icon={Settings} defaultOpen>
+            <div className="space-y-4 text-sm">
+              <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 dark:bg-amber-950/30 dark:border-amber-800">
+                <p className="text-xs text-amber-900 dark:text-amber-100">
+                  <strong>Pré-requisito:</strong> o scenario <code className="bg-white/60 px-1 py-0.5 rounded font-mono">SAP_COM_0708</code> (Electronic Invoice for Brazil — Inbound) precisa estar habilitado no seu S/4HANA. Se não estiver disponível, consulte o Basis do seu ambiente — depende do release e do módulo DRC estar licenciado.
                 </p>
               </div>
-              {sapDrcEndpoints.map((ep, i) => (
-                <div key={i} className="rounded-lg border p-4 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Badge variant={ep.method === "GET" ? "secondary" : "default"} className="text-xs font-mono">
-                      {ep.method}
-                    </Badge>
-                    <code className="text-sm font-mono">{ep.path}</code>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{ep.description}</p>
-                  <div className="text-xs text-muted-foreground">
-                    <strong>Parâmetros:</strong> {ep.params}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    <strong>Resposta:</strong> {ep.response}
-                  </div>
-                </div>
-              ))}
 
+              <div>
+                <p className="font-medium mb-2">Passo 1.1 — Communication System</p>
+                <ol className="list-decimal list-inside space-y-1 text-muted-foreground text-xs">
+                  <li>No Fiori Launchpad, abra <strong>Communication Systems</strong>.</li>
+                  <li>Clique em <strong>New</strong>. Preencha:</li>
+                </ol>
+                <div className="mt-2 rounded-lg border bg-muted/30 p-3 text-xs font-mono space-y-1">
+                  <div><span className="text-muted-foreground">System ID:</span> DFEAXIS_API</div>
+                  <div><span className="text-muted-foreground">System Name:</span> DFeAxis NF-e Inbound</div>
+                  <div><span className="text-muted-foreground">Host Name:</span> api.dfeaxis.com.br</div>
+                  <div><span className="text-muted-foreground">Port:</span> 443</div>
+                  <div><span className="text-muted-foreground">Protocol:</span> HTTPS (TLS 1.2+)</div>
+                </div>
+              </div>
+
+              <div>
+                <p className="font-medium mb-2">Passo 1.2 — Communication User</p>
+                <ol className="list-decimal list-inside space-y-1 text-muted-foreground text-xs">
+                  <li>Dentro do Communication System, aba <strong>Users for Outbound Communication</strong>, clique <strong>Add</strong>.</li>
+                  <li>Selecione <strong>Authentication Method: Authentication with API Key</strong>.</li>
+                  <li>No campo <strong>API Key</strong>, cole a chave gerada no DFeAxis (em Cadastros → Chave da API).</li>
+                  <li>O DFeAxis valida pelo header <code className="bg-muted px-1 py-0.5 rounded font-mono">X-API-Key</code> — o SAP envia isso automaticamente quando a autenticação é "API Key".</li>
+                </ol>
+              </div>
+
+              <div>
+                <p className="font-medium mb-2">Passo 1.3 — Communication Arrangement</p>
+                <ol className="list-decimal list-inside space-y-1 text-muted-foreground text-xs">
+                  <li>Abra <strong>Communication Arrangements</strong> e clique <strong>New</strong>.</li>
+                  <li>Escolha o scenario <code className="bg-muted px-1 py-0.5 rounded font-mono">SAP_COM_0708</code>.</li>
+                  <li>Em <strong>Communication System</strong>, selecione <strong>DFEAXIS_API</strong> (criado no passo 1.1).</li>
+                  <li>Na aba <strong>Outbound Services</strong>, ative os 4 serviços abaixo apontando pros paths do DFeAxis:</li>
+                </ol>
+                <div className="mt-2 rounded-lg border bg-muted/30 p-3 text-xs font-mono space-y-1">
+                  <div><span className="text-emerald-700 dark:text-emerald-400">Retrieve Inbound Invoices</span>   → /sap-drc/v1/retrieveInboundInvoices</div>
+                  <div><span className="text-emerald-700 dark:text-emerald-400">Download Official Document</span>  → /sap-drc/v1/downloadOfficialDocument</div>
+                  <div><span className="text-emerald-700 dark:text-emerald-400">Receive Official Document</span>   → /sap-drc/v1/receiveOfficialDocument</div>
+                  <div><span className="text-emerald-700 dark:text-emerald-400">Delete Inbound Invoices</span>     → /sap-drc/v1/deleteInboundInvoices</div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Ative o Communication Arrangement e pronto — o SAP DRC vai usar essas URLs nas próximas execuções do job de captura.
+                </p>
+              </div>
+
+              <div>
+                <p className="font-medium mb-2">Passo 1.4 — Teste de conectividade</p>
+                <p className="text-xs text-muted-foreground">
+                  Antes de rodar o job completo, teste a conectividade via terminal ou postman com um dos exemplos curl abaixo. Retorno <code className="bg-muted px-1 py-0.5 rounded font-mono">200 OK</code> confirma que a chave está válida e o Communication System está acessível.
+                </p>
+              </div>
+            </div>
+          </CollapsibleSection>
+
+          {/* Exemplos curl — 4 endpoints */}
+          <CollapsibleSection title="2. Exemplos práticos — 4 endpoints" icon={Server} badge="curl">
+            <div className="space-y-4">
+              <div className="rounded-lg bg-muted/50 p-3">
+                <p className="text-xs text-muted-foreground">
+                  Em todos os exemplos, substitua <code className="bg-muted px-1 py-0.5 rounded font-mono">SUA_API_KEY</code> pela chave gerada em Cadastros → Chave da API. Respostas vêm no schema <strong>NotaFiscalFragment</strong> (SAP DRC nativo), prontas pra consumir sem parsear XML.
+                </p>
+              </div>
+
+              {/* 1) retrieveInboundInvoices */}
               <div className="rounded-lg border p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm font-medium">Exemplo — Buscar NF-e (SAP DRC)</p>
+                  <div className="flex items-center gap-2">
+                    <Badge className="text-xs font-mono">POST</Badge>
+                    <code className="text-sm font-mono">/sap-drc/v1/retrieveInboundInvoices</code>
+                  </div>
                   <CopyButton text={`curl -s -X POST "https://api.dfeaxis.com.br/sap-drc/v1/retrieveInboundInvoices" -H "X-API-Key: SUA_API_KEY" -H "Content-Type: application/json" -d '{"cnpjList":["01234567000100"]}'`} />
                 </div>
-                <pre className="text-xs font-mono bg-zinc-950 text-zinc-100 rounded-lg p-4 overflow-x-auto">
+                <p className="text-xs text-muted-foreground mb-2">
+                  Descobre NF-e novas capturadas. Retorna fragments tipados (accessKey, CNPJs, número, data, valor, status).
+                </p>
+                <pre className="text-xs font-mono bg-zinc-950 text-zinc-100 rounded-lg p-3 overflow-x-auto">
 {`curl -s -X POST "https://api.dfeaxis.com.br/sap-drc/v1/retrieveInboundInvoices" \\
   -H "X-API-Key: SUA_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{"cnpjList":["01234567000100"]}'
 
-# Resposta (fragments tipados, prontos pro SAP consumir):
+# Resposta:
 {
   "notaFiscalFragments": [
     {
@@ -880,6 +950,107 @@ export default function GettingStartedPage() {
   "eventFragments": []
 }`}
                 </pre>
+              </div>
+
+              {/* 2) downloadOfficialDocument */}
+              <div className="rounded-lg border p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="text-xs font-mono">GET</Badge>
+                    <code className="text-sm font-mono">/sap-drc/v1/downloadOfficialDocument</code>
+                  </div>
+                  <CopyButton text={`curl -s -o invoice.xml "https://api.dfeaxis.com.br/sap-drc/v1/downloadOfficialDocument?accessKey=CHAVE_44_DIGITOS" -H "X-API-Key: SUA_API_KEY"`} />
+                </div>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Baixa o XML autorizado (procNFe) pra uma chave específica. Content-Type: <code className="bg-muted px-1 py-0.5 rounded font-mono">application/xml</code>.
+                </p>
+                <pre className="text-xs font-mono bg-zinc-950 text-zinc-100 rounded-lg p-3 overflow-x-auto">
+{`curl -s -o invoice.xml \\
+  "https://api.dfeaxis.com.br/sap-drc/v1/downloadOfficialDocument?accessKey=CHAVE_44_DIGITOS" \\
+  -H "X-API-Key: SUA_API_KEY"
+
+# Resposta: XML bruto (procNFe com envelope nfeProc)
+# HTTP 200 OK — XML gravado em invoice.xml
+# HTTP 404 Not Found — chave não existe ou já foi descartada`}
+                </pre>
+              </div>
+
+              {/* 3) receiveOfficialDocument */}
+              <div className="rounded-lg border p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Badge className="text-xs font-mono">POST</Badge>
+                    <code className="text-sm font-mono">/sap-drc/v1/receiveOfficialDocument</code>
+                  </div>
+                  <CopyButton text={`curl -s -X POST "https://api.dfeaxis.com.br/sap-drc/v1/receiveOfficialDocument" -H "X-API-Key: SUA_API_KEY" -H "Content-Type: application/json" -d '{"xml":"<procEventoNFe>...</procEventoNFe>"}'`} />
+                </div>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Envia o evento de manifestação definitiva (confirmação/desconhecimento/não realizada). O SAP monta o XML do evento; o DFeAxis transmite à SEFAZ e devolve o protocolo.
+                </p>
+                <pre className="text-xs font-mono bg-zinc-950 text-zinc-100 rounded-lg p-3 overflow-x-auto">
+{`curl -s -X POST "https://api.dfeaxis.com.br/sap-drc/v1/receiveOfficialDocument" \\
+  -H "X-API-Key: SUA_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"xml": "<procEventoNFe>...</procEventoNFe>"}'
+
+# Respostas:
+# 202 Accepted — evento aceito pela SEFAZ (cStat 135/136)
+# 400 Bad Request — XML malformado
+# 422 Unprocessable Entity — evento rejeitado pela SEFAZ com cStat de erro`}
+                </pre>
+              </div>
+
+              {/* 4) deleteInboundInvoices */}
+              <div className="rounded-lg border p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="destructive" className="text-xs font-mono">DELETE</Badge>
+                    <code className="text-sm font-mono">/sap-drc/v1/deleteInboundInvoices</code>
+                  </div>
+                  <CopyButton text={`curl -s -X DELETE "https://api.dfeaxis.com.br/sap-drc/v1/deleteInboundInvoices" -H "X-API-Key: SUA_API_KEY" -H "Content-Type: application/json" -d '{"uuidList":["uuid-1","uuid-2"]}'`} />
+                </div>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Confirma recebimento e libera o DFeAxis a descartar os XMLs do banco (padrão zero-retention). Equivale ao endpoint genérico <code className="bg-muted px-1 py-0.5 rounded font-mono">/documentos/{"{chave}"}/confirmar</code>, mas em lote e usando UUIDs.
+                </p>
+                <pre className="text-xs font-mono bg-zinc-950 text-zinc-100 rounded-lg p-3 overflow-x-auto">
+{`curl -s -X DELETE "https://api.dfeaxis.com.br/sap-drc/v1/deleteInboundInvoices" \\
+  -H "X-API-Key: SUA_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"uuidList": ["uuid-1", "uuid-2"]}'
+
+# Resposta: 204 No Content
+# Docs saem da listagem pendente + contador de consumo avança.`}
+                </pre>
+              </div>
+            </div>
+          </CollapsibleSection>
+
+          {/* Troubleshooting */}
+          <CollapsibleSection title="3. Troubleshooting comum" icon={AlertCircle}>
+            <div className="space-y-3 text-sm">
+              <div className="rounded-lg border p-3">
+                <p className="font-medium text-destructive">401 Unauthorized</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Chave não reconhecida. Verifique (a) se o header <code className="bg-muted px-1 py-0.5 rounded font-mono">X-API-Key</code> está sendo enviado pelo Communication Arrangement, (b) se a chave foi revogada em <Link href="/cadastros/api-keys" className="text-primary hover:underline">Cadastros → Chave da API</Link>. Se sim, gere nova e atualize o Communication User.
+                </p>
+              </div>
+              <div className="rounded-lg border p-3">
+                <p className="font-medium text-amber-700 dark:text-amber-400">403 Forbidden — CNPJ não cadastrado</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  O CNPJ enviado em <code className="bg-muted px-1 py-0.5 rounded font-mono">cnpjList</code> não tem certificado A1 ativo nesta conta. Cadastre em <Link href="/cadastros/certificados" className="text-primary hover:underline">Cadastros → Certificados A1</Link>.
+                </p>
+              </div>
+              <div className="rounded-lg border p-3">
+                <p className="font-medium text-amber-700 dark:text-amber-400">Resposta vazia em retrieveInboundInvoices</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Significa que a SEFAZ não tem NF-e novas pendentes pros CNPJs. Comportamento normal, especialmente em homologação. Em produção, é sinal de que o scheduler adaptativo do DFeAxis ainda não capturou docs novos desde a última consulta — aguarde o próximo ciclo (≤15 min).
+                </p>
+              </div>
+              <div className="rounded-lg border p-3">
+                <p className="font-medium text-amber-700 dark:text-amber-400">404 Not Found em downloadOfficialDocument</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Chave não existe ou XML já foi descartado (após <code className="bg-muted px-1 py-0.5 rounded font-mono">deleteInboundInvoices</code>). Baixe o XML sempre <strong>antes</strong> de chamar delete.
+                </p>
               </div>
             </div>
           </CollapsibleSection>
