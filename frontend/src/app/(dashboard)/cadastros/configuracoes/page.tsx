@@ -5,8 +5,6 @@ import { Save, Clock, Globe, Bell, AlertTriangle, Eye, FileCheck } from "lucide-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
-import { Separator } from "@/components/ui/separator"
 import { useSettings } from "@/hooks/use-settings"
 
 type SelectOption = { value: string; label: string; description?: string }
@@ -214,45 +212,33 @@ export default function ConfiguracoesPage() {
           </CardContent>
         </Card>
 
-        {/* Notificações */}
+        {/* Alertas via API — substitui o antigo card de Notificações por email */}
         <Card className="md:col-span-2">
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
               <Bell className="size-5 text-primary" />
-              <CardTitle className="text-base">Notificações</CardTitle>
+              <CardTitle className="text-base">Alertas via API</CardTitle>
             </div>
-            <CardDescription>Configure alertas por e-mail.</CardDescription>
+            <CardDescription>
+              Consulte alertas operacionais em tempo real — sem configurar e-mail, SMTP ou template.
+            </CardDescription>
           </CardHeader>
-          <CardContent className="pt-0">
-            <div className="flex flex-wrap items-end gap-4">
-              <div className="space-y-1.5 flex-1 min-w-[200px]">
-                <Label className="text-sm font-medium">E-mail</Label>
-                <Input
-                  type="email"
-                  placeholder="admin@suaempresa.com.br"
-                  value={settings.notifyEmail}
-                  onChange={(e) => updateSettings({ notifyEmail: e.target.value })}
-                />
-              </div>
-              <Separator orientation="vertical" className="h-8 hidden md:block" />
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={settings.notifyCertExpiry}
-                  onChange={(e) => updateSettings({ notifyCertExpiry: e.target.checked })}
-                  className="size-4"
-                />
-                <span className="text-sm">Vencimento de certificado</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={settings.notifyNoCredits}
-                  onChange={(e) => updateSettings({ notifyNoCredits: e.target.checked })}
-                  className="size-4"
-                />
-                <span className="text-sm">Créditos insuficientes</span>
-              </label>
+          <CardContent className="pt-0 space-y-3 text-sm text-muted-foreground">
+            <p>
+              O DFeAxis expõe alertas via <code className="text-[11px] bg-muted px-1 py-0.5 rounded">GET /api/v1/alerts</code>.
+              Seu ERP consulta quando quiser e reage conforme a lógica dele. Cada alerta tem um{" "}
+              <code className="text-[11px] bg-muted px-1 py-0.5 rounded">id</code> determinístico — se a condição
+              não mudou, o id não muda. Use isso pra deduplicar no seu lado.
+            </p>
+            <div>
+              <p className="font-medium text-foreground mb-1.5">Tipos de alerta disponíveis:</p>
+              <ul className="list-disc pl-5 space-y-0.5">
+                <li><code className="text-[11px] bg-muted px-1 py-0.5 rounded">cert_expiring</code> — certificado A1 expirando (warning: 8-30 dias · critical: 0-7 dias)</li>
+                <li><code className="text-[11px] bg-muted px-1 py-0.5 rounded">cert_expired</code> — certificado A1 já vencido</li>
+                <li><code className="text-[11px] bg-muted px-1 py-0.5 rounded">trial_ending</code> — trial próximo do limite de tempo ou documentos</li>
+                <li><code className="text-[11px] bg-muted px-1 py-0.5 rounded">high_usage</code> — consumo ≥ 90% do plano mensal</li>
+                <li><code className="text-[11px] bg-muted px-1 py-0.5 rounded">usage_exceeded</code> — consumo acima de 100% do plano (overage)</li>
+              </ul>
             </div>
           </CardContent>
         </Card>

@@ -127,6 +127,13 @@ const apiEndpoints = [
     params: "Nenhum",
     response: "Status de conexão por tipo de documento",
   },
+  {
+    method: "GET",
+    path: "/api/v1/alerts",
+    description: "Alertas operacionais (certificado expirando, trial terminando, consumo alto)",
+    params: "Nenhum",
+    response: '{ "alerts": [{ id, type, severity, message, metadata }], "total": N, "generated_at": "..." }',
+  },
 ]
 
 const abapCode = `*&---------------------------------------------------------------------*
