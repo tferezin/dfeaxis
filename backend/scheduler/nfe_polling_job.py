@@ -31,11 +31,22 @@ from scheduler.polling_job import (
     _get_pfx_password,
     _normalize_pfx_blob,
 )
+from services.adaptive_scheduler import (
+    adaptive_scheduler,
+    is_kill_switch_active,
+    BACKOFF_137_SEC,
+    BACKOFF_656_SEC,
+    BACKOFF_ERROR_SEC,
+)
 
 logger = logging.getLogger(__name__)
 
 # Max retries before giving up on fetching XML for a queue entry
 _MAX_XML_FETCH_ATTEMPTS = 5
+
+# Adaptive scheduler drain loop limits (padrão Sankhya)
+_DRAIN_MAX_ITERATIONS = 50
+_DRAIN_SLEEP_SEC = 0.5
 
 
 def poll_nfe_resumos() -> None:
@@ -627,3 +638,331 @@ def fetch_nfe_xml_completo() -> None:
         "nfe_fetch_xml: rodada finalizada — %d XMLs salvos, %d pendentes/falhos",
         total_fetched, total_failed,
     )
+
+
+# =========================================================================
+# Scheduler adaptativo (NT 2014.002 — padrão Sankhya)
+# =========================================================================
+#
+# Estratégia: worker acorda a cada 15 min, mas só chama SEFAZ se o estado
+# persistido em `dist_dfe_schedule_state` indicar que é elegível. Feature
+# flag por tenant (`adaptive_polling_enabled`) — default false, opt-in.
+#
+# Fase de rollout: dark launch. Job registrado em paralelo ao antigo, mas
+# com flag default false, zero tenants são processados até explicit opt-in.
+# =========================================================================
+
+
+def poll_nfe_resumos_adaptive() -> None:
+    """Job adaptativo: wake-up 15min + decisão data-driven de chamar SEFAZ.
+
+    Filtra certs elegíveis via `adaptive_scheduler.list_eligible()`:
+    - tenant com adaptive_polling_enabled = true
+    - proxima_chamada_elegivel_em <= now
+    - cert/tenant ativos
+    - lock livre
+
+    Pra cada cert elegível: tenta lock, roda ciclo (SEFAZ + drain + persist),
+    atualiza estado. Exception captura no nível do cert pra não derrubar os
+    outros. Tudo sob finally{} pra garantir release_lock.
+    """
+    if is_kill_switch_active():
+        logger.warning(
+            "adaptive: ADAPTIVE_POLLING_KILL_SWITCH=1 — abortando rodada"
+        )
+        return
+
+    try:
+        eligible = adaptive_scheduler.list_eligible()
+    except Exception as exc:
+        logger.exception("adaptive: list_eligible crashou: %s", exc)
+        return
+
+    if not eligible:
+        logger.debug("adaptive: nenhum cert elegivel neste tick")
+        return
+
+    logger.info("adaptive: %d certs elegiveis neste tick", len(eligible))
+
+    for row in eligible:
+        try:
+            _run_adaptive_cycle_for_cert(row)
+        except Exception as exc:
+            logger.exception(
+                "adaptive: ciclo crashou cert=%s cnpj=%s: %s",
+                row.get("certificate_id"), mask_cnpj(row.get("cnpj", "")), exc,
+            )
+            # Defensivo — record_exception já é chamado dentro do ciclo
+            # quando a exception é capturada corretamente. Aqui é só pra
+            # não derrubar o loop dos próximos certs.
+            try:
+                adaptive_scheduler.record_exception(
+                    row["certificate_id"], row["tipo"], row["ambiente"], exc,
+                )
+            except Exception:
+                pass
+
+        # Rate limit entre CNPJs diferentes (gentileza com SEFAZ)
+        time.sleep(1)
+
+
+def _run_adaptive_cycle_for_cert(sched_row: dict) -> None:
+    """Executa um ciclo adaptativo completo pra um cert elegível.
+
+    Lock → load credentials → drain loop (até 137, 656, erro, ou hit do limite)
+    → schedule_next → release_lock (finally).
+    """
+    sb = get_supabase_client()
+    cert_id = sched_row["certificate_id"]
+    tenant_id = sched_row["tenant_id"]
+    cnpj = sched_row["cnpj"]
+    tipo = sched_row["tipo"]
+    ambiente = sched_row["ambiente"]
+
+    # 1) Lock
+    if not adaptive_scheduler.try_acquire_lock(cert_id, tipo, ambiente):
+        logger.info(
+            "adaptive: lock ocupado cnpj=%s — skip", mask_cnpj(cnpj),
+        )
+        return
+
+    try:
+        # 2) Credenciais
+        cert_res = sb.table("certificates").select("*").eq(
+            "id", cert_id,
+        ).single().execute()
+        if not cert_res.data:
+            logger.warning("adaptive: cert=%s nao encontrado", cert_id)
+            return
+        cert = cert_res.data
+
+        tenant_res = sb.table("tenants").select(
+            "id, polling_mode, manifestacao_mode, credits, sefaz_ambiente, "
+            "subscription_status, trial_blocked_at, trial_blocked_reason"
+        ).eq("id", tenant_id).single().execute()
+        if not tenant_res.data:
+            logger.warning("adaptive: tenant=%s nao encontrado", tenant_id)
+            return
+        tenant_data = tenant_res.data
+
+        pfx_password = _get_pfx_password(cert_id, tenant_id)
+        if not pfx_password:
+            adaptive_scheduler.record_exception(
+                cert_id, tipo, ambiente,
+                RuntimeError("pfx password ausente"),
+            )
+            return
+
+        pfx_encrypted, pfx_iv = _normalize_pfx_blob(
+            cert["pfx_encrypted"], cert["pfx_iv"]
+        )
+
+        # 3) Drain loop
+        ult_nsu = nsu_controller.get_cursor(cert_id, tipo, ambiente)
+        drain_iter = 0
+        drain_docs_total = 0
+        prev_ult_nsu: str | None = None
+        last_response = None
+
+        for drain_iter in range(_DRAIN_MAX_ITERATIONS):
+            response = sefaz_client.consultar_distribuicao(
+                cnpj=cnpj, tipo=tipo, ult_nsu=ult_nsu,
+                pfx_encrypted=pfx_encrypted, pfx_iv=pfx_iv,
+                tenant_id=tenant_id, pfx_password=pfx_password,
+                ambiente=ambiente,
+            )
+            last_response = response
+
+            # Log de auditoria por chamada SEFAZ
+            try:
+                sb.table("polling_log").insert({
+                    "tenant_id": tenant_id,
+                    "cnpj": cnpj,
+                    "tipo": tipo,
+                    "triggered_by": "adaptive_scheduler",
+                    "status": "success" if response.cstat in ("137", "138") else "error",
+                    "docs_found": len(response.documents),
+                    "ult_nsu": response.ult_nsu,
+                    "latency_ms": response.latency_ms,
+                    "error_message": (
+                        response.xmotivo if response.cstat not in ("137", "138") else None
+                    ),
+                }).execute()
+            except Exception:
+                pass  # log best-effort
+
+            # --- Terminal: 656 (rate limit) ---
+            if response.cstat == "656":
+                # Se SEFAZ sugerir cursor diferente, atualiza local
+                # (mesma lógica do router manual — sem retry inline).
+                if response.ult_nsu and response.ult_nsu != ult_nsu:
+                    nsu_controller.update_cursor(
+                        cert_id, tipo, ambiente, response.ult_nsu,
+                        response.max_nsu or response.ult_nsu,
+                    )
+                    nsu_controller.update_last_nsu(cert_id, tipo, response.ult_nsu)
+                adaptive_scheduler.schedule_next(
+                    certificate_id=cert_id, tipo=tipo, ambiente=ambiente,
+                    cstat="656", xmotivo=response.xmotivo,
+                    ult_nsu=response.ult_nsu, max_nsu=response.max_nsu,
+                    latency_ms=response.latency_ms,
+                    seconds_until_next=BACKOFF_656_SEC,
+                    drain_iteracoes=drain_iter + 1,
+                    drain_docs=drain_docs_total,
+                )
+                return
+
+            # --- Terminal: erro SEFAZ não-137/138/656 ---
+            if response.cstat not in ("137", "138"):
+                logger.warning(
+                    "adaptive: cstat inesperado cnpj=%s cstat=%s xmotivo=%s",
+                    mask_cnpj(cnpj), response.cstat, response.xmotivo,
+                )
+                adaptive_scheduler.schedule_next(
+                    certificate_id=cert_id, tipo=tipo, ambiente=ambiente,
+                    cstat=response.cstat, xmotivo=response.xmotivo,
+                    ult_nsu=response.ult_nsu, max_nsu=response.max_nsu,
+                    latency_ms=response.latency_ms,
+                    seconds_until_next=BACKOFF_ERROR_SEC,
+                    drain_iteracoes=drain_iter + 1,
+                    drain_docs=drain_docs_total,
+                )
+                return
+
+            # --- Detector de cursor travado (bug defensivo) ---
+            if (
+                prev_ult_nsu is not None
+                and response.ult_nsu == prev_ult_nsu
+                and len(response.documents) > 0
+            ):
+                logger.error(
+                    "adaptive: DRAIN STUCK cnpj=%s nsu=%s — aborta ciclo",
+                    mask_cnpj(cnpj), prev_ult_nsu,
+                )
+                adaptive_scheduler.schedule_next(
+                    certificate_id=cert_id, tipo=tipo, ambiente=ambiente,
+                    cstat=response.cstat, xmotivo="drain cursor stuck",
+                    ult_nsu=response.ult_nsu, max_nsu=response.max_nsu,
+                    latency_ms=response.latency_ms,
+                    seconds_until_next=BACKOFF_137_SEC,
+                    drain_iteracoes=drain_iter + 1,
+                    drain_docs=drain_docs_total,
+                )
+                return
+            prev_ult_nsu = response.ult_nsu
+
+            # --- Processa documentos do batch (cursor transacional) ---
+            docs = list(response.documents)
+            batch_had_persistence_error = False
+
+            for doc in docs:
+                try:
+                    if doc.schema.startswith("res"):
+                        _enqueue_and_ciencia(
+                            sb=sb, cert=cert, tenant_data=tenant_data,
+                            doc=doc, pfx_encrypted=pfx_encrypted,
+                            pfx_iv=pfx_iv, pfx_password=pfx_password,
+                            ambiente=ambiente,
+                        )
+                    else:
+                        # procNFe (XML completo)
+                        row_data = _build_document_row(
+                            tenant_id=tenant_id, cnpj=cnpj, doc=doc,
+                            is_resumo=False, doc_status="available",
+                            manif_status="ciencia",
+                        )
+                        if row_data is not None:
+                            sb.table("documents").upsert(
+                                row_data, on_conflict="tenant_id,chave_acesso",
+                            ).execute()
+                except Exception as persist_exc:
+                    batch_had_persistence_error = True
+                    logger.error(
+                        "adaptive: persist falhou cnpj=%s chave=%s: %s",
+                        mask_cnpj(cnpj), doc.chave, persist_exc,
+                    )
+
+                time.sleep(0.3)
+
+            if batch_had_persistence_error:
+                # Cursor transacional: NÃO avança NSU, NÃO schedule_next.
+                # finally{} libera lock. Próximo wake re-tenta o mesmo lote.
+                logger.warning(
+                    "adaptive: batch com erro de persistencia cnpj=%s "
+                    "— NSU nao avanca, proximo wake re-traz",
+                    mask_cnpj(cnpj),
+                )
+                return
+
+            drain_docs_total += len(docs)
+
+            # Avança cursor só após batch OK
+            if docs:
+                nsu_controller.update_cursor(
+                    cert_id, tipo, ambiente, response.ult_nsu,
+                    response.max_nsu or response.ult_nsu,
+                )
+                nsu_controller.update_last_nsu(cert_id, tipo, response.ult_nsu)
+                ult_nsu = response.ult_nsu
+
+            # --- Terminal: 137 (fila vazia) ---
+            if response.cstat == "137":
+                adaptive_scheduler.schedule_next(
+                    certificate_id=cert_id, tipo=tipo, ambiente=ambiente,
+                    cstat="137", xmotivo=response.xmotivo,
+                    ult_nsu=response.ult_nsu, max_nsu=response.max_nsu,
+                    latency_ms=response.latency_ms,
+                    seconds_until_next=BACKOFF_137_SEC,
+                    drain_iteracoes=drain_iter + 1,
+                    drain_docs=drain_docs_total,
+                )
+                return
+
+            # --- 138 + ultNSU >= maxNSU → drenado, próximo seria 137 ---
+            if (
+                response.ult_nsu and response.max_nsu
+                and response.ult_nsu >= response.max_nsu
+            ):
+                logger.info(
+                    "adaptive: drain completo cnpj=%s ultNSU=%s maxNSU=%s",
+                    mask_cnpj(cnpj), response.ult_nsu, response.max_nsu,
+                )
+                adaptive_scheduler.schedule_next(
+                    certificate_id=cert_id, tipo=tipo, ambiente=ambiente,
+                    cstat="138", xmotivo="drained: ultNSU>=maxNSU",
+                    ult_nsu=response.ult_nsu, max_nsu=response.max_nsu,
+                    latency_ms=response.latency_ms,
+                    seconds_until_next=BACKOFF_137_SEC,
+                    drain_iteracoes=drain_iter + 1,
+                    drain_docs=drain_docs_total,
+                )
+                return
+
+            # Encadeia próxima iteração (138 + ainda tem pendentes)
+            time.sleep(_DRAIN_SLEEP_SEC)
+
+        # Saiu por atingir _DRAIN_MAX_ITERATIONS — safety limit
+        logger.error(
+            "adaptive: DRAIN MAX ITER atingido cnpj=%s iter=%d docs=%d",
+            mask_cnpj(cnpj), drain_iter + 1, drain_docs_total,
+        )
+        adaptive_scheduler.schedule_next(
+            certificate_id=cert_id, tipo=tipo, ambiente=ambiente,
+            cstat=last_response.cstat if last_response else None,
+            xmotivo="drain_max_iterations_reached",
+            ult_nsu=last_response.ult_nsu if last_response else None,
+            max_nsu=last_response.max_nsu if last_response else None,
+            latency_ms=last_response.latency_ms if last_response else None,
+            seconds_until_next=BACKOFF_137_SEC,
+            drain_iteracoes=drain_iter + 1,
+            drain_docs=drain_docs_total,
+        )
+
+    except Exception as exc:
+        logger.exception(
+            "adaptive: exception no ciclo cnpj=%s: %s",
+            mask_cnpj(cnpj), exc,
+        )
+        adaptive_scheduler.record_exception(cert_id, tipo, ambiente, exc)
+    finally:
+        adaptive_scheduler.release_lock(cert_id, tipo, ambiente)

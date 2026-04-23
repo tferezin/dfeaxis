@@ -1420,12 +1420,41 @@ def start_scheduler() -> BackgroundScheduler:
             sefaz_ambiente,
         )
 
+    # Scheduler adaptativo (NT 2014.002 — Fase B dark launch).
+    # Roda em AMBOS os ambientes (homolog e prod) — flag `adaptive_polling_enabled`
+    # por tenant (default false) controla quem é processado. Sem opt-in, o job
+    # acorda, não acha cert elegível, dorme de novo — zero chamada SEFAZ.
+    adaptive_active = False
+    try:
+        from scheduler.nfe_polling_job import poll_nfe_resumos_adaptive
+
+        scheduler.add_job(
+            poll_nfe_resumos_adaptive,
+            trigger=IntervalTrigger(minutes=15),
+            id="nfe_poll_resumos_adaptive",
+            name="NFe: scheduler adaptativo (NT 2014.002)",
+            coalesce=True,
+            max_instances=1,
+            misfire_grace_time=300,
+            replace_existing=True,
+        )
+        adaptive_active = True
+        logger.info(
+            "nfe_poll_resumos_adaptive agendado: wake 15min, "
+            "opt-in por tenant (adaptive_polling_enabled, default false)"
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "Não foi possível agendar nfe_poll_resumos_adaptive: %s", exc
+        )
+
     scheduler.start()
     nfe_status = "nfe_poll_resumos, nfe_fetch_xml" if nfe_jobs_active else "NFe: DESABILITADO (homolog)"
+    adaptive_status = "adaptive (dark launch)" if adaptive_active else "adaptive: OFF"
     logger.info(
         "Scheduler iniciado. Jobs ativos: trial_emails, monthly_overage, "
-        "manifestacao_alerts, pfx_cleanup, %s.",
-        nfe_status,
+        "manifestacao_alerts, pfx_cleanup, %s, %s.",
+        nfe_status, adaptive_status,
     )
     return scheduler
 
