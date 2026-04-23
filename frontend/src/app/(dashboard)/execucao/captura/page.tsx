@@ -476,10 +476,10 @@ export default function CapturaManualPage() {
         <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-600 dark:text-amber-400" />
         <div>
           <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
-            Funcionalidade de teste / validacao
+            Funcionalidade de teste / validação
           </p>
           <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
-            Esta funcionalidade e apenas para testes durante a fase de validacao. Em producao, a captura deve ser disparada pelo seu ERP via API
+            Esta funcionalidade é apenas para testes durante a fase de validação. Em produção, a captura deve ser disparada pelo seu ERP via API
             (<code className="bg-amber-100 dark:bg-amber-900/50 px-1 py-0.5 rounded text-xs font-mono">POST /api/v1/polling/trigger</code>).
           </p>
         </div>
@@ -489,10 +489,10 @@ export default function CapturaManualPage() {
       <div>
         <div className="flex items-center gap-2">
           <h1 className="text-2xl font-semibold tracking-tight">Captura Manual</h1>
-          <Badge variant="secondary" className="text-[10px]">Temporario</Badge>
+          <Badge variant="secondary" className="text-[10px]">Temporário</Badge>
         </div>
         <p className="text-sm text-muted-foreground mt-1">
-          Teste a conexao com a SEFAZ e capture documentos.
+          Teste a conexão com a SEFAZ e capture documentos.
         </p>
       </div>
 
@@ -581,7 +581,7 @@ export default function CapturaManualPage() {
           ) : (
             <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-3">
               <p className="text-xs text-amber-800 dark:text-amber-300">
-                Nenhum certificado cadastrado. Use a secao abaixo para enviar um certificado .pfx.
+                Nenhum certificado cadastrado. Use a seção abaixo para enviar um certificado .pfx.
               </p>
             </div>
           )}
@@ -667,7 +667,7 @@ export default function CapturaManualPage() {
         <CardHeader className="pb-3">
           <CardTitle className="text-base">CT-e / MDF-e / NFS-e — Captura direta</CardTitle>
           <p className="text-xs text-muted-foreground">
-            Estes documentos vem completos da SEFAZ em uma unica consulta.
+            Estes documentos vêm completos da SEFAZ em uma única consulta.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -782,7 +782,7 @@ export default function CapturaManualPage() {
             <CardTitle className="text-base">NF-e — Captura em 2 etapas</CardTitle>
           </div>
           <p className="text-xs text-muted-foreground">
-            A SEFAZ exige ciencia da operacao antes de liberar o XML completo da NF-e.
+            A SEFAZ exige ciência da operação antes de liberar o XML completo da NF-e.
           </p>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -805,7 +805,7 @@ export default function CapturaManualPage() {
               ) : (
                 <Search className="size-4" />
               )}
-              {nfeStep1Status === "loading" ? "Buscando resumos..." : "Buscar Resumos + Enviar Ciencia"}
+              {nfeStep1Status === "loading" ? "Buscando resumos..." : "Buscar Resumos + Enviar Ciência"}
             </Button>
 
             {/* Step 1 results */}
@@ -859,11 +859,11 @@ export default function CapturaManualPage() {
                           <strong>{nfeStep1Result.resumos_found ?? 0}</strong> resumo(s) encontrado(s)
                         </span>
                         <span className="text-emerald-700 dark:text-emerald-300">
-                          <strong>{nfeStep1Result.ciencia_sent ?? 0}</strong> ciencia(s) enviada(s)
+                          <strong>{nfeStep1Result.ciencia_sent ?? 0}</strong> ciência(s) enviada(s)
                         </span>
                         {(nfeStep1Result.completos_found ?? 0) > 0 && (
                           <span className="text-blue-700 dark:text-blue-300">
-                            <strong>{nfeStep1Result.completos_found}</strong> XML(s) completo(s) ja disponivel(is)
+                            <strong>{nfeStep1Result.completos_found}</strong> XML(s) completo(s) já disponível(is)
                           </span>
                         )}
                       </div>
@@ -920,7 +920,7 @@ export default function CapturaManualPage() {
             <div>
               <p className="text-sm font-medium">Etapa 2: Capturar XML completo</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Busca os XMLs completos das NF-e cuja ciencia ja foi processada pela SEFAZ.
+                Busca os XMLs completos das NF-e cuja ciência já foi processada pela SEFAZ.
               </p>
             </div>
             <Button
@@ -1025,7 +1025,7 @@ export default function CapturaManualPage() {
               Limpar fila de processamento
             </Button>
             <span className="text-xs text-muted-foreground">
-              Remove resumos pendentes para reprocessar ciencia e XML
+              Remove resumos pendentes para reprocessar ciência e XML
             </span>
             {nfeResetFilaResult && (
               <span className="text-xs text-emerald-600">{nfeResetFilaResult}</span>

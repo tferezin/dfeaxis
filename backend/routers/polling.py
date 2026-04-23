@@ -196,7 +196,7 @@ async def nfe_resumos(
     ).eq("cnpj", body.cnpj).eq("is_active", True).execute()
 
     if not cert_result.data:
-        raise HTTPException(status_code=404, detail="CNPJ nao encontrado ou certificado inativo")
+        raise HTTPException(status_code=404, detail="CNPJ não encontrado ou certificado inativo")
 
     cert = cert_result.data[0]
 
@@ -208,7 +208,7 @@ async def nfe_resumos(
     ).eq("id", tenant_id).single().execute()
 
     if not tenant_res.data:
-        raise HTTPException(status_code=404, detail="Tenant nao encontrado")
+        raise HTTPException(status_code=404, detail="Tenant não encontrado")
 
     tenant_data = tenant_res.data
     ambiente = tenant_data.get("sefaz_ambiente", "2")
@@ -239,7 +239,7 @@ async def nfe_resumos(
 
     pfx_password = _get_pfx_password(cert["id"], tenant_id)
     if not pfx_password:
-        raise HTTPException(status_code=400, detail="Senha do certificado nao encontrada")
+        raise HTTPException(status_code=400, detail="Senha do certificado não encontrada")
 
     pfx_encrypted, pfx_iv = _normalize_pfx_blob(
         cert["pfx_encrypted"], cert["pfx_iv"]
@@ -321,7 +321,7 @@ async def nfe_resumos(
                     "nsu": doc.nsu,
                     "tipo": "resumo",
                     "status": "skipped_emitente",
-                    "detail": "NF-e emitida pelo proprio CNPJ — ciencia nao aplicavel",
+                    "detail": "NF-e emitida pelo próprio CNPJ — ciência não aplicável",
                 })
                 continue
 
@@ -355,7 +355,7 @@ async def nfe_resumos(
                     "nsu": doc.nsu,
                     "tipo": "resumo",
                     "status": "enqueued",
-                    "detail": "Enfileirado (manifestacao_mode=manual_only, ciencia nao enviada)",
+                    "detail": "Enfileirado (manifestacao_mode=manual_only, ciência não enviada)",
                 })
                 continue
 
@@ -470,7 +470,7 @@ async def nfe_resumos(
                     "nsu": doc.nsu,
                     "tipo": "evento",
                     "status": "skipped",
-                    "detail": "Evento SEFAZ, nao documento fiscal",
+                    "detail": "Evento SEFAZ, não é documento fiscal",
                 })
 
     # Cursor transacional: só avança se nenhum doc do lote teve falha de
@@ -564,7 +564,7 @@ async def nfe_retry_ciencia(
     ).eq("cnpj", body.cnpj).eq("is_active", True).execute()
 
     if not cert_result.data:
-        raise HTTPException(status_code=404, detail="CNPJ nao encontrado")
+        raise HTTPException(status_code=404, detail="CNPJ não encontrado")
 
     cert = cert_result.data[0]
 
@@ -577,7 +577,7 @@ async def nfe_retry_ciencia(
 
     pfx_password = _get_pfx_password(cert["id"], tenant_id)
     if not pfx_password:
-        raise HTTPException(status_code=400, detail="Senha do certificado nao encontrada")
+        raise HTTPException(status_code=400, detail="Senha do certificado não encontrada")
 
     pfx_encrypted, pfx_iv = _normalize_pfx_blob(
         cert["pfx_encrypted"], cert["pfx_iv"]
@@ -593,7 +593,7 @@ async def nfe_retry_ciencia(
     if not queue_result.data:
         return NfeRetryCienciaResponse(
             pending_in_queue=0,
-            results=[{"status": "empty", "detail": "Nenhuma entrada pendente na fila de ciencia"}],
+            results=[{"status": "empty", "detail": "Nenhuma entrada pendente na fila de ciência"}],
         )
 
     entries = queue_result.data
@@ -612,7 +612,7 @@ async def nfe_retry_ciencia(
                 "ciencia_cstat": "575",
                 "xml_fetched": True,
                 "xml_fetched_at": datetime.now(timezone.utc).isoformat(),
-                "ultimo_erro": "descartado: emitente=nosso CNPJ, ciencia nao aplicavel",
+                "ultimo_erro": "descartado: emitente=nosso CNPJ, ciência não aplicável",
             }).eq("id", entry["id"]).execute()
             ciencia_failed += 1
             results.append({
@@ -765,7 +765,7 @@ async def nfe_xml_completo(
     ).eq("cnpj", body.cnpj).eq("is_active", True).execute()
 
     if not cert_result.data:
-        raise HTTPException(status_code=404, detail="CNPJ nao encontrado ou certificado inativo")
+        raise HTTPException(status_code=404, detail="CNPJ não encontrado ou certificado inativo")
 
     cert = cert_result.data[0]
 
@@ -775,13 +775,13 @@ async def nfe_xml_completo(
     ).eq("id", tenant_id).single().execute()
 
     if not tenant_res.data:
-        raise HTTPException(status_code=404, detail="Tenant nao encontrado")
+        raise HTTPException(status_code=404, detail="Tenant não encontrado")
 
     ambiente = tenant_res.data.get("sefaz_ambiente", "2")
 
     pfx_password = _get_pfx_password(cert["id"], tenant_id)
     if not pfx_password:
-        raise HTTPException(status_code=400, detail="Senha do certificado nao encontrada")
+        raise HTTPException(status_code=400, detail="Senha do certificado não encontrada")
 
     pfx_encrypted, pfx_iv = _normalize_pfx_blob(
         cert["pfx_encrypted"], cert["pfx_iv"]
@@ -803,7 +803,7 @@ async def nfe_xml_completo(
             xml_found=0, saved=0, still_pending=0,
             results=[{
                 "status": "empty",
-                "detail": "Nenhum resumo com ciencia processada aguardando XML. Execute a Etapa 1 primeiro.",
+                "detail": "Nenhum resumo com ciência processada aguardando XML. Execute a Etapa 1 primeiro.",
             }],
         )
 
@@ -893,12 +893,12 @@ async def nfe_xml_completo(
                 sb.table("nfe_ciencia_queue").update({
                     "xml_fetched": True,
                     "xml_fetched_at": datetime.now(timezone.utc).isoformat(),
-                    "ultimo_erro": "XML era evento SEFAZ, nao documento fiscal",
+                    "ultimo_erro": "XML era evento SEFAZ, não é documento fiscal",
                 }).eq("id", entry["id"]).execute()
                 results.append({
                     "chave": chave,
                     "status": "skipped",
-                    "detail": "Evento SEFAZ, nao documento fiscal",
+                    "detail": "Evento SEFAZ, não é documento fiscal",
                 })
         else:
             still_pending += 1
