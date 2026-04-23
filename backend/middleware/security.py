@@ -348,7 +348,8 @@ async def verify_trial_active(request: Request, auth: dict) -> None:
     sb = get_supabase_client()
     result = sb.table("tenants").select(
         "subscription_status, trial_expires_at, trial_active, "
-        "trial_blocked_at, trial_blocked_reason, current_period_end"
+        "trial_blocked_at, trial_blocked_reason, current_period_end, "
+        "past_due_since"
     ).eq("id", tenant_id).single().execute()
 
     if not result.data:
@@ -367,18 +368,39 @@ async def verify_trial_active(request: Request, auth: dict) -> None:
             },
         )
 
-    # Past due: grace period until current_period_end, then block
+    # Past due: tolerancia de 5 dias apos past_due_since (regra 5+5).
+    # Se past_due_since nao esta setado (webhook falhou?), cai no fallback
+    # antigo de current_period_end.
     if status == "past_due":
-        period_end = data.get("current_period_end")
         now = datetime.now(timezone.utc)
+        past_due_raw = data.get("past_due_since")
+
+        if past_due_raw:
+            past_due_dt = datetime.fromisoformat(
+                past_due_raw.replace("Z", "+00:00")
+            )
+            days_since = (now - past_due_dt).days
+            if days_since <= 5:
+                # Dentro da tolerancia — libera
+                return
+            # Passou dos 5 dias — bloqueia
+            raise HTTPException(
+                status_code=402,
+                detail={
+                    "message": _PAYMENT_OVERDUE_MESSAGE,
+                    "code": "PAYMENT_OVERDUE",
+                    "days_since_failure": days_since,
+                },
+            )
+
+        # Fallback: past_due_since nao setado, usa current_period_end
+        period_end = data.get("current_period_end")
         if period_end:
             period_dt = datetime.fromisoformat(
                 period_end.replace("Z", "+00:00")
             )
             if now < period_dt:
-                # Still within paid period — allow access
                 return
-        # Past the billing period or no period_end — block
         raise HTTPException(
             status_code=402,
             detail={

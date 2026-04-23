@@ -336,7 +336,7 @@ def _on_subscription_change(subscription: dict) -> str | None:
 
 
 def _on_invoice_paid(invoice: dict) -> str | None:
-    """Renewal payment succeeded — keep tenant active (sync subscription state).
+    """Renewal payment succeeded — keep tenant active + limpa past_due_since.
 
     NOTA: o reset de docs_consumidos_mes NAO acontece mais aqui. Reset esta
     no monthly_overage_job (scheduler) que roda no dia 1 de cada mes
@@ -344,7 +344,8 @@ def _on_invoice_paid(invoice: dict) -> str | None:
     a 30/31), independente do billing_day do tenant ser 5, 10 ou 15.
 
     Stripe manda invoice.paid tanto na compra inicial quanto em cada renewal.
-    Aqui apenas sincronizamos o estado da subscription no banco.
+    Aqui sincroniza sub + limpa past_due_since (se estava em dunning, pagou
+    agora, reset).
     """
     subscription_id = invoice.get("subscription")
     if not subscription_id:
@@ -353,18 +354,64 @@ def _on_invoice_paid(invoice: dict) -> str | None:
     sub = stripe.Subscription.retrieve(subscription_id)
     sync_subscription_to_db(sub)
 
-    return (sub.get("metadata") or {}).get("tenant_id")
+    tenant_id = (sub.get("metadata") or {}).get("tenant_id")
+    if tenant_id:
+        # Limpa past_due_since — pagou, sai do dunning
+        try:
+            sb = get_supabase_client()
+            sb.table("tenants").update({"past_due_since": None}).eq(
+                "id", tenant_id
+            ).execute()
+        except Exception as exc:
+            logger.warning(
+                "nao consegui limpar past_due_since pra tenant=%s: %s",
+                tenant_id, exc,
+            )
+
+    return tenant_id
 
 
 def _on_invoice_failed(invoice: dict) -> str | None:
-    """Payment failed — Stripe will retry; we mark past_due via subscription sync."""
+    """Payment failed — marca past_due + stampa past_due_since pra dunning.
+
+    Stripe vai fazer retry automatico nos proximos dias (configurado na conta).
+    A gente usa past_due_since pra calcular quantos dias restam ate o
+    bloqueio (regra 5+5: 5 dias de tolerancia a partir da primeira falha).
+
+    Se o retry passar mais tarde, webhook invoice.paid limpa past_due_since.
+    """
     subscription_id = invoice.get("subscription")
     if not subscription_id:
         return None
     stripe = get_stripe()
     sub = stripe.Subscription.retrieve(subscription_id)
     sync_subscription_to_db(sub)
-    return (sub.get("metadata") or {}).get("tenant_id")
+
+    tenant_id = (sub.get("metadata") or {}).get("tenant_id")
+    if tenant_id:
+        sb = get_supabase_client()
+        # So marca past_due_since se ainda nao tem (preserva data da PRIMEIRA
+        # falha pra dunning. Se cliente falhar dia 5 e dia 8, o D-dia pra
+        # bloqueio e contado a partir do dia 5, nao do dia 8).
+        try:
+            current = sb.table("tenants").select("past_due_since").eq(
+                "id", tenant_id
+            ).single().execute()
+            if not current.data or not current.data.get("past_due_since"):
+                sb.table("tenants").update({
+                    "past_due_since": datetime.now(timezone.utc).isoformat(),
+                }).eq("id", tenant_id).execute()
+                logger.info(
+                    "past_due_since marcado pra tenant=%s (primeira falha)",
+                    tenant_id,
+                )
+        except Exception as exc:
+            logger.warning(
+                "nao consegui atualizar past_due_since pra tenant=%s: %s",
+                tenant_id, exc,
+            )
+
+    return tenant_id
 
 
 # ---------------------------------------------------------------------------

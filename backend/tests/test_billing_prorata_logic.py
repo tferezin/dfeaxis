@@ -125,61 +125,65 @@ class TestProrataCents:
         return SimpleNamespace(plan=plan, period=period)
 
     def test_exemplo_usuario_dia_4_abril_starter(self):
-        """Cliente Starter 4/Abril (30 dias): 26/30 x 290 = R$ 251,33."""
+        """Cliente Starter 4/Abril (30 dias): 27/30 x 290 = R$ 261.
+
+        Inclui o dia de adesao (30 - 4 + 1 = 27 dias).
+        """
         with patch.object(checkout, "get_plan_by_price_id") as mock:
             mock.return_value = self._mock_lookup()
             now = datetime(2026, 4, 4, 14, 0, 0, tzinfo=timezone.utc)
             proration, days = checkout._compute_prorata_cents("price_test", now)
-        assert days == 26
-        assert proration == 25133  # R$ 251,33
+        assert days == 27
+        assert proration == int(29000 * 27 / 30)  # 26100 cents = R$ 261,00
 
     def test_exemplo_usuario_dia_30_abril_starter(self):
-        """Cliente 30/Abril: 0 dias restantes → cortesia."""
+        """Cliente 30/Abril: 1 dia (dia de adesao) → R$ 9,67 → cortesia."""
         with patch.object(checkout, "get_plan_by_price_id") as mock:
             mock.return_value = self._mock_lookup()
             now = datetime(2026, 4, 30, 14, 0, 0, tzinfo=timezone.utc)
             proration, days = checkout._compute_prorata_cents("price_test", now)
-        assert days == 0
-        assert proration == 0
-
-    def test_dia_29_abril_starter(self):
-        """1 dia → R$ 9,66 → abaixo do minimo R$ 50."""
-        with patch.object(checkout, "get_plan_by_price_id") as mock:
-            mock.return_value = self._mock_lookup()
-            now = datetime(2026, 4, 29, 14, 0, 0, tzinfo=timezone.utc)
-            proration, days = checkout._compute_prorata_cents("price_test", now)
         assert days == 1
-        assert proration == 966
+        assert proration == int(29000 * 1 / 30)  # 966 cents = R$ 9,66
 
     def test_dia_15_business_mensal(self):
-        """Business mensal (R$ 690) dia 15/Abril: 15/30 × 690 = R$ 345."""
+        """Business mensal (R$ 690) dia 15/Abril: 16/30 × 690 = R$ 368."""
         with patch.object(checkout, "get_plan_by_price_id") as mock:
             mock.return_value = self._mock_lookup(monthly_cents=69000)
             now = datetime(2026, 4, 15, 14, 0, 0, tzinfo=timezone.utc)
             proration, days = checkout._compute_prorata_cents("price_test", now)
-        assert days == 15
-        assert proration == 34500
+        assert days == 16
+        assert proration == int(69000 * 16 / 30)  # 36800 cents = R$ 368,00
 
     def test_fevereiro_28_dias(self):
-        """Fevereiro (28 dias): dia 4 = 24 dias restantes."""
+        """Fevereiro (28 dias): dia 4 = 25 dias (28 - 4 + 1)."""
         with patch.object(checkout, "get_plan_by_price_id") as mock:
             mock.return_value = self._mock_lookup()
             now = datetime(2026, 2, 4, 14, 0, 0, tzinfo=timezone.utc)
             proration, days = checkout._compute_prorata_cents("price_test", now)
-        assert days == 24
-        assert proration == int(29000 * 24 / 28)  # R$ 248,57
+        assert days == 25
+        assert proration == int(29000 * 25 / 28)  # R$ 258,93
 
-    def test_plano_anual_usa_mensal_equivalente(self):
-        """Anual: yearly/12 = 'mensalidade equivalente' pra ProRata."""
+    def test_dia_1_mes_inteiro(self):
+        """Dia 1 do mes: todos os 30 dias (30 - 1 + 1 = 30) → valor cheio."""
+        with patch.object(checkout, "get_plan_by_price_id") as mock:
+            mock.return_value = self._mock_lookup()
+            now = datetime(2026, 4, 1, 14, 0, 0, tzinfo=timezone.utc)
+            proration, days = checkout._compute_prorata_cents("price_test", now)
+        assert days == 30
+        assert proration == 29000  # R$ 290 cheio
+
+    def test_plano_anual_nao_tem_prorata(self):
+        """Plano ANUAL: nao cobra ProRata, cobra cheio na adesao."""
         with patch.object(checkout, "get_plan_by_price_id") as mock:
             mock.return_value = self._mock_lookup(
                 yearly_cents=278400, period="yearly"
             )
             now = datetime(2026, 4, 4, 14, 0, 0, tzinfo=timezone.utc)
             proration, days = checkout._compute_prorata_cents("price_test", now)
-        assert days == 26
-        monthly_eq = 278400 // 12  # 23200
-        assert proration == int(monthly_eq * 26 / 30)
+        # Retorna (0, 0) — sinal pra checkout NAO criar Invoice avulsa.
+        # Stripe vai cobrar o valor cheio no proprio checkout (valor anual).
+        assert days == 0
+        assert proration == 0
 
     def test_price_id_nao_encontrado(self):
         with patch.object(checkout, "get_plan_by_price_id") as mock:
@@ -204,5 +208,5 @@ class TestConstantes:
     def test_9_reais_abaixo_do_minimo(self):
         assert 966 < checkout.PRORATION_MIN_CENTS  # cortesia
 
-    def test_251_reais_acima_do_minimo(self):
-        assert 25133 >= checkout.PRORATION_MIN_CENTS  # cobra
+    def test_261_reais_acima_do_minimo(self):
+        assert 26100 >= checkout.PRORATION_MIN_CENTS  # cobra (dia 4 de Abril)

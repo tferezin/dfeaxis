@@ -150,6 +150,55 @@ def _build_trial_alert(tenant: dict) -> Optional[dict]:
     }
 
 
+def _build_payment_overdue_alert(tenant: dict) -> Optional[dict]:
+    """Alerta de inadimplencia — dunning de 5 dias.
+
+    past_due_since e stamped pelo webhook invoice.payment_failed. Cliente
+    tem 5 dias de tolerancia: API retorna warning/critical com days_remaining.
+    No 6o dia (days_remaining <= 0) o middleware de auth bloqueia o acesso
+    (separadamente deste alerta, que so informa).
+    """
+    past_due = _parse_date(tenant.get("past_due_since"))
+    if not past_due:
+        return None
+
+    today = date.today()
+    days_since_failure = (today - past_due).days
+    # 5 dias de tolerancia — bloqueio a partir do dia 6
+    tolerance_days = 5
+    days_remaining = tolerance_days - days_since_failure
+
+    if days_remaining >= 3:
+        severity = "warning"
+    elif days_remaining >= 1:
+        severity = "critical"
+    else:
+        severity = "critical"  # ja bloqueado
+
+    if days_remaining > 0:
+        message = (
+            f"Pagamento em atraso. Regularize nos proximos "
+            f"{days_remaining} dia(s) pra manter o acesso."
+        )
+    else:
+        message = (
+            "Pagamento em atraso. Acesso bloqueado — regularize pra reativar."
+        )
+
+    return {
+        "id": f"payment_overdue:{past_due.isoformat()}",
+        "type": "payment_overdue",
+        "severity": severity,
+        "message": message,
+        "metadata": {
+            "past_due_since": past_due.isoformat(),
+            "days_since_failure": days_since_failure,
+            "days_remaining": max(0, days_remaining),
+            "blocked": days_remaining <= 0,
+        },
+    }
+
+
 def _build_usage_alert(tenant: dict) -> Optional[dict]:
     """Consumo mensal >= 90% do incluido no plano pago."""
     if tenant.get("subscription_status") != "active":
@@ -207,6 +256,7 @@ async def list_alerts(auth: dict = Depends(verify_jwt_or_api_key)):
     - `trial_ending` (tempo ou cap proximo do fim)
     - `high_usage` (consumo >= 90% do plano)
     - `usage_exceeded` (consumo > 100% do plano)
+    - `payment_overdue` (cartao falhou — 5 dias de tolerancia ate bloqueio)
 
     Cada alerta tem `id` deterministico. Se a condicao nao mudou, o id
     tambem nao muda — use isso pra deduplicar no seu ERP.
@@ -222,10 +272,11 @@ async def list_alerts(auth: dict = Depends(verify_jwt_or_api_key)):
     ).eq("tenant_id", tenant_id).eq("is_active", True).execute()
     alerts.extend(_build_cert_alerts(certs_res.data or []))
 
-    # Tenant (trial + uso mensal)
+    # Tenant (trial + uso mensal + dunning)
     tenant_res = sb.table("tenants").select(
         "subscription_status, trial_expires_at, trial_cap, "
-        "docs_consumidos_trial, docs_consumidos_mes, docs_included_mes"
+        "docs_consumidos_trial, docs_consumidos_mes, docs_included_mes, "
+        "past_due_since"
     ).eq("id", tenant_id).single().execute()
     tenant = tenant_res.data or {}
 
@@ -236,6 +287,10 @@ async def list_alerts(auth: dict = Depends(verify_jwt_or_api_key)):
     usage_alert = _build_usage_alert(tenant)
     if usage_alert:
         alerts.append(usage_alert)
+
+    overdue_alert = _build_payment_overdue_alert(tenant)
+    if overdue_alert:
+        alerts.append(overdue_alert)
 
     return {
         "alerts": alerts,

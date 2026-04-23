@@ -238,6 +238,7 @@ export default function ConfiguracoesPage() {
                 <li><code className="text-[11px] bg-muted px-1 py-0.5 rounded">trial_ending</code> — trial próximo do limite de tempo ou documentos</li>
                 <li><code className="text-[11px] bg-muted px-1 py-0.5 rounded">high_usage</code> — consumo ≥ 90% do plano mensal</li>
                 <li><code className="text-[11px] bg-muted px-1 py-0.5 rounded">usage_exceeded</code> — consumo acima de 100% do plano (overage)</li>
+                <li><code className="text-[11px] bg-muted px-1 py-0.5 rounded">payment_overdue</code> — falha de pagamento · 5 dias de tolerância até bloqueio</li>
               </ul>
             </div>
           </CardContent>

@@ -86,37 +86,37 @@ def _compute_next_billing_anchor(
 def _compute_prorata_cents(
     price_id: str, now: datetime
 ) -> tuple[int | None, int]:
-    """Calcula ProRata em centavos baseado em dias restantes do mes calendario.
+    """Calcula ProRata em centavos — so pra plano MENSAL.
 
     Formula: (dias_restantes / dias_do_mes) * valor_mensal.
-    - Pra plano mensal: usa monthly_amount_cents do catalogo
-    - Pra plano anual: usa yearly_amount_cents / 12 como "mensalidade
-      equivalente" — pros propositos de calcular cortesia, da um valor
-      comparavel ao mensal
+    dias_restantes = last_day_of_month - now.day + 1 (inclui o dia de
+    adesao como dia consumido — cliente que assina dia 30 tem 1 dia).
+
+    - Plano mensal: cobra ProRata proporcional
+    - Plano anual: retorna (0, 0) — plano anual cobra valor cheio na
+      adesao, sem ProRata (decisao do usuario 23/Abril)
 
     Retorna (proration_cents, dias_restantes) ou (None, 0) se o price_id
     nao estiver no catalogo.
-
-    dias_restantes = last_day_of_month - now.day. Cliente que assina no
-    ultimo dia do mes tem 0 dias restantes — cai na regra da cortesia.
     """
     lookup = get_plan_by_price_id(price_id)
     if not lookup:
         return (None, 0)
 
+    # Plano anual nao usa ProRata — cobra cheio na adesao
+    if lookup.period == "yearly":
+        return (0, 0)
+
     days_in_month = calendar.monthrange(now.year, now.month)[1]
-    days_remaining = days_in_month - now.day
+    days_remaining = days_in_month - now.day + 1
 
     if days_remaining <= 0:
         return (0, 0)
 
     plan = lookup.plan
-    if lookup.period == "yearly":
-        monthly_equivalent = plan.yearly_amount_cents // 12
-    else:
-        monthly_equivalent = plan.monthly_amount_cents
-
-    proration_cents = int(monthly_equivalent * days_remaining / days_in_month)
+    proration_cents = int(
+        plan.monthly_amount_cents * days_remaining / days_in_month
+    )
     return (proration_cents, days_remaining)
 
 
@@ -245,40 +245,65 @@ def create_checkout_session(
     subscription_data: dict = {"metadata": session_metadata}
 
     if mode == "subscription":
-        now = datetime.now(timezone.utc)
-        anchor = _compute_next_billing_anchor(billing_day, now)
-        anchor_ts = int(anchor.timestamp())
-        proration_cents, days_remaining = _compute_prorata_cents(price_id, now)
+        lookup = get_plan_by_price_id(price_id)
+        is_yearly = bool(lookup and lookup.period == "yearly")
 
-        # Subscription sempre comeca a cobrar no anchor do proximo mes
-        # (modelo mes calendario). Proration padrao Stripe desabilitado —
-        # ProRata sera cobrada via Invoice avulsa separada se >= R$ 50.
-        subscription_data["billing_cycle_anchor"] = anchor_ts
-        subscription_data["proration_behavior"] = "none"
-        subscription_data["trial_end"] = anchor_ts
-
-        # Stash no metadata pra o webhook saber se deve criar Invoice avulsa
-        # de ProRata apos o checkout completar (cartao capturado).
-        if proration_cents is not None and proration_cents >= PRORATION_MIN_CENTS:
-            subscription_data["metadata"]["prorata_cents"] = str(proration_cents)
-            subscription_data["metadata"]["prorata_days"] = str(days_remaining)
+        if is_yearly:
+            # Plano anual: checkout Stripe padrao — cobra valor cheio na
+            # adesao, plano renova no mesmo dia do ano seguinte. Sem
+            # ProRata, sem anchor, sem trial_end. Simples.
+            session_metadata["plan_period"] = "yearly"
             logger.info(
-                "Checkout c/ ProRata agendada pos-captura: tenant=%s dias=%d "
-                "valor_cents=%d anchor=%s",
-                tenant_id, days_remaining, proration_cents, anchor.isoformat(),
-            )
-        elif proration_cents is not None:
-            logger.info(
-                "Checkout c/ cortesia (ProRata %d cents < %d): tenant=%s "
-                "anchor=%s",
-                proration_cents, PRORATION_MIN_CENTS, tenant_id,
-                anchor.isoformat(),
+                "Checkout ANUAL: tenant=%s price=%s — cobra cheio na adesao",
+                tenant_id, price_id,
             )
         else:
-            logger.warning(
-                "price_id %s nao esta no catalogo — sem ProRata",
-                price_id,
+            # Plano mensal: modelo mes calendario
+            # - Subscription ancora no dia 5 do mes seguinte (trial_end ate la)
+            # - Proration padrao Stripe desabilitado
+            # - ProRata proprio sera cobrada via Invoice avulsa (se >= R$ 50)
+            now = datetime.now(timezone.utc)
+            anchor = _compute_next_billing_anchor(billing_day, now)
+            anchor_ts = int(anchor.timestamp())
+            proration_cents, days_remaining = _compute_prorata_cents(
+                price_id, now
             )
+
+            subscription_data["billing_cycle_anchor"] = anchor_ts
+            subscription_data["proration_behavior"] = "none"
+            subscription_data["trial_end"] = anchor_ts
+            session_metadata["plan_period"] = "monthly"
+
+            # Stash no metadata pra o webhook saber se deve criar Invoice
+            # avulsa de ProRata apos o checkout completar (cartao capturado).
+            if (
+                proration_cents is not None
+                and proration_cents >= PRORATION_MIN_CENTS
+            ):
+                subscription_data["metadata"]["prorata_cents"] = str(
+                    proration_cents
+                )
+                subscription_data["metadata"]["prorata_days"] = str(
+                    days_remaining
+                )
+                logger.info(
+                    "Checkout MENSAL c/ ProRata: tenant=%s dias=%d "
+                    "valor_cents=%d anchor=%s",
+                    tenant_id, days_remaining, proration_cents,
+                    anchor.isoformat(),
+                )
+            elif proration_cents is not None:
+                logger.info(
+                    "Checkout MENSAL c/ cortesia (ProRata %d cents < %d): "
+                    "tenant=%s anchor=%s",
+                    proration_cents, PRORATION_MIN_CENTS, tenant_id,
+                    anchor.isoformat(),
+                )
+            else:
+                logger.warning(
+                    "price_id %s nao esta no catalogo — sem ProRata",
+                    price_id,
+                )
 
     session = stripe.checkout.Session.create(
         mode=mode,
