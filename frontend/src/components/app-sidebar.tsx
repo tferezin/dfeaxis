@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   FileText,
   Truck,
+  Bus,
   Building2,
   FileStack,
   FileCheck,
@@ -93,6 +94,7 @@ const navigation: NavSection[] = [
     items: [
       { title: "NF-e Recebidas", href: "/historico/nfe", icon: FileText, badge: "SAP" },
       { title: "CT-e Recebidos", href: "/historico/cte", icon: Truck, badge: "SAP" },
+      { title: "CT-e OS Recebidos", href: "/historico/cteos", icon: Bus, badge: "SAP" },
       { title: "NFS-e Recebidas", href: "/historico/nfse", icon: Building2, badge: "ADN" },
       { title: "MDF-e Recebidos", href: "/historico/mdfe", icon: FileStack },
     ],
