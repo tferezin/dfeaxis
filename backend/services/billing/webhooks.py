@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime, timezone
 from typing import Any
 
 from db.supabase import get_supabase_client
@@ -109,6 +110,11 @@ def _on_checkout_completed(session: dict) -> str | None:
     Este é o ponto de conversão real do negócio: trial → cliente pagante.
     Disparamos o evento `purchase` no GA4 via Measurement Protocol para que
     a campanha do Google Ads otimize por receita real, não só por cadastros.
+
+    Tambem e aqui que criamos a Invoice avulsa de ProRata (se houver). No
+    checkout.py agendamos via metadata (prorata_cents) — aqui lemos e
+    cobramos. Isso e separado da subscription porque a sub tem trial_end
+    ate o billing_cycle_anchor — sem cobranca recorrente ate la.
     """
     tenant_id = (session.get("metadata") or {}).get("tenant_id") or session.get(
         "client_reference_id"
@@ -125,6 +131,28 @@ def _on_checkout_completed(session: dict) -> str | None:
     sub = stripe.Subscription.retrieve(subscription_id)
     sync_subscription_to_db(sub)
 
+    # CRITICO: copia o default_payment_method da subscription pro customer
+    # root. Sem isso, Invoice avulsa com charge_automatically nao cobra
+    # (fatura fica em status=open esperando pagamento manual). Precisa ser
+    # feito ANTES de criar a Invoice de ProRata.
+    try:
+        _sync_default_payment_method(stripe, sub)
+    except Exception as exc:  # noqa: BLE001
+        logger.error(
+            "sync default_payment_method failed for session=%s: %s",
+            session.get("id"), exc,
+        )
+
+    # Cria Invoice avulsa de ProRata se agendada no checkout. Nao falha o
+    # webhook se nao der — logamos e seguimos, subscription ja foi criada.
+    try:
+        _create_prorata_invoice_from_metadata(session=session, subscription=sub)
+    except Exception as exc:  # noqa: BLE001
+        logger.error(
+            "prorata invoice failed for tenant=%s session=%s: %s",
+            tenant_id, session.get("id"), exc,
+        )
+
     # Dispara purchase no GA4 via Measurement Protocol.
     # Tracking NUNCA pode quebrar o webhook — qualquer erro vira warning log.
     try:
@@ -136,6 +164,93 @@ def _on_checkout_completed(session: dict) -> str | None:
         )
 
     return tenant_id
+
+
+def _sync_default_payment_method(stripe, subscription: dict) -> None:
+    """Copia subscription.default_payment_method pro customer.invoice_settings.
+
+    Stripe Checkout atrela o cartao ao payment_method da subscription, mas
+    NAO ao customer root. Invoice avulsa com charge_automatically busca o
+    metodo no customer.invoice_settings.default_payment_method — se nao
+    tiver, fatura fica em 'open' sem cobrar. Essa funcao garante que o
+    customer tenha o mesmo payment_method da sub pra Invoices avulsas
+    futuras (ProRata, overage anual) cobrem automaticamente.
+    """
+    customer_id = subscription.get("customer")
+    pm_id = subscription.get("default_payment_method")
+    if not customer_id or not pm_id:
+        return
+    try:
+        stripe.Customer.modify(
+            customer_id,
+            invoice_settings={"default_payment_method": pm_id},
+        )
+        logger.info(
+            "default_payment_method sincronizado pro customer=%s pm=%s",
+            customer_id, pm_id,
+        )
+    except Exception as exc:
+        logger.error(
+            "Customer.modify default_payment_method falhou: customer=%s pm=%s %s",
+            customer_id, pm_id, exc,
+        )
+
+
+def _create_prorata_invoice_from_metadata(
+    *, session: dict, subscription: dict
+) -> None:
+    """Le prorata_cents/prorata_days do metadata e cria a Invoice avulsa.
+
+    Agendado no checkout.py via subscription_data.metadata. A gente chama
+    aqui apos a subscription estar criada e o cartao capturado — momento
+    correto pra debitar o ProRata imediatamente.
+    """
+    # Metadata pode estar na session ou na sub (ambos apontam pro mesmo dict
+    # no create_checkout_session). Usamos o que tiver.
+    metadata = subscription.get("metadata") or session.get("metadata") or {}
+    prorata_cents_str = metadata.get("prorata_cents")
+    if not prorata_cents_str:
+        return  # sem ProRata — cortesia ou erro de catalogo
+
+    try:
+        prorata_cents = int(prorata_cents_str)
+        prorata_days = int(metadata.get("prorata_days") or 0)
+    except (TypeError, ValueError):
+        logger.warning(
+            "ProRata metadata invalida na session=%s: cents=%r days=%r",
+            session.get("id"),
+            prorata_cents_str,
+            metadata.get("prorata_days"),
+        )
+        return
+
+    tenant_id = metadata.get("tenant_id") or session.get("client_reference_id")
+    customer_id = subscription.get("customer") or session.get("customer")
+    if not customer_id or not tenant_id:
+        logger.warning(
+            "ProRata sem customer/tenant — session=%s customer=%s tenant=%s",
+            session.get("id"), customer_id, tenant_id,
+        )
+        return
+
+    # Label amigavel do mes (pt-BR)
+    now = datetime.now(timezone.utc)
+    month_label = now.strftime("%m/%Y")
+
+    # Import tardio pra evitar ciclo (checkout.py importa nada deste modulo,
+    # mas webhook.py ja importa de varios lugares)
+    from services.billing.checkout import create_prorata_invoice
+
+    create_prorata_invoice(
+        customer_id=customer_id,
+        proration_cents=prorata_cents,
+        days_remaining=prorata_days,
+        month_label=month_label,
+        tenant_id=tenant_id,
+        # Idempotency: se webhook for reentregue, Stripe retorna mesmo InvoiceItem
+        # em vez de duplicar a cobranca.
+        idempotency_session_id=session.get("id"),
+    )
 
 
 def _fire_ga4_purchase(
@@ -221,12 +336,15 @@ def _on_subscription_change(subscription: dict) -> str | None:
 
 
 def _on_invoice_paid(invoice: dict) -> str | None:
-    """Renewal payment succeeded — keep tenant active and reset monthly counter.
+    """Renewal payment succeeded — keep tenant active (sync subscription state).
+
+    NOTA: o reset de docs_consumidos_mes NAO acontece mais aqui. Reset esta
+    no monthly_overage_job (scheduler) que roda no dia 1 de cada mes
+    calendario. Assim o ciclo de apuracao e sempre o mes calendario (dia 1
+    a 30/31), independente do billing_day do tenant ser 5, 10 ou 15.
 
     Stripe manda invoice.paid tanto na compra inicial quanto em cada renewal.
-    Resetamos docs_consumidos_mes=0 em ambos os casos: no primeiro o campo já
-    é 0 (no-op), no renewal é o fix do bug onde o contador não zerava no ciclo
-    seguinte e o cliente ficava bloqueado mesmo tendo pago.
+    Aqui apenas sincronizamos o estado da subscription no banco.
     """
     subscription_id = invoice.get("subscription")
     if not subscription_id:
@@ -235,18 +353,7 @@ def _on_invoice_paid(invoice: dict) -> str | None:
     sub = stripe.Subscription.retrieve(subscription_id)
     sync_subscription_to_db(sub)
 
-    tenant_id = (sub.get("metadata") or {}).get("tenant_id")
-    if tenant_id:
-        sb = get_supabase_client()
-        sb.table("tenants").update({"docs_consumidos_mes": 0}).eq(
-            "id", tenant_id
-        ).execute()
-        logger.info(
-            "Reset docs_consumidos_mes=0 for tenant %s (invoice.paid renewal)",
-            tenant_id,
-        )
-
-    return tenant_id
+    return (sub.get("metadata") or {}).get("tenant_id")
 
 
 def _on_invoice_failed(invoice: dict) -> str | None:

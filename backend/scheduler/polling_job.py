@@ -1297,7 +1297,9 @@ def start_scheduler() -> BackgroundScheduler:
     - Reduz risco de erro 656 (consumo indevido SEFAZ)
     - Simplifica arquitetura (sem lógica de "polling_mode auto vs manual")
     """
-    scheduler = BackgroundScheduler()
+    # timezone=utc explicito — jobs de billing (dia 1 e dia 5) dependem
+    # disso pra nao virar de mes no fuso errado em containers fora de UTC.
+    scheduler = BackgroundScheduler(timezone="UTC")
 
     # Transactional trial emails — imported lazily so the polling scheduler
     # still starts even if email deps are missing in a dev environment.
@@ -1326,24 +1328,55 @@ def start_scheduler() -> BackgroundScheduler:
     except Exception as exc:  # noqa: BLE001
         logger.warning("Não foi possível agendar trial email jobs: %s", exc)
 
-    # Billing: cálculo mensal de excedente + InvoiceItem no Stripe
-    # Roda dia 1 às 02:00 UTC. Usa cron ao invés de interval pra garantir a data.
+    # Billing dia 1: snapshot do mes anterior + reset do contador
+    # Congela o valor final de docs_consumidos_mes em monthly_overage_charges
+    # e zera o contador pra iniciar o mes corrente com UX correta.
+    try:
+        from scheduler.monthly_snapshot_reset_job import (
+            process_monthly_snapshot_reset,
+        )
+
+        scheduler.add_job(
+            process_monthly_snapshot_reset,
+            "cron",
+            day=1,
+            hour=2,
+            minute=0,
+            id="monthly_snapshot_reset",
+            name="Billing: snapshot do mes anterior + reset contador (dia 1)",
+            replace_existing=True,
+        )
+        logger.info(
+            "monthly_snapshot_reset_job agendado: dia 1 as 02:00 UTC"
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "Nao foi possivel agendar monthly_snapshot_reset_job: %s", exc
+        )
+
+    # Billing dia 5: apuracao + faturamento
+    # Le snapshots do dia 1, cria InvoiceItem pendurado no Stripe, e pros
+    # tenants anuais cria Invoice avulsa + finaliza (cobra na hora). Pros
+    # tenants mensais, Stripe cobra automaticamente na subscription renewal
+    # que acontece no mesmo dia 5 (anchor configurado no checkout).
     try:
         from scheduler.monthly_overage_job import process_monthly_overage
 
         scheduler.add_job(
             process_monthly_overage,
             "cron",
-            day=1,
+            day=5,
             hour=2,
             minute=0,
             id="monthly_overage",
-            name="Billing: cobrança de excedente mensal",
+            name="Billing: apuracao + faturamento excedente (dia 5)",
             replace_existing=True,
         )
-        logger.info("monthly_overage_job agendado: dia 1 às 02:00 UTC")
+        logger.info("monthly_overage_job agendado: dia 5 as 02:00 UTC")
     except Exception as exc:  # noqa: BLE001
-        logger.warning("Não foi possível agendar monthly_overage_job: %s", exc)
+        logger.warning(
+            "Nao foi possivel agendar monthly_overage_job: %s", exc
+        )
 
     # Manifestação: alerta de NF-e pendentes (1x/dia)
     try:
