@@ -101,6 +101,16 @@ async def listar_documentos(
             fetched_at=doc["fetched_at"],
             manifestacao_status=doc.get("manifestacao_status"),
             is_resumo=doc.get("is_resumo", False),
+            # Metadados pré-extraídos (migration 015) — reduzem trabalho
+            # do ERP cliente, que não precisa parsear o XML só pra essas
+            # infos básicas. Campos são populados no _build_document_row
+            # via xml_parser.parse_document_xml.
+            supplier_cnpj=doc.get("cnpj_emitente"),
+            supplier_name=doc.get("razao_social_emitente"),
+            company_cnpj=doc.get("cnpj_destinatario"),
+            nota_numero=doc.get("numero_documento"),
+            data_emissao=doc.get("data_emissao"),
+            valor_total=doc.get("valor_total"),
         ))
 
     ult_nsu = documentos[-1].nsu if documentos else desde or "000000000000000"

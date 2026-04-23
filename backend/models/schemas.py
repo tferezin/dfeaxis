@@ -82,6 +82,16 @@ class DocumentoOut(BaseModel):
     fetched_at: datetime
     manifestacao_status: Optional[str] = None
     is_resumo: bool = False
+    # Metadados extraídos do XML — evitam o ERP cliente (ABAP/ADVPL/qualquer)
+    # ter que parsear o XML manualmente só pra saber fornecedor, número,
+    # data, valor. NULL em resumos (sem XML completo) ou quando o parser
+    # não conseguiu extrair (XML malformado).
+    supplier_cnpj: Optional[str] = None        # cnpj_emitente — quem emitiu a nota
+    supplier_name: Optional[str] = None        # razao_social_emitente
+    company_cnpj: Optional[str] = None         # cnpj_destinatario — quem recebeu
+    nota_numero: Optional[str] = None          # numero_documento (nNF/nCT/nMDF)
+    data_emissao: Optional[datetime] = None    # timestamp <dhEmi>
+    valor_total: Optional[float] = None        # vNF/vTPrest/vCarga/ValorServicos
 
 
 class DocumentosResponse(BaseModel):
