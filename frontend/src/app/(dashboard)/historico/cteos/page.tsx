@@ -38,11 +38,10 @@ type CteosStatus = "Autorizado" | "Cancelado" | "Pendente" | "Denegado"
 interface CteosRow {
   id: number
   emitente: string
-  remetente: string
-  destinatario: string
+  tomador: string
   cteosNumero: string
   chave: string
-  valorFrete: number
+  valorServico: number
   status: CteosStatus
   emissao: string
 }
@@ -66,22 +65,26 @@ const statusConfig: Record<CteosStatus, { label: string; className: string }> = 
   },
 }
 
+// CT-e OS (modelo 67) cobre prestacao de servico de transporte de
+// passageiros e valores — onibus interestadual, carro-forte, van de
+// turismo. Nao tem "remetente/destinatario" como CT-e de carga: tem
+// emitente (transportadora) e tomador (quem contrata o servico).
 const mockData: CteosRow[] = [
-  { id: 1, emitente: "Transportadora Veloz S.A.", remetente: "Distribuidora Alimentos Ltda", destinatario: "Supermercado Bom Preco", cteosNumero: "000.001.234", chave: "3526 0312 3456 7800 0190 5700 1001 2345 6712 3456 7890", valorFrete: 3420.50, status: "Autorizado", emissao: "15/03/2026" },
-  { id: 2, emitente: "Logistica Nacional Ltda", remetente: "Industria Quimica Norte", destinatario: "Metalurgica Brasil ME", cteosNumero: "000.002.345", chave: "3526 0398 7654 3200 0110 5700 1002 3456 7823 4567 8901", valorFrete: 5800.00, status: "Autorizado", emissao: "14/03/2026" },
-  { id: 3, emitente: "Expresso Rodoviario ME", remetente: "Textil Nordeste ME", destinatario: "Eletro Comercial Eireli", cteosNumero: "000.003.456", chave: "3526 0311 2223 3300 0144 5700 1003 4567 8934 5678 9012", valorFrete: 1290.75, status: "Pendente", emissao: "14/03/2026" },
-  { id: 4, emitente: "Frete Seguro Transportes", remetente: "Agropecuaria Campo Verde", destinatario: "Construtora Horizonte Ltda", cteosNumero: "000.004.567", chave: "3526 0344 5556 6600 0177 5700 1004 5678 9045 6789 0123", valorFrete: 8900.20, status: "Cancelado", emissao: "13/03/2026" },
-  { id: 5, emitente: "Transportadora Veloz S.A.", remetente: "Moveis Planejados Sul", destinatario: "Auto Pecas Centro Sul", cteosNumero: "000.005.678", chave: "3526 0355 6667 7700 0188 5700 1005 6789 0156 7890 1234", valorFrete: 2350.00, status: "Autorizado", emissao: "13/03/2026" },
-  { id: 6, emitente: "Rapido Translog Eireli", remetente: "Tech Solutions S.A.", destinatario: "Grafica Express ME", cteosNumero: "000.006.789", chave: "3526 0366 7778 8800 0199 5700 1006 7890 1267 8901 2345", valorFrete: 780.30, status: "Autorizado", emissao: "12/03/2026" },
-  { id: 7, emitente: "Logistica Nacional Ltda", remetente: "Farmacia Popular Eireli", destinatario: "Clinica Odonto Plus", cteosNumero: "000.007.890", chave: "3526 0377 8889 9900 0100 5700 1007 8901 2378 9012 3456", valorFrete: 450.00, status: "Denegado", emissao: "12/03/2026" },
-  { id: 8, emitente: "Expresso Rodoviario ME", remetente: "Laboratorio Vida Saude", destinatario: "Padaria Sao Jorge Ltda", cteosNumero: "000.008.901", chave: "3526 0388 9990 0000 0111 5700 1008 9012 3489 0123 4567", valorFrete: 1120.45, status: "Autorizado", emissao: "11/03/2026" },
-  { id: 9, emitente: "Frete Seguro Transportes", remetente: "Posto Combustivel Rota", destinatario: "Supermercado Bom Preco", cteosNumero: "000.009.012", chave: "3526 0399 0001 1100 0122 5700 1009 0123 4590 1234 5678", valorFrete: 3670.80, status: "Pendente", emissao: "11/03/2026" },
-  { id: 10, emitente: "Transportadora Veloz S.A.", remetente: "Distribuidora Alimentos Ltda", destinatario: "Industria Quimica Norte", cteosNumero: "000.010.123", chave: "3526 0310 1112 2200 0133 5700 1010 1234 5601 2345 6789", valorFrete: 6540.00, status: "Autorizado", emissao: "10/03/2026" },
-  { id: 11, emitente: "Rapido Translog Eireli", remetente: "Construtora Horizonte Ltda", destinatario: "Metalurgica Brasil ME", cteosNumero: "000.011.234", chave: "3526 0321 3334 4400 0155 5700 1011 2345 6712 3456 7890", valorFrete: 4230.25, status: "Autorizado", emissao: "10/03/2026" },
-  { id: 12, emitente: "Logistica Nacional Ltda", remetente: "Eletro Comercial Eireli", destinatario: "Moveis Planejados Sul", cteosNumero: "000.012.345", chave: "3526 0332 4445 5500 0166 5700 1012 3456 7823 4567 8901", valorFrete: 1890.00, status: "Cancelado", emissao: "09/03/2026" },
-  { id: 13, emitente: "Expresso Rodoviario ME", remetente: "Agropecuaria Campo Verde", destinatario: "Textil Nordeste ME", cteosNumero: "000.013.456", chave: "3526 0343 5556 6600 0177 5700 1013 4567 8934 5678 9012", valorFrete: 7650.60, status: "Autorizado", emissao: "09/03/2026" },
-  { id: 14, emitente: "Frete Seguro Transportes", remetente: "Auto Pecas Centro Sul", destinatario: "Laboratorio Vida Saude", cteosNumero: "000.014.567", chave: "3526 0354 6667 7700 0188 5700 1014 5678 9045 6789 0123", valorFrete: 2100.00, status: "Pendente", emissao: "08/03/2026" },
-  { id: 15, emitente: "Transportadora Veloz S.A.", remetente: "Grafica Express ME", destinatario: "Tech Solutions S.A.", cteosNumero: "000.015.678", chave: "3526 0365 7778 8800 0199 5700 1015 6789 0156 7890 1234", valorFrete: 920.80, status: "Autorizado", emissao: "08/03/2026" },
+  { id: 1, emitente: "Expresso Brasileiro Onibus Ltda", tomador: "Industria Metalurgica Norte S.A.", cteosNumero: "000.001.234", chave: "3526 0312 3456 7800 0190 6700 1001 2345 6712 3456 7890", valorServico: 1250.75, status: "Autorizado", emissao: "15/03/2026" },
+  { id: 2, emitente: "Viacao Interestadual Sul", tomador: "Construtora Horizonte Ltda", cteosNumero: "000.002.345", chave: "3526 0398 7654 3200 0110 6700 1002 3456 7823 4567 8901", valorServico: 3800.00, status: "Autorizado", emissao: "14/03/2026" },
+  { id: 3, emitente: "Van Turismo Executivo ME", tomador: "Tech Solutions Consultoria S.A.", cteosNumero: "000.003.456", chave: "3526 0311 2223 3300 0144 6700 1003 4567 8934 5678 9012", valorServico: 680.50, status: "Pendente", emissao: "14/03/2026" },
+  { id: 4, emitente: "Proteforte Transporte de Valores", tomador: "Banco Regional Investimentos", cteosNumero: "000.004.567", chave: "3526 0344 5556 6600 0177 6700 1004 5678 9045 6789 0123", valorServico: 4200.00, status: "Cancelado", emissao: "13/03/2026" },
+  { id: 5, emitente: "Rodoviaria Litoral Express", tomador: "Hotel Beira Mar Resort", cteosNumero: "000.005.678", chave: "3526 0355 6667 7700 0188 6700 1005 6789 0156 7890 1234", valorServico: 2150.00, status: "Autorizado", emissao: "13/03/2026" },
+  { id: 6, emitente: "Via Segura Carros-Fortes", tomador: "Rede Varejo Nacional Ltda", cteosNumero: "000.006.789", chave: "3526 0366 7778 8800 0199 6700 1006 7890 1267 8901 2345", valorServico: 890.30, status: "Autorizado", emissao: "12/03/2026" },
+  { id: 7, emitente: "Translog Passageiros Eireli", tomador: "Universidade Federal do Estado", cteosNumero: "000.007.890", chave: "3526 0377 8889 9900 0100 6700 1007 8901 2378 9012 3456", valorServico: 550.00, status: "Denegado", emissao: "12/03/2026" },
+  { id: 8, emitente: "Expresso Brasileiro Onibus Ltda", tomador: "Industria Textil Sao Paulo", cteosNumero: "000.008.901", chave: "3526 0388 9990 0000 0111 6700 1008 9012 3489 0123 4567", valorServico: 1780.45, status: "Autorizado", emissao: "11/03/2026" },
+  { id: 9, emitente: "Fretamento Turismo Nacional", tomador: "Prefeitura Municipal Campo Verde", cteosNumero: "000.009.012", chave: "3526 0399 0001 1100 0122 6700 1009 0123 4590 1234 5678", valorServico: 3670.80, status: "Pendente", emissao: "11/03/2026" },
+  { id: 10, emitente: "Proteforte Transporte de Valores", tomador: "Supermercados Central S.A.", cteosNumero: "000.010.123", chave: "3526 0310 1112 2200 0133 6700 1010 1234 5601 2345 6789", valorServico: 6540.00, status: "Autorizado", emissao: "10/03/2026" },
+  { id: 11, emitente: "Viacao Interestadual Sul", tomador: "Mineradora Atlantico Ltda", cteosNumero: "000.011.234", chave: "3526 0321 3334 4400 0155 6700 1011 2345 6712 3456 7890", valorServico: 4230.25, status: "Autorizado", emissao: "10/03/2026" },
+  { id: 12, emitente: "Van Turismo Executivo ME", tomador: "Secretaria Estadual de Esportes", cteosNumero: "000.012.345", chave: "3526 0332 4445 5500 0166 6700 1012 3456 7823 4567 8901", valorServico: 1890.00, status: "Cancelado", emissao: "09/03/2026" },
+  { id: 13, emitente: "Rodoviaria Litoral Express", tomador: "Agencia Turismo Ferias Ltda", cteosNumero: "000.013.456", chave: "3526 0343 5556 6600 0177 6700 1013 4567 8934 5678 9012", valorServico: 7650.60, status: "Autorizado", emissao: "09/03/2026" },
+  { id: 14, emitente: "Via Segura Carros-Fortes", tomador: "Cooperativa de Credito Rural", cteosNumero: "000.014.567", chave: "3526 0354 6667 7700 0188 6700 1014 5678 9045 6789 0123", valorServico: 2100.00, status: "Pendente", emissao: "08/03/2026" },
+  { id: 15, emitente: "Expresso Brasileiro Onibus Ltda", tomador: "Federacao das Industrias", cteosNumero: "000.015.678", chave: "3526 0365 7778 8800 0199 6700 1015 6789 0156 7890 1234", valorServico: 920.80, status: "Autorizado", emissao: "08/03/2026" },
 ]
 
 export default function HistoricoCtePage() {
@@ -223,7 +226,7 @@ export default function HistoricoCtePage() {
         ) : realData.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <Inbox className="size-12 text-muted-foreground/30 mb-4" />
-            <p className="text-sm text-muted-foreground">Nenhum CT-e capturado. Configure um certificado e execute uma captura para ver documentos reais.</p>
+            <p className="text-sm text-muted-foreground">Nenhum CT-e OS capturado. CT-e OS (modelo 67) é específico para transporte de passageiros e valores — só aparecem quando houver emissão para os CNPJs cadastrados.</p>
           </div>
         ) : (
           <>
@@ -284,7 +287,7 @@ export default function HistoricoCtePage() {
                   {paginatedReal.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                        Nenhum CT-e encontrado com os filtros aplicados.
+                        Nenhum CT-e OS encontrado com os filtros aplicados.
                       </TableCell>
                     </TableRow>
                   )}
@@ -399,12 +402,11 @@ export default function HistoricoCtePage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Emitente</TableHead>
-              <TableHead>Remetente</TableHead>
-              <TableHead>Destinatário</TableHead>
-              <TableHead>CT-e N.</TableHead>
+              <TableHead>Emitente (Transportadora)</TableHead>
+              <TableHead>Tomador</TableHead>
+              <TableHead>CT-e OS N.</TableHead>
               <TableHead>Chave de Acesso</TableHead>
-              <TableHead className="text-right">Valor Frete (R$)</TableHead>
+              <TableHead className="text-right">Valor Serviço (R$)</TableHead>
               <TableHead>Emissão</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Ações</TableHead>
@@ -413,21 +415,18 @@ export default function HistoricoCtePage() {
           <TableBody>
             {paginatedData.map((row) => (
               <TableRow key={row.id}>
-                <TableCell className="max-w-[160px] truncate font-medium">
+                <TableCell className="max-w-[180px] truncate font-medium">
                   {row.emitente}
                 </TableCell>
-                <TableCell className="max-w-[160px] truncate">
-                  {row.remetente}
-                </TableCell>
-                <TableCell className="max-w-[160px] truncate">
-                  {row.destinatario}
+                <TableCell className="max-w-[180px] truncate">
+                  {row.tomador}
                 </TableCell>
                 <TableCell className="font-mono text-xs">{row.cteosNumero}</TableCell>
                 <TableCell className="max-w-[180px] truncate font-mono text-xs">
                   {row.chave}
                 </TableCell>
                 <TableCell className="text-right font-mono">
-                  {row.valorFrete.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                  {row.valorServico.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                 </TableCell>
                 <TableCell>{row.emissao}</TableCell>
                 <TableCell>
@@ -451,8 +450,8 @@ export default function HistoricoCtePage() {
             ))}
             {paginatedData.length === 0 && (
               <TableRow>
-                <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
-                  Nenhum CT-e encontrado com os filtros aplicados.
+                <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
+                  Nenhum CT-e OS encontrado com os filtros aplicados.
                 </TableCell>
               </TableRow>
             )}
