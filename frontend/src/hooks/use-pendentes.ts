@@ -7,6 +7,7 @@ import { useSettings } from "@/hooks/use-settings"
 interface PendentesData {
   pendentesNfe: number
   pendentesCte: number
+  pendentesCteos: number
   pendentesMdfe: number
   pendentesNfse: number
   total: number
@@ -21,6 +22,7 @@ export function usePendentes(): PendentesData {
   const [data, setData] = useState<Omit<PendentesData, "reload">>({
     pendentesNfe: 0,
     pendentesCte: 0,
+    pendentesCteos: 0,
     pendentesMdfe: 0,
     pendentesNfse: 0,
     total: 0,
@@ -59,6 +61,7 @@ export function usePendentes(): PendentesData {
         setData({
           pendentesNfe: 0,
           pendentesCte: 0,
+          pendentesCteos: 0,
           pendentesMdfe: 0,
           pendentesNfse: 0,
           total: 0,
@@ -74,12 +77,13 @@ export function usePendentes(): PendentesData {
         .in("certificate_id", certIds)
         .eq("ambiente", ambiente)
 
-      let nfe = 0, cte = 0, mdfe = 0, nfse = 0
+      let nfe = 0, cte = 0, cteos = 0, mdfe = 0, nfse = 0
       for (const r of rows ?? []) {
         const p = r.pendentes ?? 0
         switch ((r.tipo ?? "").toUpperCase()) {
           case "NFE": nfe += p; break
           case "CTE": cte += p; break
+          case "CTEOS": cteos += p; break
           case "MDFE": mdfe += p; break
           case "NFSE": nfse += p; break
         }
@@ -88,9 +92,10 @@ export function usePendentes(): PendentesData {
       setData({
         pendentesNfe: nfe,
         pendentesCte: cte,
+        pendentesCteos: cteos,
         pendentesMdfe: mdfe,
         pendentesNfse: nfse,
-        total: nfe + cte + mdfe + nfse,
+        total: nfe + cte + cteos + mdfe + nfse,
         loading: false,
       })
     } catch {

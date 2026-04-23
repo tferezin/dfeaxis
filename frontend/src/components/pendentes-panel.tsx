@@ -11,6 +11,7 @@ export function PendentesPanel() {
   const {
     pendentesNfe,
     pendentesCte,
+    pendentesCteos,
     pendentesMdfe,
     pendentesNfse,
     total,
@@ -45,9 +46,10 @@ export function PendentesPanel() {
             {isBlocked && " — limite do trial atingido"}
           </p>
 
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
             <PendentesItem label="NF-e" value={pendentesNfe} />
             <PendentesItem label="CT-e" value={pendentesCte} />
+            <PendentesItem label="CT-e OS" value={pendentesCteos} />
             <PendentesItem label="MDF-e" value={pendentesMdfe} />
             <PendentesItem label="NFS-e" value={pendentesNfse} />
           </div>

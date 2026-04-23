@@ -37,6 +37,7 @@ import {
 interface DashboardCounts {
   nfe: number
   cte: number
+  cteos: number
   mdfe: number
   nfse: number
 }
@@ -154,7 +155,7 @@ export default function DashboardPage() {
   })
 
   const [realCompanyName, setRealCompanyName] = useState("")
-  const [realCounts, setRealCounts] = useState<DashboardCounts>({ nfe: 0, cte: 0, mdfe: 0, nfse: 0 })
+  const [realCounts, setRealCounts] = useState<DashboardCounts>({ nfe: 0, cte: 0, cteos: 0, mdfe: 0, nfse: 0 })
   const [realActivity, setRealActivity] = useState<ActivityEntry[]>([])
   // realCredits removed — legacy MercadoPago system replaced by Stripe plan usage
   const [realDocuments, setRealDocuments] = useState<Array<{
@@ -174,12 +175,13 @@ export default function DashboardPage() {
   }>>([])
   const [realNfeTotal, setRealNfeTotal] = useState(0)
   const [realCteTotal, setRealCteTotal] = useState(0)
+  const [realCteosTotal, setRealCteosTotal] = useState(0)
   const [realMdfeTotal, setRealMdfeTotal] = useState(0)
   const [realNfseTotal, setRealNfseTotal] = useState(0)
   const [realCnpjCount, setRealCnpjCount] = useState(0)
-  const [realVolumeData, setRealVolumeData] = useState<Array<{ date: string; nfe: number; cte: number; mdfe: number; nfse: number }>>([])
+  const [realVolumeData, setRealVolumeData] = useState<Array<{ date: string; nfe: number; cte: number; cteos: number; mdfe: number; nfse: number }>>([])
   const [realLoading, setRealLoading] = useState(false)
-  // Total agregado de docs capturados na competência selecionada (NFE+CTE+MDFE+NFSE).
+  // Total agregado de docs capturados na competência selecionada (NFE+CTE+CTEOS+MDFE+NFSE).
   // É a base pra cálculo de consumo mensal e overage.
   const [realDocsNaCompetencia, setRealDocsNaCompetencia] = useState(0)
 
@@ -190,7 +192,7 @@ export default function DashboardPage() {
       if (tipo === "NFE") {
         const match = xml.match(/<vNF>([\d.,]+)<\/vNF>/)
         return match ? parseFloat(match[1].replace(",", ".")) : 0
-      } else if (tipo === "CTE") {
+      } else if (tipo === "CTE" || tipo === "CTEOS") {
         const match = xml.match(/<vTPrest>([\d.,]+)<\/vTPrest>/)
         return match ? parseFloat(match[1].replace(",", ".")) : 0
       } else if (tipo === "MDFE") {
@@ -208,11 +210,12 @@ export default function DashboardPage() {
     // When Producao is selected, documents don't have an ambiente column
     // so we show empty state — skip all queries.
     if (isProd) {
-      setRealCounts({ nfe: 0, cte: 0, mdfe: 0, nfse: 0 })
+      setRealCounts({ nfe: 0, cte: 0, cteos: 0, mdfe: 0, nfse: 0 })
       setRealDocsNaCompetencia(0)
       setRealDocuments([])
       setRealNfeTotal(0)
       setRealCteTotal(0)
+      setRealCteosTotal(0)
       setRealMdfeTotal(0)
       setRealNfseTotal(0)
       setRealVolumeData([])
@@ -248,12 +251,15 @@ export default function DashboardPage() {
       }
 
       // Counts por tipo — documentos capturados na competência (ou todos se "Todos")
-      const [nfeRes, cteRes, mdfeRes, nfseRes] = await Promise.all([
+      const [nfeRes, cteRes, cteosRes, mdfeRes, nfseRes] = await Promise.all([
         applyDateFilter(
           sb.from('documents').select('id', { count: 'exact', head: true }).eq('tipo', 'NFE')
         ),
         applyDateFilter(
           sb.from('documents').select('id', { count: 'exact', head: true }).eq('tipo', 'CTE')
+        ),
+        applyDateFilter(
+          sb.from('documents').select('id', { count: 'exact', head: true }).eq('tipo', 'CTEOS')
         ),
         applyDateFilter(
           sb.from('documents').select('id', { count: 'exact', head: true }).eq('tipo', 'MDFE')
@@ -277,16 +283,18 @@ export default function DashboardPage() {
       setRealCounts({
         nfe: nfeRes.count ?? 0,
         cte: cteRes.count ?? 0,
+        cteos: cteosRes.count ?? 0,
         mdfe: mdfeRes.count ?? 0,
         nfse: nfseRes.count ?? 0,
       })
 
-      // Total consolidado dos 4 tipos pra o card "Uso do mês" — é assim
+      // Total consolidado dos 5 tipos pra o card "Uso do mês" — é assim
       // que o contador de cobrança funciona: um único número que zera
       // dia 1 e serve de base pro cálculo de excedente (overage).
       const totalCompetencia =
         (nfeRes.count ?? 0) +
         (cteRes.count ?? 0) +
+        (cteosRes.count ?? 0) +
         (mdfeRes.count ?? 0) +
         (nfseRes.count ?? 0)
       setRealDocsNaCompetencia(totalCompetencia)
@@ -357,7 +365,7 @@ export default function DashboardPage() {
       // os 20 exibidos). Usa valor_total (coluna nova do parser) com
       // fallback pra extração via regex pro xml_content dos docs antigos
       // pré-backfill.
-      let nfeSum = 0, cteSum = 0, mdfeSum = 0, nfseSum = 0
+      let nfeSum = 0, cteSum = 0, cteosSum = 0, mdfeSum = 0, nfseSum = 0
       for (const doc of aggregationRows) {
         const val =
           doc.valor_total != null
@@ -365,21 +373,23 @@ export default function DashboardPage() {
             : extractXmlValue(doc.xml_content || "", doc.tipo)
         if (doc.tipo === "NFE") nfeSum += val
         if (doc.tipo === "CTE") cteSum += val
+        if (doc.tipo === "CTEOS") cteosSum += val
         if (doc.tipo === "MDFE") mdfeSum += val
         if (doc.tipo === "NFSE") nfseSum += val
       }
       setRealNfeTotal(nfeSum)
       setRealCteTotal(cteSum)
+      setRealCteosTotal(cteosSum)
       setRealMdfeTotal(mdfeSum)
       setRealNfseTotal(nfseSum)
 
       // Volume chart agrupado por dia sobre TODOS os documents da competência
-      const byDay: Record<string, { nfe: number; cte: number; mdfe: number; nfse: number }> = {}
+      const byDay: Record<string, { nfe: number; cte: number; cteos: number; mdfe: number; nfse: number }> = {}
       for (const doc of aggregationRows) {
         const dateStr = doc.data_emissao || doc.fetched_at
         const day = new Date(dateStr).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
-        if (!byDay[day]) byDay[day] = { nfe: 0, cte: 0, mdfe: 0, nfse: 0 }
-        const key = doc.tipo.toLowerCase() as "nfe" | "cte" | "mdfe" | "nfse"
+        if (!byDay[day]) byDay[day] = { nfe: 0, cte: 0, cteos: 0, mdfe: 0, nfse: 0 }
+        const key = doc.tipo.toLowerCase() as "nfe" | "cte" | "cteos" | "mdfe" | "nfse"
         if (key in byDay[day]) byDay[day][key]++
       }
       const volumeData = Object.entries(byDay)
@@ -420,7 +430,7 @@ export default function DashboardPage() {
   const cteValue = showMock ? "384" : realCounts.cte.toLocaleString("pt-BR")
   const mdfeValue = showMock ? "56" : realCounts.mdfe.toLocaleString("pt-BR")
   const nfseValue = showMock ? "12" : realCounts.nfse.toLocaleString("pt-BR")
-  const allFinancialTotal = realNfeTotal + realCteTotal + realMdfeTotal + realNfseTotal
+  const allFinancialTotal = realNfeTotal + realCteTotal + realCteosTotal + realMdfeTotal + realNfseTotal
 
   if (!showMock && realLoading) {
     return (
@@ -553,7 +563,7 @@ export default function DashboardPage() {
               const isActivePlan = subscriptionStatus === "active"
               // Use real doc count from current competencia (more accurate than
               // docs_consumidos_mes which only tracks the billing cycle)
-              const realTotal = realCounts.nfe + realCounts.cte + realCounts.mdfe + realCounts.nfse
+              const realTotal = realCounts.nfe + realCounts.cte + realCounts.cteos + realCounts.mdfe + realCounts.nfse
               const used = isActivePlan
                 ? (realTotal > 0 ? realTotal : docsConsumidosMes)
                 : (realTotal > 0 ? realTotal : trialDocsConsumidos)
@@ -701,6 +711,7 @@ export default function DashboardPage() {
               ] : [
                 ...(realCounts.nfe > 0 ? [{ label: `NF-e (${realCounts.nfe})`, value: realNfeTotal > 0 ? fmt(realNfeTotal) : "aguardando XML", amount: realNfeTotal, color: "text-blue-600", bgColor: "bg-blue-500", hideBar: realNfeTotal === 0 }] : []),
                 ...(realCounts.cte > 0 ? [{ label: `CT-e (${realCounts.cte})`, value: realCteTotal > 0 ? fmt(realCteTotal) : "aguardando XML", amount: realCteTotal, color: "text-violet-600", bgColor: "bg-violet-500", hideBar: realCteTotal === 0 }] : []),
+                ...(realCounts.cteos > 0 ? [{ label: `CT-e OS (${realCounts.cteos})`, value: realCteosTotal > 0 ? fmt(realCteosTotal) : "aguardando XML", amount: realCteosTotal, color: "text-fuchsia-600", bgColor: "bg-fuchsia-500", hideBar: realCteosTotal === 0 }] : []),
                 ...(realCounts.mdfe > 0 ? [{ label: `MDF-e (${realCounts.mdfe})`, value: realMdfeTotal > 0 ? fmt(realMdfeTotal) : "aguardando XML", amount: realMdfeTotal, color: "text-emerald-600", bgColor: "bg-emerald-500", hideBar: realMdfeTotal === 0 }] : []),
                 ...(realCounts.nfse > 0 ? [{ label: `NFS-e (${realCounts.nfse})`, value: realNfseTotal > 0 ? fmt(realNfseTotal) : "aguardando XML", amount: realNfseTotal, color: "text-amber-600", bgColor: "bg-amber-500", hideBar: realNfseTotal === 0 }] : []),
               ]}
