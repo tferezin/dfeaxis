@@ -46,6 +46,41 @@ const steps = [
   },
 ]
 
+// Endpoints SAP DRC nativos — consumidos quando o cliente configura
+// Communication Arrangement / BTP Destination apontando pro DFeAxis.
+// Retornam schema SAP (NotaFiscalFragment com accessKey, companyCNPJ etc)
+// já tipado — SAP consome direto, sem parsear XML.
+const sapDrcEndpoints = [
+  {
+    method: "POST",
+    path: "/sap-drc/v1/retrieveInboundInvoices",
+    description: "Retorna NF-e pendentes já parseadas no schema SAP DRC",
+    params: "Body JSON: { cnpjList: [\"01234567000100\"] }",
+    response: "Lista de NotaFiscalFragments + EventFragments tipados",
+  },
+  {
+    method: "GET",
+    path: "/sap-drc/v1/downloadOfficialDocument",
+    description: "Baixa o XML autorizado (procNFe) para uma chave de acesso",
+    params: "Query: accessKey (44 dígitos)",
+    response: "XML bruto (Content-Type: application/xml)",
+  },
+  {
+    method: "POST",
+    path: "/sap-drc/v1/receiveOfficialDocument",
+    description: "Envia evento fiscal (ciência/confirmação) via contrato SAP",
+    params: "Body JSON: { xml: \"<procEventoNFe>...</procEventoNFe>\" }",
+    response: "202 Accepted (ou 4xx com detalhes)",
+  },
+  {
+    method: "DELETE",
+    path: "/sap-drc/v1/deleteInboundInvoices",
+    description: "Marca notas como entregues e descarta XML (equivalente ao /confirmar)",
+    params: "Body JSON: { uuidList: [\"uuid-1\", \"uuid-2\"] }",
+    response: "204 No Content",
+  },
+]
+
 const apiEndpoints = [
   {
     method: "GET",
@@ -521,7 +556,11 @@ function CollapsibleSection({ title, icon: Icon, badge, children, defaultOpen = 
   )
 }
 
+type IntegrationProfile = "sap-drc" | "sap-abap" | "generic" | null
+
 export default function GettingStartedPage() {
+  const [profile, setProfile] = useState<IntegrationProfile>(null)
+
   return (
     <div className="space-y-8">
       {/* HEADER */}
@@ -531,19 +570,33 @@ export default function GettingStartedPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Primeiros Passos</h1>
         </div>
         <p className="text-sm text-muted-foreground mt-1">
-          O DFeAxis captura documentos fiscais da SEFAZ <strong>sob demanda</strong>: seu ERP (SAP, TOTVS, Oracle ou
-          qualquer outro) dispara a consulta via API REST quando quiser. Não fazemos polling automático — toda
-          consulta à SEFAZ é iniciada por você, o que te dá controle total da frequência e evita consumo indevido.
-          Durante cada captura, o DFeAxis envia ciência automática (obrigatório pela SEFAZ) e entrega os documentos
-          prontos pro seu ERP processar. Siga os passos abaixo para configurar e validar o fluxo.
+          O DFeAxis captura documentos fiscais da SEFAZ <strong>sob demanda</strong>: seu ERP (SAP, TOTVS, Oracle ou qualquer outro) dispara a consulta via API REST quando quiser. Durante cada captura, enviamos a ciência automática exigida pela SEFAZ e entregamos o documento pronto pro seu ERP processar.
         </p>
       </div>
 
-      {/* AVISO MULTI-ERP */}
-      <Card className="border-amber-500/30 bg-amber-50 dark:bg-amber-950/20">
-        <CardContent className="pt-4 pb-4">
-          <p className="text-sm text-amber-900 dark:text-amber-100">
-            <strong>Exemplos abaixo são em ABAP para SAP DRC.</strong> A API DFeAxis é REST padrão — funciona nativamente com qualquer ERP (TOTVS, Oracle, Senior, Sankhya) ou sistema próprio. Use os exemplos ABAP como referência de fluxo e adapte para sua linguagem (Java, .NET, Node, Python, ABAP, etc.).
+      {/* PRÉ-REQUISITO — comum a TODOS os cenários */}
+      <Card className="border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-950/20">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-3 text-base">
+            <div className="size-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center shrink-0">
+              <Key className="size-5 text-emerald-700 dark:text-emerald-300" />
+            </div>
+            <span>Antes de começar — pré-requisito único</span>
+            <Badge variant="secondary" className="text-xs">Comum a todos</Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0 space-y-2 text-sm">
+          <p>
+            <strong>1.</strong> Acesse <Link href="/cadastros/certificados" className="text-primary hover:underline">Cadastros → Certificados</Link> e faça upload do seu arquivo <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">.pfx</code>.
+          </p>
+          <p>
+            <strong>2.</strong> A <strong>API Key é gerada automaticamente</strong> nesse momento e aparece na tela <strong>uma única vez</strong> — copie e guarde num lugar seguro.
+          </p>
+          <p>
+            <strong>3.</strong> Se perder, é só gerar nova em <Link href="/cadastros/api-keys" className="text-primary hover:underline">Cadastros → API Keys</Link>.
+          </p>
+          <p className="text-xs text-muted-foreground pt-2 border-t border-emerald-200 dark:border-emerald-800">
+            Depois disso, escolha abaixo como seu ERP vai consumir os documentos — o fluxo muda dependendo do tipo de integração.
           </p>
         </CardContent>
       </Card>
@@ -647,56 +700,342 @@ export default function GettingStartedPage() {
         </CardContent>
       </Card>
 
-      {/* SEPARATOR */}
-      <div className="border-t pt-8">
-        <div className="flex items-center gap-2 mb-1">
-          <Code2 className="size-6 text-primary" />
-          <h2 className="text-xl font-semibold tracking-tight">Integração SAP DRC</h2>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          Documentação técnica para integrar o DFeAxis ao SAP via RFC Destination HTTP.
-        </p>
-      </div>
-
-      {/* API DOCUMENTATION */}
-      <CollapsibleSection title="API REST — Endpoints" icon={Server} badge="7 endpoints" defaultOpen>
-        <div className="space-y-4">
-          <div className="rounded-lg bg-muted/50 p-4 space-y-1">
-            <p className="text-sm font-medium">Autenticação</p>
-            <p className="text-xs text-muted-foreground">
-              Todas as requisições devem incluir o header <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">X-API-Key</code> com a chave gerada em <strong>Cadastros &gt; API Keys</strong>.
-            </p>
+      {/* SEPARATOR + ESCOLHA DE PERFIL */}
+      <div className="border-t pt-8 space-y-4">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <Code2 className="size-6 text-primary" />
+            <h2 className="text-xl font-semibold tracking-tight">Como seu ERP vai consumir os documentos?</h2>
           </div>
+          <p className="text-sm text-muted-foreground">
+            Cada cenário tem um caminho técnico diferente. Escolha o seu pra ver apenas os exemplos relevantes.
+          </p>
+        </div>
 
-          <div className="space-y-3">
-            {apiEndpoints.map((ep, i) => (
-              <div key={i} className="rounded-lg border p-4 space-y-2">
-                <div className="flex items-center gap-2">
-                  <Badge variant={ep.method === "GET" ? "secondary" : "default"} className="text-xs font-mono">
-                    {ep.method}
-                  </Badge>
-                  <code className="text-sm font-mono">{ep.path}</code>
+        <div className="grid md:grid-cols-3 gap-3">
+          {/* Card SAP DRC Standard */}
+          <Card
+            onClick={() => setProfile("sap-drc")}
+            className={`cursor-pointer transition-all ${
+              profile === "sap-drc"
+                ? "border-primary ring-2 ring-primary/30"
+                : "hover:border-primary/50 hover:shadow-md"
+            }`}
+          >
+            <CardContent className="py-5 space-y-2">
+              <div className="flex items-start gap-3">
+                <div className="size-10 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center shrink-0">
+                  <Server className="size-5 text-blue-700 dark:text-blue-300" />
                 </div>
-                <p className="text-sm text-muted-foreground">{ep.description}</p>
-                <div className="text-xs text-muted-foreground">
-                  <strong>Parâmetros:</strong> {ep.params}
+                <div className="flex-1">
+                  <p className="text-sm font-semibold">SAP DRC Standard</p>
+                  <p className="text-xs text-muted-foreground">via BTP / Communication Arrangement</p>
                 </div>
               </div>
-            ))}
-          </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                SAP consome direto do nosso endpoint <code className="bg-muted px-1 py-0.5 rounded text-[10px] font-mono">/sap-drc/v1/*</code>. Zero código ABAP — contrato nativo do SAP DRC.
+              </p>
+            </CardContent>
+          </Card>
 
-          <div className="rounded-lg border p-4">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-medium">Exemplo — Buscar CT-e</p>
-              <CopyButton text={`curl -s "https://api.dfeaxis.com.br/api/v1/documentos?cnpj=SEU_CNPJ&tipo=cte" -H "X-API-Key: SUA_API_KEY"`} />
+          {/* Card SAP ABAP custom */}
+          <Card
+            onClick={() => setProfile("sap-abap")}
+            className={`cursor-pointer transition-all ${
+              profile === "sap-abap"
+                ? "border-primary ring-2 ring-primary/30"
+                : "hover:border-primary/50 hover:shadow-md"
+            }`}
+          >
+            <CardContent className="py-5 space-y-2">
+              <div className="flex items-start gap-3">
+                <div className="size-10 rounded-lg bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center shrink-0">
+                  <FileCode className="size-5 text-amber-700 dark:text-amber-300" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold">SAP ABAP custom</p>
+                  <p className="text-xs text-muted-foreground">via RFC Destination HTTP</p>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Código <code className="bg-muted px-1 py-0.5 rounded text-[10px] font-mono">Z_</code> próprio consumindo <code className="bg-muted px-1 py-0.5 rounded text-[10px] font-mono">/api/v1/*</code>. Exemplo ABAP completo pronto pra copiar.
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Card Outros ERPs */}
+          <Card
+            onClick={() => setProfile("generic")}
+            className={`cursor-pointer transition-all ${
+              profile === "generic"
+                ? "border-primary ring-2 ring-primary/30"
+                : "hover:border-primary/50 hover:shadow-md"
+            }`}
+          >
+            <CardContent className="py-5 space-y-2">
+              <div className="flex items-start gap-3">
+                <div className="size-10 rounded-lg bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center shrink-0">
+                  <Workflow className="size-5 text-purple-700 dark:text-purple-300" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold">Outros ERPs</p>
+                  <p className="text-xs text-muted-foreground">TOTVS, Oracle, Sankhya, próprio</p>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                REST genérico consumindo <code className="bg-muted px-1 py-0.5 rounded text-[10px] font-mono">/api/v1/*</code>. Exemplos em <code className="bg-muted px-1 py-0.5 rounded text-[10px] font-mono">curl</code> + JSON.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {profile === null && (
+          <Card className="bg-muted/30 border-dashed">
+            <CardContent className="py-6 text-center">
+              <p className="text-sm text-muted-foreground">
+                Selecione um dos cards acima para ver o guia passo a passo do seu cenário.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* PERFIL: SAP DRC STANDARD                                          */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {profile === "sap-drc" && (
+        <div className="space-y-4">
+          <Card className="border-blue-500/30 bg-blue-50/50 dark:bg-blue-950/20">
+            <CardContent className="pt-4 pb-4">
+              <p className="text-sm text-blue-900 dark:text-blue-100">
+                <strong>Caminho nativo SAP DRC.</strong> O SAP consome direto do nosso endpoint — sem código ABAP custom, sem parsear XML manualmente. Configure o Communication Arrangement apontando pro DFeAxis e deixe o DRC Standard fazer o trabalho.
+              </p>
+            </CardContent>
+          </Card>
+
+          <CollapsibleSection title="Passo a passo — Communication Arrangement" icon={Settings} defaultOpen>
+            <ol className="space-y-3 text-sm list-decimal list-inside">
+              <li>No SAP S/4HANA Cloud, acesse <strong>Communication Arrangements</strong> e escolha o scenario <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">SAP_COM_0708</code> (Electronic Invoice — Inbound) ou equivalente do seu release.</li>
+              <li>Crie um <strong>Communication System</strong> apontando pra <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">https://api.dfeaxis.com.br</code> (porta 443, TLS ativo).</li>
+              <li>Crie um <strong>Communication User</strong> do tipo <em>API Key</em> e use sua chave gerada no DFeAxis como credencial (header <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">X-API-Key</code>).</li>
+              <li>Ative os serviços <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">retrieveInboundInvoices</code>, <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">downloadOfficialDocument</code>, <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">receiveOfficialDocument</code> e <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">deleteInboundInvoices</code>.</li>
+              <li>Pronto — o SAP DRC vai buscar os documentos periodicamente conforme o job já configurado no seu ambiente.</li>
+            </ol>
+          </CollapsibleSection>
+
+          <CollapsibleSection title="Endpoints SAP DRC — referência" icon={Server} badge="4 endpoints" defaultOpen>
+            <div className="space-y-3">
+              <div className="rounded-lg bg-muted/50 p-4 space-y-1">
+                <p className="text-sm font-medium">Autenticação</p>
+                <p className="text-xs text-muted-foreground">
+                  Header <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">X-API-Key</code> com a chave gerada no upload do certificado.
+                </p>
+              </div>
+              {sapDrcEndpoints.map((ep, i) => (
+                <div key={i} className="rounded-lg border p-4 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Badge variant={ep.method === "GET" ? "secondary" : "default"} className="text-xs font-mono">
+                      {ep.method}
+                    </Badge>
+                    <code className="text-sm font-mono">{ep.path}</code>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{ep.description}</p>
+                  <div className="text-xs text-muted-foreground">
+                    <strong>Parâmetros:</strong> {ep.params}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    <strong>Resposta:</strong> {ep.response}
+                  </div>
+                </div>
+              ))}
+
+              <div className="rounded-lg border p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium">Exemplo — Buscar NF-e (SAP DRC)</p>
+                  <CopyButton text={`curl -s -X POST "https://api.dfeaxis.com.br/sap-drc/v1/retrieveInboundInvoices" -H "X-API-Key: SUA_API_KEY" -H "Content-Type: application/json" -d '{"cnpjList":["01234567000100"]}'`} />
+                </div>
+                <pre className="text-xs font-mono bg-zinc-950 text-zinc-100 rounded-lg p-4 overflow-x-auto">
+{`curl -s -X POST "https://api.dfeaxis.com.br/sap-drc/v1/retrieveInboundInvoices" \\
+  -H "X-API-Key: SUA_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"cnpjList":["01234567000100"]}'
+
+# Resposta (fragments tipados, prontos pro SAP consumir):
+{
+  "notaFiscalFragments": [
+    {
+      "accessKey": "35260398765432000168550010000004561234567891",
+      "companyCNPJ": "01234567000100",
+      "companyRegion": "SP",
+      "supplierCNPJ": "98765432000168",
+      "supplierRegion": "SP",
+      "notaFiscalNumber": "456",
+      "notaFiscalSeries": "1",
+      "issueDate": "2026-04-15",
+      "notaFiscalStatusCode": "100",
+      "notaFiscalStatusDescription": "Autorizado"
+    }
+  ],
+  "eventFragments": []
+}`}
+                </pre>
+              </div>
             </div>
-            <pre className="text-xs font-mono bg-zinc-950 text-zinc-100 rounded-lg p-4 overflow-x-auto">
+          </CollapsibleSection>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* PERFIL: SAP ABAP CUSTOM                                           */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {profile === "sap-abap" && (
+        <div className="space-y-4">
+          <Card className="border-amber-500/30 bg-amber-50/50 dark:bg-amber-950/20">
+            <CardContent className="pt-4 pb-4">
+              <p className="text-sm text-amber-900 dark:text-amber-100">
+                <strong>Caminho ABAP custom.</strong> Você escreve um programa <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">Z_</code> próprio consumindo nossa API REST via RFC Destination HTTP. Exemplos completos abaixo, prontos pra copiar e adaptar.
+              </p>
+            </CardContent>
+          </Card>
+
+          <CollapsibleSection title="SAP — Configuração RFC Destination (SM59)" icon={Settings}>
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Configure uma RFC Destination tipo G (HTTP to External Server) na transação SM59.
+              </p>
+              <div className="relative">
+                <div className="absolute top-2 right-2">
+                  <CopyButton text={rfcConfig} />
+                </div>
+                <pre className="text-xs font-mono bg-zinc-950 text-zinc-100 rounded-lg p-4 overflow-x-auto whitespace-pre">
+{rfcConfig}
+                </pre>
+              </div>
+            </div>
+          </CollapsibleSection>
+
+          <CollapsibleSection title="1. Buscar documentos — Programa ABAP modelo" icon={FileCode} badge="ABAP">
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Substitua <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">&lt;SUA_API_KEY&gt;</code> e <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">&lt;CNPJ_EMPRESA&gt;</code> pelos valores reais.
+              </p>
+              <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-4">
+                <p className="text-sm text-emerald-800">
+                  <strong>Fluxo:</strong> Conecta via RFC Destination → Busca documentos → Decodifica XML de base64 → Processa conforme regra de negócio → Confirma recebimento.
+                </p>
+              </div>
+              <div className="relative">
+                <div className="absolute top-2 right-2">
+                  <CopyButton text={abapCode} />
+                </div>
+                <pre className="text-xs font-mono bg-zinc-950 text-zinc-100 rounded-lg p-4 overflow-x-auto whitespace-pre max-h-[600px] overflow-y-auto">
+{abapCode}
+                </pre>
+              </div>
+            </div>
+          </CollapsibleSection>
+
+          <CollapsibleSection title="2. Confirmar recebimento" icon={CheckCircle2} badge="ABAP">
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Após processar o XML no ERP, chame <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">POST /api/v1/documentos/{"{chave}"}/confirmar</code>. O XML é descartado do DFeAxis.
+              </p>
+              <div className="relative">
+                <div className="absolute top-2 right-2 z-10">
+                  <CopyButton text={abapCodeConfirmar} />
+                </div>
+                <pre className="text-xs font-mono bg-zinc-950 text-zinc-100 rounded-lg p-4 overflow-x-auto whitespace-pre max-h-[500px] overflow-y-auto">
+{abapCodeConfirmar}
+                </pre>
+              </div>
+            </div>
+          </CollapsibleSection>
+
+          <CollapsibleSection title="3. Manifestação definitiva" icon={Send} badge="ABAP">
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Após a MIRO, envie o evento de manifestação (<code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">tipo_evento=210200</code> = Confirmação).
+              </p>
+              <div className="rounded-lg bg-blue-50 border border-blue-200 p-4">
+                <p className="text-sm text-blue-900 font-medium mb-1">Tipos de evento</p>
+                <ul className="text-xs text-blue-800 space-y-0.5">
+                  <li><code className="bg-white/60 px-1 py-0.5 rounded font-mono">210210</code> — Ciência da Operação (auto no modo auto_ciencia)</li>
+                  <li><code className="bg-white/60 px-1 py-0.5 rounded font-mono">210200</code> — Confirmação da Operação (após MIRO)</li>
+                  <li><code className="bg-white/60 px-1 py-0.5 rounded font-mono">210220</code> — Desconhecimento da Operação</li>
+                  <li><code className="bg-white/60 px-1 py-0.5 rounded font-mono">210240</code> — Operação não Realizada</li>
+                </ul>
+              </div>
+              <div className="relative">
+                <div className="absolute top-2 right-2 z-10">
+                  <CopyButton text={abapCodeManifestar} />
+                </div>
+                <pre className="text-xs font-mono bg-zinc-950 text-zinc-100 rounded-lg p-4 overflow-x-auto whitespace-pre max-h-[500px] overflow-y-auto">
+{abapCodeManifestar}
+                </pre>
+              </div>
+            </div>
+          </CollapsibleSection>
+
+          <CollapsibleSection title="4. Consultar pendentes / histórico" icon={Search} badge="ABAP">
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-muted-foreground mb-2">
+                  <strong>Pendentes</strong> — NF-e aguardando manifestação definitiva (ciência já enviada).
+                </p>
+                <div className="relative">
+                  <div className="absolute top-2 right-2 z-10">
+                    <CopyButton text={abapCodeConsultarPendentes} />
+                  </div>
+                  <pre className="text-xs font-mono bg-zinc-950 text-zinc-100 rounded-lg p-4 overflow-x-auto whitespace-pre max-h-[400px] overflow-y-auto">
+{abapCodeConsultarPendentes}
+                  </pre>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground mb-2">
+                  <strong>Histórico</strong> — eventos de manifestação já enviados (filtros opcionais por cnpj, chave, tipo, limit).
+                </p>
+                <div className="relative">
+                  <div className="absolute top-2 right-2 z-10">
+                    <CopyButton text={abapCodeConsultarHistorico} />
+                  </div>
+                  <pre className="text-xs font-mono bg-zinc-950 text-zinc-100 rounded-lg p-4 overflow-x-auto whitespace-pre max-h-[400px] overflow-y-auto">
+{abapCodeConsultarHistorico}
+                  </pre>
+                </div>
+              </div>
+            </div>
+          </CollapsibleSection>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* PERFIL: OUTROS ERPs (REST GENÉRICO)                               */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {profile === "generic" && (
+        <div className="space-y-4">
+          <Card className="border-purple-500/30 bg-purple-50/50 dark:bg-purple-950/20">
+            <CardContent className="pt-4 pb-4">
+              <p className="text-sm text-purple-900 dark:text-purple-100">
+                <strong>REST genérico.</strong> Funciona em qualquer linguagem (Java, .NET, Node, Python, ADVPL, PL/SQL…). O ERP chama nossa API e recebe JSON com os metadados já estruturados (emitente, destinatário, número, data, valor) + XML em base64 quando precisar do documento completo.
+              </p>
+            </CardContent>
+          </Card>
+
+          <CollapsibleSection title="1. Buscar documentos" icon={Server} defaultOpen>
+            <div className="space-y-3">
+              <div className="rounded-lg border p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium">Exemplo — Buscar CT-e</p>
+                  <CopyButton text={`curl -s "https://api.dfeaxis.com.br/api/v1/documentos?cnpj=SEU_CNPJ&tipo=cte" -H "X-API-Key: SUA_API_KEY"`} />
+                </div>
+                <pre className="text-xs font-mono bg-zinc-950 text-zinc-100 rounded-lg p-4 overflow-x-auto">
 {`curl -s "https://api.dfeaxis.com.br/api/v1/documentos?cnpj=SEU_CNPJ&tipo=cte" \\
   -H "X-API-Key: SUA_API_KEY"
 
-# Resposta:
+# Resposta — metadados já estruturados + XML em base64
 {
-  "cnpj": "01786983000368",
+  "cnpj": "01234567000100",
   "total": 2,
   "ult_nsu": "000000000412893",
   "documentos": [
@@ -705,184 +1044,105 @@ export default function GettingStartedPage() {
       "tipo": "CTE",
       "nsu": "000000000412892",
       "xml_b64": "PD94bWwgdmVyc2lvbi4uLg==",
+      "supplier_cnpj": "98765432000168",
+      "supplier_name": "TRANSPORTES ACME LTDA",
+      "company_cnpj": "01234567000100",
+      "nota_numero": "456",
+      "data_emissao": "2026-04-15T10:30:00-03:00",
+      "valor_total": 15750.50,
       "is_resumo": false
     }
   ]
 }`}
-            </pre>
-          </div>
-
-          <div className="rounded-lg border p-4">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-medium">Exemplo — Confirmar recebimento</p>
-              <CopyButton text={`curl -s -X POST "https://api.dfeaxis.com.br/api/v1/documentos/CHAVE_44_DIGITOS/confirmar" -H "X-API-Key: SUA_API_KEY"`} />
+                </pre>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Os campos <code className="bg-muted px-1 py-0.5 rounded text-[10px] font-mono">supplier_cnpj</code>, <code className="bg-muted px-1 py-0.5 rounded text-[10px] font-mono">nota_numero</code>, <code className="bg-muted px-1 py-0.5 rounded text-[10px] font-mono">data_emissao</code> e <code className="bg-muted px-1 py-0.5 rounded text-[10px] font-mono">valor_total</code> vêm pré-extraídos do XML — seu ERP não precisa parsear o XML só pra isso.
+                </p>
+              </div>
             </div>
-            <pre className="text-xs font-mono bg-zinc-950 text-zinc-100 rounded-lg p-4 overflow-x-auto">
+          </CollapsibleSection>
+
+          <CollapsibleSection title="2. Confirmar recebimento" icon={CheckCircle2}>
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Após seu ERP gravar o documento, confirme pra descartar o XML do nosso banco.
+              </p>
+              <div className="rounded-lg border p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium">Exemplo</p>
+                  <CopyButton text={`curl -s -X POST "https://api.dfeaxis.com.br/api/v1/documentos/CHAVE_44_DIGITOS/confirmar" -H "X-API-Key: SUA_API_KEY"`} />
+                </div>
+                <pre className="text-xs font-mono bg-zinc-950 text-zinc-100 rounded-lg p-4 overflow-x-auto">
 {`curl -s -X POST "https://api.dfeaxis.com.br/api/v1/documentos/CHAVE_44_DIGITOS/confirmar" \\
   -H "X-API-Key: SUA_API_KEY"
 
 # Resposta:
-{ "status": "discarded" }
-# O XML foi removido do banco. O documento não aparecerá mais na listagem.`}
-            </pre>
-          </div>
-        </div>
-      </CollapsibleSection>
-
-      {/* API KEY */}
-      <CollapsibleSection title="Autenticação — API Key" icon={Key}>
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            A API Key é gerada no painel DFeAxis em <strong>Cadastros &gt; API Keys</strong>. Cada cliente possui suas próprias chaves, garantindo isolamento total dos dados.
-          </p>
-          <div className="rounded-lg bg-amber-50 border border-amber-200 p-4">
-            <p className="text-sm text-amber-800">
-              <strong>Importante:</strong> A API Key deve ser mantida em sigilo. Ela dá acesso aos documentos fiscais do cliente. Nunca compartilhe publicamente ou em código-fonte.
-            </p>
-          </div>
-          <div className="rounded-lg border p-4">
-            <p className="text-sm font-medium mb-2">Fluxo de segurança</p>
-            <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
-              <li>Cliente gera API Key no painel DFeAxis</li>
-              <li>Configura a chave no SAP (RFC Destination ou tabela Z)</li>
-              <li>SAP envia a chave no header <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">X-API-Key</code></li>
-              <li>DFeAxis valida a chave e identifica o tenant (cliente)</li>
-              <li>Retorna apenas os documentos daquele tenant</li>
-            </ol>
-          </div>
-        </div>
-      </CollapsibleSection>
-
-      {/* RFC DESTINATION */}
-      <CollapsibleSection title="SAP — Configuração RFC Destination (SM59)" icon={Settings}>
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            Configure uma RFC Destination tipo G (HTTP to External Server) na transação SM59 do SAP.
-          </p>
-          <div className="relative">
-            <div className="absolute top-2 right-2">
-              <CopyButton text={rfcConfig} />
+{ "status": "discarded" }`}
+                </pre>
+              </div>
             </div>
-            <pre className="text-xs font-mono bg-zinc-950 text-zinc-100 rounded-lg p-4 overflow-x-auto whitespace-pre">
-{rfcConfig}
-            </pre>
-          </div>
-        </div>
-      </CollapsibleSection>
+          </CollapsibleSection>
 
-      {/* ABAP CODE */}
-      <CollapsibleSection title="SAP — Programa ABAP Modelo" icon={FileCode} badge="ABAP">
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            Programa ABAP completo para consumir documentos do DFeAxis. Substitua <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">&lt;SUA_API_KEY&gt;</code> e <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">&lt;CNPJ_EMPRESA&gt;</code> pelos valores reais.
-          </p>
-          <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-4">
-            <p className="text-sm text-emerald-800">
-              <strong>Fluxo do programa:</strong> Conecta via RFC Destination &rarr; Busca documentos &rarr; Decodifica XML de base64 &rarr; Processa conforme regra de negócio &rarr; Confirma recebimento (limpa do DFeAxis).
-            </p>
-          </div>
-          <div className="relative">
-            <div className="absolute top-2 right-2">
-              <CopyButton text={abapCode} />
-            </div>
-            <pre className="text-xs font-mono bg-zinc-950 text-zinc-100 rounded-lg p-4 overflow-x-auto whitespace-pre max-h-[600px] overflow-y-auto">
-{abapCode}
-            </pre>
-          </div>
-        </div>
-      </CollapsibleSection>
+          <CollapsibleSection title="3. Manifestação definitiva" icon={Send}>
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Após confirmar a entrada no seu ERP, envie o evento fiscal. <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">tipo_evento=210200</code> = Confirmação da Operação.
+              </p>
+              <div className="rounded-lg border p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium">Exemplo</p>
+                  <CopyButton text={`curl -s -X POST "https://api.dfeaxis.com.br/api/v1/manifestacao" -H "X-API-Key: SUA_API_KEY" -H "Content-Type: application/json" -d '{"chave_acesso":"CHAVE_44_DIGITOS","tipo_evento":"210200"}'`} />
+                </div>
+                <pre className="text-xs font-mono bg-zinc-950 text-zinc-100 rounded-lg p-4 overflow-x-auto">
+{`curl -s -X POST "https://api.dfeaxis.com.br/api/v1/manifestacao" \\
+  -H "X-API-Key: SUA_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "chave_acesso": "CHAVE_44_DIGITOS",
+    "tipo_evento": "210200"
+  }'
 
-      {/* ABAP — CONFIRMAR RECEBIMENTO */}
-      <CollapsibleSection title="SAP — Confirmar Recebimento (POST /documentos/{chave}/confirmar)" icon={CheckCircle2} badge="ABAP">
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            Após o XML ser processado no ERP (MIRO, DRC ou tabela Z), o cliente deve confirmar o recebimento.
-            Isso faz com que o XML seja <strong>descartado do servidor DFeAxis</strong> e o documento saia da listagem pendente.
-          </p>
-          <div className="relative">
-            <div className="absolute top-2 right-2 z-10">
-              <CopyButton text={abapCodeConfirmar} />
+# Resposta:
+{ "status": "accepted", "protocolo": "135260000001234" }`}
+                </pre>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Tipos: <code className="bg-muted px-1 py-0.5 rounded text-[10px] font-mono">210210</code> (Ciência), <code className="bg-muted px-1 py-0.5 rounded text-[10px] font-mono">210200</code> (Confirmação), <code className="bg-muted px-1 py-0.5 rounded text-[10px] font-mono">210220</code> (Desconhecimento), <code className="bg-muted px-1 py-0.5 rounded text-[10px] font-mono">210240</code> (Não Realizada). Para lote, use <code className="bg-muted px-1 py-0.5 rounded text-[10px] font-mono">/api/v1/manifestacao/batch</code> (até 50 chaves).
+                </p>
+              </div>
             </div>
-            <pre className="text-xs font-mono bg-zinc-950 text-zinc-100 rounded-lg p-4 overflow-x-auto whitespace-pre max-h-[500px] overflow-y-auto">
-{abapCodeConfirmar}
-            </pre>
-          </div>
+          </CollapsibleSection>
         </div>
-      </CollapsibleSection>
+      )}
 
-      {/* ABAP — MANIFESTACAO */}
-      <CollapsibleSection title="SAP — Manifestação Definitiva (POST /manifestacao)" icon={Send} badge="ABAP">
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            Envia o evento de manifestação definitiva para a SEFAZ. Tipicamente chamado pelo SAP
-            <strong> após a MIRO</strong> ter sido feita com sucesso, usando <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">tipo_evento=210200</code>
-            {" "}(Confirmação da Operação).
-          </p>
-          <div className="rounded-lg bg-blue-50 border border-blue-200 p-4">
-            <p className="text-sm text-blue-900 font-medium mb-1">Tipos de evento suportados</p>
-            <ul className="text-xs text-blue-800 space-y-0.5">
-              <li><code className="bg-white/60 px-1 py-0.5 rounded font-mono">210210</code> — Ciência da Operação (pode ser automática via modo auto_ciencia)</li>
-              <li><code className="bg-white/60 px-1 py-0.5 rounded font-mono">210200</code> — Confirmação da Operação (após MIRO)</li>
-              <li><code className="bg-white/60 px-1 py-0.5 rounded font-mono">210220</code> — Desconhecimento da Operação</li>
-              <li><code className="bg-white/60 px-1 py-0.5 rounded font-mono">210240</code> — Operação não Realizada</li>
-            </ul>
-          </div>
-          <div className="relative">
-            <div className="absolute top-2 right-2 z-10">
-              <CopyButton text={abapCodeManifestar} />
-            </div>
-            <pre className="text-xs font-mono bg-zinc-950 text-zinc-100 rounded-lg p-4 overflow-x-auto whitespace-pre max-h-[500px] overflow-y-auto">
-{abapCodeManifestar}
-            </pre>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Para manifestação em lote, use <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">POST /api/v1/manifestacao/batch</code>
-            {" "}com body <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">{"{ chaves: [...], tipo_evento: \"210200\" }"}</code>
-            {" "}(limite de 50 chaves por request).
-          </p>
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* REFERÊNCIA COMPLETA — sempre visível no rodapé, colapsada          */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      <div className="border-t pt-6">
+        <div className="flex items-center gap-2 mb-3">
+          <Server className="size-5 text-muted-foreground" />
+          <h2 className="text-base font-semibold">Referência completa — todos os endpoints</h2>
         </div>
-      </CollapsibleSection>
 
-      {/* ABAP — CONSULTAR PENDENTES */}
-      <CollapsibleSection title="SAP — Consultar Pendentes (GET /manifestacao/pendentes)" icon={Search} badge="ABAP">
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            Lista as NF-e recebidas que ainda estão <strong>pendentes de manifestação definitiva</strong> (confirmar, desconhecer ou operação não realizada) para um CNPJ.
-            A ciência é enviada automaticamente durante a captura — este endpoint retorna apenas docs aguardando a decisão fiscal final.
-          </p>
-          <div className="relative">
-            <div className="absolute top-2 right-2 z-10">
-              <CopyButton text={abapCodeConsultarPendentes} />
-            </div>
-            <pre className="text-xs font-mono bg-zinc-950 text-zinc-100 rounded-lg p-4 overflow-x-auto whitespace-pre max-h-[500px] overflow-y-auto">
-{abapCodeConsultarPendentes}
-            </pre>
+        <CollapsibleSection title="API genérica — /api/v1/*" icon={Server} badge={`${apiEndpoints.length} endpoints`}>
+          <div className="space-y-3">
+            {apiEndpoints.map((ep, i) => (
+              <div key={i} className="rounded-lg border p-3 space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <Badge variant={ep.method === "GET" ? "secondary" : "default"} className="text-xs font-mono">
+                    {ep.method}
+                  </Badge>
+                  <code className="text-sm font-mono">{ep.path}</code>
+                </div>
+                <p className="text-xs text-muted-foreground">{ep.description}</p>
+                <div className="text-xs text-muted-foreground">
+                  <strong>Parâmetros:</strong> {ep.params}
+                </div>
+              </div>
+            ))}
           </div>
-        </div>
-      </CollapsibleSection>
+        </CollapsibleSection>
+      </div>
 
-      {/* ABAP — CONSULTAR HISTORICO */}
-      <CollapsibleSection title="SAP — Consultar Histórico (GET /manifestacao/historico)" icon={History} badge="ABAP">
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            Consulta o histórico de eventos de manifestação já enviados. Suporta filtros opcionais por
-            {" "}<code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">cnpj</code>,
-            {" "}<code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">chave_acesso</code>,
-            {" "}<code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">tipo_evento</code> e
-            {" "}<code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">limit</code> (máx 500).
-            Cada evento indica a origem (<code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">source</code>):
-            {" "}auto_capture, dashboard ou api.
-          </p>
-          <div className="relative">
-            <div className="absolute top-2 right-2 z-10">
-              <CopyButton text={abapCodeConsultarHistorico} />
-            </div>
-            <pre className="text-xs font-mono bg-zinc-950 text-zinc-100 rounded-lg p-4 overflow-x-auto whitespace-pre max-h-[500px] overflow-y-auto">
-{abapCodeConsultarHistorico}
-            </pre>
-          </div>
-        </div>
-      </CollapsibleSection>
 
       {/* FOOTER NOTE */}
       <Card className="bg-muted/30">
