@@ -24,6 +24,56 @@ export function TrialBanner() {
   const { isReadOnly } = useReadOnly()
 
   if (trial.loading) return null
+
+  // Payment overdue (past_due) — prioridade maxima pra avisar que pode
+  // ter bloqueio iminente. Banner aparece tanto durante a tolerancia
+  // (amber c/ countdown) quanto ja bloqueado (red).
+  if (trial.subscriptionStatus === "past_due" && trial.pastDueSince) {
+    const daysRemaining = trial.pastDueDaysRemaining ?? 0
+    const blocked = trial.isPaymentBlocked
+
+    if (blocked) {
+      return (
+        <div className="flex items-center justify-between gap-3 border-b border-red-200 bg-red-50 px-6 py-3 text-sm text-red-800">
+          <div className="flex items-center gap-2">
+            <Lock className="h-4 w-4 shrink-0" />
+            <span className="font-medium">
+              Pagamento em atraso. Captura SEFAZ suspensa — regularize pra reativar.
+            </span>
+          </div>
+          <Link
+            href="/financeiro/creditos"
+            className="shrink-0 rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-red-700"
+          >
+            Regularizar pagamento
+          </Link>
+        </div>
+      )
+    }
+
+    return (
+      <div className="flex items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-6 py-3 text-sm text-amber-800">
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>
+            <span className="font-semibold">Pagamento pendente.</span>{" "}
+            Regularize em{" "}
+            <span className="font-semibold">
+              {daysRemaining} {daysRemaining === 1 ? "dia" : "dias"}
+            </span>{" "}
+            pra evitar a suspensao da captura SEFAZ.
+          </span>
+        </div>
+        <Link
+          href="/financeiro/creditos"
+          className="shrink-0 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-amber-700"
+        >
+          Regularizar
+        </Link>
+      </div>
+    )
+  }
+
   if (trial.subscriptionStatus === "active") return null
 
   const docsConsumidos = trial.docsConsumidos ?? 0

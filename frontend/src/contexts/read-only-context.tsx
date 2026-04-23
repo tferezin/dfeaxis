@@ -42,13 +42,11 @@ export function ReadOnlyProvider({ children }: { children: ReactNode }) {
     trial.subscriptionStatus === "expired" ||
     (!trial.trialActive && trial.subscriptionStatus === "trial")
 
-  // Payment overdue: past_due AND current_period_end is in the past
-  const periodEnd = (trial as any).currentPeriodEnd
-    ? new Date((trial as any).currentPeriodEnd)
-    : null
-  const paymentOverdue =
-    trial.subscriptionStatus === "past_due" &&
-    (!periodEnd || periodEnd.getTime() < Date.now())
+  // Payment overdue: usa a regra 5+5 (isPaymentBlocked calculado no hook
+  // baseado em past_due_since). Antes era heuristica de current_period_end —
+  // trocado em 23/Abril pra bater com o middleware backend que tambem usa
+  // past_due_since + 5 dias.
+  const paymentOverdue = trial.isPaymentBlocked
 
   const isReadOnly =
     !trial.loading && (timeExpired || reason !== null || paymentOverdue)

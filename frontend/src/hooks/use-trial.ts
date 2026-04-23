@@ -15,6 +15,15 @@ interface TrialStatus {
   trialCap: number
   trialBlockedReason: TrialBlockedReason
   currentPeriodEnd: string | null
+  /** Timestamp ISO da primeira falha de pagamento no ciclo. null se nao esta em past_due. */
+  pastDueSince: string | null
+  /** Dias restantes antes do bloqueio de escrita (regra 5+5).
+   *  - > 0: ainda dentro da tolerancia
+   *  - 0: bloqueado (middleware retorna 402 em endpoints de escrita)
+   *  - null: nao esta em past_due */
+  pastDueDaysRemaining: number | null
+  /** true = cliente no soft block (past_due ha mais de 5 dias) */
+  isPaymentBlocked: boolean
   loading: boolean
 }
 
@@ -28,6 +37,9 @@ export function useTrial(): TrialStatus {
     trialCap: 500,
     trialBlockedReason: null,
     currentPeriodEnd: null,
+    pastDueSince: null,
+    pastDueDaysRemaining: null,
+    isPaymentBlocked: false,
     loading: true,
   })
 
@@ -47,7 +59,7 @@ export function useTrial(): TrialStatus {
         const { data, error } = await sb
           .from("tenants")
           .select(
-            "trial_active, trial_expires_at, subscription_status, docs_consumidos_trial, trial_cap, trial_blocked_reason, current_period_end"
+            "trial_active, trial_expires_at, subscription_status, docs_consumidos_trial, trial_cap, trial_blocked_reason, current_period_end, past_due_since"
           )
           .eq("user_id", user.id)
           .single()
@@ -64,6 +76,19 @@ export function useTrial(): TrialStatus {
         const diffMs = expiresAt ? expiresAt.getTime() - now.getTime() : 0
         const daysRemaining = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)))
 
+        // Calcula countdown do dunning (regra 5+5)
+        const pastDueRaw = (data as Record<string, unknown>).past_due_since as string | null
+        let pastDueDaysRemaining: number | null = null
+        let isPaymentBlocked = false
+        if (pastDueRaw) {
+          const pastDueDate = new Date(pastDueRaw)
+          const daysSince = Math.floor(
+            (now.getTime() - pastDueDate.getTime()) / (1000 * 60 * 60 * 24)
+          )
+          pastDueDaysRemaining = Math.max(0, 5 - daysSince)
+          isPaymentBlocked = daysSince > 5
+        }
+
         setStatus({
           trialActive: data.trial_active ?? false,
           trialExpiresAt: data.trial_expires_at,
@@ -73,6 +98,9 @@ export function useTrial(): TrialStatus {
           trialCap: data.trial_cap ?? 500,
           trialBlockedReason: (data.trial_blocked_reason ?? null) as TrialBlockedReason,
           currentPeriodEnd: data.current_period_end ?? null,
+          pastDueSince: pastDueRaw,
+          pastDueDaysRemaining,
+          isPaymentBlocked,
           loading: false,
         })
       } catch {

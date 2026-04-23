@@ -313,6 +313,52 @@ def _is_trial_exempt(path: str) -> bool:
     return any(exempt in path for exempt in _TRIAL_EXEMPT_PATHS)
 
 
+# --- Paths exempt from past_due (payment failure) block ---
+#
+# Quando um tenant esta past_due ha mais de 5 dias (regra 5+5), o middleware
+# retorna 402 em endpoints protegidos. MAS existem paths que precisam ficar
+# acessiveis pro cliente conseguir regularizar + manter compliance fiscal:
+#
+# 1. Billing (pagar): /billing/portal, /billing/checkout
+# 2. Ver status: /alerts, /tenants/me
+# 3. Compliance fiscal: GET documentos ja capturados, baixar XML
+# 4. Suporte: /chat/
+# 5. Read-only de historico: /manifestacao/historico, /manifestacao/pendentes,
+#    /documentos/retroativo/{job_id} (status), /sefaz/status
+#
+# Endpoints de WRITE (captura nova, manifestacao nova, upload de cert) sao
+# bloqueados normalmente — cliente so volta ao fluxo completo apos pagar.
+_PAST_DUE_EXEMPT_PATHS = (
+    "/billing/",       # portal, checkout — tudo de pagar
+    "/alerts",
+    "/tenants/me",
+    "/tenants/settings",
+    "/credits/",       # ver saldo
+    "/chat/",          # suporte
+    "/sefaz/status",   # health
+    "/manifestacao/historico",
+    "/manifestacao/pendentes",
+)
+
+# Metodos HTTP sempre liberados em past_due — read-only nunca bloqueia.
+# Cliente bloqueado PRECISA conseguir baixar docs ja capturados (obrigacao
+# fiscal/legal). Escrita (POST/PUT/DELETE/PATCH) sim e bloqueada.
+_PAST_DUE_READ_ONLY_METHODS = ("GET", "HEAD", "OPTIONS")
+
+
+def _is_past_due_exempt(request: Request) -> bool:
+    """Libera request quando past_due. Regra:
+    - GET/HEAD/OPTIONS: sempre libera (read-only nao bloqueia)
+    - POST/PUT/DELETE/PATCH: so libera se path esta em _PAST_DUE_EXEMPT_PATHS
+      (billing, chat, settings)
+    """
+    method = request.method.upper()
+    if method in _PAST_DUE_READ_ONLY_METHODS:
+        return True
+    path = request.url.path
+    return any(exempt in path for exempt in _PAST_DUE_EXEMPT_PATHS)
+
+
 # Mensagem unificada pra trial bloqueado (cap OU tempo). Decisão de
 # produto 2026-04-15: uma só mensagem em vez de 3 variantes — o cliente
 # entende melhor e a call-to-action é a mesma (assinar um plano).
@@ -369,8 +415,9 @@ async def verify_trial_active(request: Request, auth: dict) -> None:
         )
 
     # Past due: tolerancia de 5 dias apos past_due_since (regra 5+5).
-    # Se past_due_since nao esta setado (webhook falhou?), cai no fallback
-    # antigo de current_period_end.
+    # Soft block granular: passada a tolerancia, bloqueia apenas endpoints
+    # de ESCRITA (captura, manifestacao nova) e preserva read-only + billing
+    # portal/checkout pra compliance fiscal e pagamento.
     if status == "past_due":
         now = datetime.now(timezone.utc)
         past_due_raw = data.get("past_due_since")
@@ -381,9 +428,12 @@ async def verify_trial_active(request: Request, auth: dict) -> None:
             )
             days_since = (now - past_due_dt).days
             if days_since <= 5:
-                # Dentro da tolerancia — libera
+                # Dentro da tolerancia — libera tudo
                 return
-            # Passou dos 5 dias — bloqueia
+            # Passou dos 5 dias: soft block.
+            # Libera read-only e endpoints de regularizacao (billing, chat).
+            if _is_past_due_exempt(request):
+                return
             raise HTTPException(
                 status_code=402,
                 detail={
@@ -393,7 +443,9 @@ async def verify_trial_active(request: Request, auth: dict) -> None:
                 },
             )
 
-        # Fallback: past_due_since nao setado, usa current_period_end
+        # Fallback: past_due_since nao setado, usa current_period_end.
+        # Mesmo soft-block aplica aqui — se cliente sem past_due_since
+        # mas Stripe diz que esta past_due ha muito, bloqueia escrita.
         period_end = data.get("current_period_end")
         if period_end:
             period_dt = datetime.fromisoformat(
@@ -401,6 +453,8 @@ async def verify_trial_active(request: Request, auth: dict) -> None:
             )
             if now < period_dt:
                 return
+        if _is_past_due_exempt(request):
+            return
         raise HTTPException(
             status_code=402,
             detail={
