@@ -34,7 +34,7 @@ router = APIRouter()
 @router.get("/documentos", response_model=DocumentosResponse)
 async def listar_documentos(
     cnpj: str = Query(..., min_length=14, max_length=14),
-    tipo: str = Query("nfe", pattern=r"^(nfe|cte|mdfe)$"),
+    tipo: str = Query("nfe", pattern=r"^(nfe|cte|cteos|mdfe)$"),
     desde: Optional[str] = Query(None, description="NSU a partir de"),
     incluir_pendentes: bool = Query(
         True,

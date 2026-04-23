@@ -299,7 +299,18 @@ def parse_nfe(xml_str: str) -> DocumentMetadata:
 
 
 def parse_cte(xml_str: str) -> DocumentMetadata:
-    """Extrai metadata de CTe."""
+    """Extrai metadata de CT-e (modelo 57) ou CT-e OS (modelo 67).
+
+    Ambos compartilham o namespace NS_CTE e os campos principais de
+    ide/emit/ide. A diferença é:
+      - CT-e OS tem root `<CTeOS>` em vez de `<CTe>`, resumo `resCTeOS`
+        em vez de `resCTe`, envelope autorizado `cteOSProc` vs `cteProc`.
+      - CT-e OS usa `<toma>/<toma4>` (tomador) em vez de `<dest>` — é
+        transporte de pessoas/valores, não mercadoria.
+    Como o namespace é o mesmo (`http://www.portalfiscal.inf.br/cte`) e
+    os XPaths com `.//` localizam elementos em qualquer profundidade, o
+    mesmo parser serve pros dois — apenas adicionamos fallbacks.
+    """
     meta = DocumentMetadata()
     root = _safe_parse(xml_str)
     if root is None:
@@ -309,7 +320,9 @@ def parse_cte(xml_str: str) -> DocumentMetadata:
     ns = {"cte": NS_CTE}
 
     tag_local = etree.QName(root).localname
-    if tag_local == "resCTe":
+    # Resumos (schema reduzido que SEFAZ envia antes da ciência): resCTe
+    # pro modelo 57, resCTeOS pro modelo 67. Só trazem CNPJ do emitente.
+    if tag_local in ("resCTe", "resCTeOS"):
         cnpj = _find_text(root, "./cte:CNPJ", ns) or _find_text(root, "./CNPJ", {})
         meta.cnpj_emitente = _clean_cnpj(cnpj)
         return meta
@@ -332,12 +345,18 @@ def parse_cte(xml_str: str) -> DocumentMetadata:
         ],
     )
 
+    # CT-e normal (57) tem <dest>, CT-e OS (67) tem <toma> ou <toma4>.
+    # Tentamos os 3 — o primeiro que existir ganha.
     meta.cnpj_destinatario = _clean_cnpj(
         _find_text_any(
             root,
             [
                 (".//cte:dest/cte:CNPJ", ns),
                 (".//dest/CNPJ", {}),
+                (".//cte:toma4/cte:CNPJ", ns),
+                (".//toma4/CNPJ", {}),
+                (".//cte:toma/cte:CNPJ", ns),
+                (".//toma/CNPJ", {}),
             ],
         )
     )
@@ -573,7 +592,10 @@ def parse_document_xml(xml_str: str, tipo: str) -> DocumentMetadata:
     xml_str : str
         Conteúdo XML do documento.
     tipo : str
-        "NFE" | "CTE" | "MDFE" | "NFSE" (case-insensitive).
+        "NFE" | "CTE" | "CTEOS" | "MDFE" | "NFSE" (case-insensitive).
+        CTEOS é o CT-e Outros Serviços (modelo 67) — transporte de
+        passageiros e valores. Usa o mesmo parser do CT-e 57 porque
+        namespace e estrutura core são idênticos.
 
     Returns
     -------
@@ -587,7 +609,11 @@ def parse_document_xml(xml_str: str, tipo: str) -> DocumentMetadata:
     tipo_upper = (tipo or "").strip().upper()
     if tipo_upper == "NFE":
         return parse_nfe(xml_str)
-    if tipo_upper == "CTE":
+    # CT-e (57) e CT-e OS (67) usam o mesmo parser — mesmo namespace,
+    # mesmos XPaths core. Distinção acontece no dispatcher de captura
+    # ao persistir no banco (tipo="CTE" vs "CTEOS" conforme schema do
+    # docZip retornado pelo DistDFe).
+    if tipo_upper in ("CTE", "CTEOS"):
         return parse_cte(xml_str)
     if tipo_upper == "MDFE":
         return parse_mdfe(xml_str)

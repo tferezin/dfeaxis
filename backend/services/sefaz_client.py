@@ -48,6 +48,30 @@ NAMESPACES = {
 }
 
 
+def _refine_tipo_by_schema(tipo_consulta: str, schema: str) -> str:
+    """Refina o tipo do documento baseado no `schema` do docZip retornado.
+
+    Contexto: a consulta DistDFe do CT-e (endpoint CteDistribuicaoDFe) é
+    compartilhada pra 3 modelos — CT-e (57), CT-e OS (67) e GTV-e (64).
+    Quando a gente consulta `tipo="cte"`, o docZip pode vir com schema
+    `resCTe` (modelo 57), `resCTeOS` (modelo 67) ou `resGTVe` (64). Pra
+    persistir no banco com o tipo correto (e separar CT-e "normal" de
+    CT-e OS em dashboards/histórico), checamos o schema.
+
+    NF-e, MDF-e e NFS-e têm endpoint próprio, então tipo_consulta = tipo
+    final. Só CT-e precisa refinamento.
+    """
+    tipo_upper = (tipo_consulta or "").strip().upper()
+    if tipo_upper != "CTE" or not schema:
+        return tipo_upper
+    schema_lower = schema.lower()
+    if "cteos" in schema_lower:
+        return "CTEOS"
+    # Futuro: se decidirmos capturar GTV-e (modelo 64), adicionar aqui.
+    # Por enquanto só CT-e 57 + CT-e OS 67 são relevantes pro produto.
+    return "CTE"
+
+
 @dataclass
 class SefazDocument:
     """Documento retornado pela SEFAZ."""
@@ -384,7 +408,7 @@ class SefazClient:
                             chave = self._extract_chave(xml_str, tipo)
                             documents.append(SefazDocument(
                                 chave=chave or f"unknown_{nsu}",
-                                tipo=tipo.upper(),
+                                tipo=_refine_tipo_by_schema(tipo, schema),
                                 nsu=nsu,
                                 xml_content=xml_str,
                                 schema=schema,
@@ -426,7 +450,7 @@ class SefazClient:
 
                     documents.append(SefazDocument(
                         chave=chave or f"unknown_{nsu}",
-                        tipo=tipo.upper(),
+                        tipo=_refine_tipo_by_schema(tipo, schema),
                         nsu=nsu,
                         xml_content=xml_str,
                         schema=schema,

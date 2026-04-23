@@ -107,7 +107,7 @@ class ConfirmarResponse(BaseModel):
 
 class RetroativoRequest(BaseModel):
     cnpj: CnpjStr
-    tipo: str = Field(pattern=r"^(nfe|cte|mdfe)$")
+    tipo: str = Field(pattern=r"^(nfe|cte|cteos|mdfe)$")
     data_inicio: date
     data_fim: date
 
