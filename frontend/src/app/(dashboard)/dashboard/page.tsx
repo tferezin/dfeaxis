@@ -645,12 +645,13 @@ export default function DashboardPage() {
         // Se == 0 com sub ativa, o hook setou syncError=true — UI mostra
         // aviso "Sincronizando..." em vez de chutar valor (ver card abaixo).
         // Trial: usa trialCap real do tenant.
-        const limiteTotal = isActive ? docsIncludedMes : trialCap
+        const limiteTotal = showMock ? 3000 : (isActive ? docsIncludedMes : trialCap)
+        const usoAtual = showMock ? 1791 : realDocsNaCompetencia
         const pctUso = limiteTotal > 0
-          ? Math.min(100, Math.round((realDocsNaCompetencia / limiteTotal) * 100))
+          ? Math.min(100, Math.round((usoAtual / limiteTotal) * 100))
           : 0
-        const excedenteDocs = Math.max(0, realDocsNaCompetencia - limiteTotal)
-        const excedenteValorCents = isActive ? excedenteDocs * overageCentsPerDoc : 0
+        const excedenteDocs = Math.max(0, usoAtual - limiteTotal)
+        const excedenteValorCents = (showMock || isActive) ? excedenteDocs * overageCentsPerDoc : 0
         const excedenteBRL = (excedenteValorCents / 100).toLocaleString("pt-BR", {
           minimumFractionDigits: 2,
           maximumFractionDigits: 2,
@@ -673,18 +674,18 @@ export default function DashboardPage() {
                   }`}
                   style={{
                     width: `${Math.max(pctUso, excedenteDocs > 0 ? 100 : pctUso)}%`,
-                    minWidth: realDocsNaCompetencia > 0 && pctUso < 4 ? "4px" : undefined,
+                    minWidth: usoAtual > 0 && pctUso < 4 ? "4px" : undefined,
                   }}
                 />
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">
-                  {realDocsNaCompetencia.toLocaleString("pt-BR")} de{" "}
+                  {usoAtual.toLocaleString("pt-BR")} de{" "}
                   {limiteTotal.toLocaleString("pt-BR")} documentos capturados
-                  {!isActive && " (limite do trial)"}
+                  {!showMock && !isActive && " (limite do trial)"}
                 </span>
                 {excedenteDocs > 0 ? (
-                  isActive ? (
+                  (showMock || isActive) ? (
                     <span className="font-semibold text-red-600">
                       Excedente previsto: {excedenteDocs.toLocaleString("pt-BR")} docs · R$ {excedenteBRL}
                     </span>
