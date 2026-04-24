@@ -23,13 +23,13 @@ from typing import Any
 
 import requests
 
-SUPABASE_URL = "https://kmiooqyasvhglszcioow.supabase.co"
-SR_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or (
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
-    "eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImttaW9vcXlhc3ZoZ2xzemNpb293Iiwicm9sZSI6"
-    "InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3Mzc4OTI2OCwiZXhwIjoyMDg5MzY1MjY4fQ."
-    "2V6Tq4QrL599qb3qybTdfOcVTIguKC5NF7rpGPKVbh0"
-)
+SUPABASE_URL = os.environ.get("SUPABASE_URL") or "https://kmiooqyasvhglszcioow.supabase.co"
+SR_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+if not SR_KEY:
+    sys.exit(
+        "ERRO: variável SUPABASE_SERVICE_ROLE_KEY não definida. "
+        "Exporte antes de rodar: `export SUPABASE_SERVICE_ROLE_KEY=...`"
+    )
 
 REST = f"{SUPABASE_URL}/rest/v1"
 HEADERS = {
