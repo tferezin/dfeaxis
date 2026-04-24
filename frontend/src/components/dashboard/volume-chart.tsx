@@ -13,6 +13,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Inbox } from "lucide-react"
 
 function generateMockData(): VolumeDataPoint[] {
+  // Médias diárias calibradas para bater com os totais mensais dos stat cards:
+  // NF-e 1.247, CT-e 384, CT-e OS 92, MDF-e 56, NFS-e 12.
   const data: VolumeDataPoint[] = []
   const now = new Date()
   for (let i = 29; i >= 0; i--) {
@@ -22,11 +24,11 @@ function generateMockData(): VolumeDataPoint[] {
     const month = (date.getMonth() + 1).toString().padStart(2, "0")
     data.push({
       date: `${day}/${month}`,
-      nfe: Math.floor(Math.random() * 80 + 40),
-      cte: Math.floor(Math.random() * 35 + 10),
-      cteos: Math.floor(Math.random() * 15 + 3),
-      mdfe: Math.floor(Math.random() * 10 + 2),
-      nfse: Math.floor(Math.random() * 20 + 5),
+      nfe: Math.floor(Math.random() * 25 + 30),
+      cte: Math.floor(Math.random() * 10 + 8),
+      cteos: Math.floor(Math.random() * 5 + 1),
+      mdfe: Math.floor(Math.random() * 4),
+      nfse: Math.random() < 0.4 ? 1 : 0,
     })
   }
   return data
