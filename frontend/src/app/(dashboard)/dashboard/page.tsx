@@ -717,8 +717,11 @@ export default function DashboardPage() {
               totalValue={showMock ? "R$ 2.847.320,45" : fmt(allTotal)}
               period={periodoAtual}
               items={showMock ? [
-                { label: "Autorizadas", value: "R$ 2.847.320,45", amount: 2847320, color: "text-emerald-600", bgColor: "bg-emerald-500" },
-                { label: "Canceladas", value: "R$ 63.250,00", amount: 63250, color: "text-gray-500", bgColor: "bg-gray-400" },
+                { label: "NF-e (1.247)", value: "R$ 2.550.000,00", amount: 2550000, color: "text-blue-600", bgColor: "bg-blue-500" },
+                { label: "CT-e (384)", value: "R$ 180.000,00", amount: 180000, color: "text-violet-600", bgColor: "bg-violet-500" },
+                { label: "CT-e OS (92)", value: "R$ 75.000,00", amount: 75000, color: "text-fuchsia-600", bgColor: "bg-fuchsia-500" },
+                { label: "MDF-e (56)", value: "—", amount: 0, color: "text-emerald-600", bgColor: "bg-emerald-500", hideBar: true },
+                { label: "NFS-e (12)", value: "R$ 42.320,45", amount: 42320, color: "text-amber-600", bgColor: "bg-amber-500" },
               ] : [
                 ...(realCounts.nfe > 0 ? [{ label: `NF-e (${realCounts.nfe})`, value: realNfeTotal > 0 ? fmt(realNfeTotal) : "aguardando XML", amount: realNfeTotal, color: "text-blue-600", bgColor: "bg-blue-500", hideBar: realNfeTotal === 0 }] : []),
                 ...(realCounts.cte > 0 ? [{ label: `CT-e (${realCounts.cte})`, value: realCteTotal > 0 ? fmt(realCteTotal) : "aguardando XML", amount: realCteTotal, color: "text-violet-600", bgColor: "bg-violet-500", hideBar: realCteTotal === 0 }] : []),

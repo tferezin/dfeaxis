@@ -1,6 +1,6 @@
 "use client"
 
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis, Line, LineChart } from "recharts"
+import { CartesianGrid, XAxis, YAxis, Line, LineChart } from "recharts"
 import {
   ChartContainer,
   ChartTooltip,
@@ -24,17 +24,16 @@ function generateMockData() {
       date: `${day}/${month}`,
       nfe: Math.floor(Math.random() * 80 + 40),
       cte: Math.floor(Math.random() * 35 + 10),
+      cteos: Math.floor(Math.random() * 15 + 3),
+      mdfe: Math.floor(Math.random() * 10 + 2),
+      nfse: Math.floor(Math.random() * 20 + 5),
+      overlap: 0,
     })
   }
   return data
 }
 
 const mockChartData = generateMockData()
-
-const areaConfig = {
-  nfe: { label: "NF-e", color: "oklch(0.623 0.214 259.815)" },
-  cte: { label: "CT-e", color: "oklch(0.696 0.17 162.48)" },
-} satisfies ChartConfig
 
 const lineConfig = {
   nfe: { label: "NF-e", color: "#3b82f6" },
@@ -95,7 +94,7 @@ function buildMonthDays(rawData: VolumeDataPoint[], competenciaId?: string): Cha
 
 export function VolumeChart({ empty = false, realData, competenciaId }: { empty?: boolean; realData?: VolumeDataPoint[]; competenciaId?: string }) {
   const hasReal = realData && realData.some(d => d.nfe + d.cte + d.cteos + d.mdfe + d.nfse > 0)
-  const chartData = hasReal ? buildMonthDays(realData, competenciaId) : null
+  const chartData: ChartDataPoint[] = hasReal ? buildMonthDays(realData, competenciaId) : mockChartData
 
   return (
     <Card className="transition-shadow hover:shadow-md">
@@ -117,7 +116,7 @@ export function VolumeChart({ empty = false, realData, competenciaId }: { empty?
             <Inbox className="size-12 text-muted-foreground/30 mb-4" />
             <p className="text-sm text-muted-foreground">Nenhum dado disponível.</p>
           </div>
-        ) : chartData ? (
+        ) : (
         <ChartContainer config={lineConfig} className="h-[300px] w-full">
           <LineChart data={chartData} margin={{ top: 4, right: 30, bottom: 0, left: -20 }}>
             <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-muted" />
@@ -145,28 +144,6 @@ export function VolumeChart({ empty = false, realData, competenciaId }: { empty?
             <Line dataKey="nfe" type="monotone" stroke="var(--color-nfe)" strokeWidth={2.5} dot={{ r: 3, fill: "var(--color-nfe)", strokeWidth: 0 }} activeDot={{ r: 7 }} connectNulls={false} />
             <Line dataKey="overlap" type="monotone" stroke="var(--color-overlap)" strokeWidth={0} dot={{ r: 6, fill: "var(--color-overlap)", strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 8 }} connectNulls={false} />
           </LineChart>
-        </ChartContainer>
-        ) : (
-        <ChartContainer config={areaConfig} className="h-[300px] w-full">
-          <AreaChart data={mockChartData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
-            <defs>
-              <linearGradient id="fillNfe" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--color-nfe)" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="var(--color-nfe)" stopOpacity={0.02} />
-              </linearGradient>
-              <linearGradient id="fillCte" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--color-cte)" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="var(--color-cte)" stopOpacity={0.02} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-muted" />
-            <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} interval="preserveStartEnd" tick={{ fontSize: 11 }} />
-            <YAxis tickLine={false} axisLine={false} tickMargin={4} tick={{ fontSize: 11 }} />
-            <ChartTooltip content={<ChartTooltipContent indicator="dot" />} />
-            <ChartLegend content={<ChartLegendContent />} />
-            <Area dataKey="nfe" type="monotone" fill="url(#fillNfe)" stroke="var(--color-nfe)" strokeWidth={2} dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
-            <Area dataKey="cte" type="monotone" fill="url(#fillCte)" stroke="var(--color-cte)" strokeWidth={2} dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
-          </AreaChart>
         </ChartContainer>
         )}
       </CardContent>
