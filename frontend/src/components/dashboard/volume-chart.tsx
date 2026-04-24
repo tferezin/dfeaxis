@@ -1,6 +1,6 @@
 "use client"
 
-import { CartesianGrid, XAxis, YAxis, Line, LineChart } from "recharts"
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts"
 import {
   ChartContainer,
   ChartTooltip,
@@ -12,8 +12,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Inbox } from "lucide-react"
 
-function generateMockData() {
-  const data = []
+function generateMockData(): VolumeDataPoint[] {
+  const data: VolumeDataPoint[] = []
   const now = new Date()
   for (let i = 29; i >= 0; i--) {
     const date = new Date(now)
@@ -27,21 +27,17 @@ function generateMockData() {
       cteos: Math.floor(Math.random() * 15 + 3),
       mdfe: Math.floor(Math.random() * 10 + 2),
       nfse: Math.floor(Math.random() * 20 + 5),
-      overlap: 0,
     })
   }
   return data
 }
 
-const mockChartData = generateMockData()
-
-const lineConfig = {
+const areaConfig = {
   nfe: { label: "NF-e", color: "#3b82f6" },
   cte: { label: "CT-e", color: "#8b5cf6" },
   cteos: { label: "CT-e OS", color: "#d946ef" },
   mdfe: { label: "MDF-e", color: "#10b981" },
   nfse: { label: "NFS-e", color: "#f59e0b" },
-  overlap: { label: "Sobreposição", color: "#ef4444" },
 } satisfies ChartConfig
 
 export interface VolumeDataPoint {
@@ -53,18 +49,13 @@ export interface VolumeDataPoint {
   nfse: number
 }
 
-interface ChartDataPoint extends VolumeDataPoint {
-  overlap: number
-}
-
-function buildMonthDays(rawData: VolumeDataPoint[], competenciaId?: string): ChartDataPoint[] {
-  const result: ChartDataPoint[] = []
-  // Use competencia month if provided (e.g., "2026-03"), otherwise current month
+function buildMonthDays(rawData: VolumeDataPoint[], competenciaId?: string): VolumeDataPoint[] {
+  const result: VolumeDataPoint[] = []
   let year: number, month: number
   if (competenciaId && /^\d{4}-\d{2}$/.test(competenciaId)) {
     const [y, m] = competenciaId.split("-").map(Number)
     year = y
-    month = m - 1 // JS months are 0-indexed
+    month = m - 1
   } else {
     const now = new Date()
     year = now.getFullYear()
@@ -79,22 +70,16 @@ function buildMonthDays(rawData: VolumeDataPoint[], competenciaId?: string): Cha
     const date = new Date(year, month, day)
     const key = date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
     const d = dataMap[key] || { date: key, nfe: 0, cte: 0, cteos: 0, mdfe: 0, nfse: 0 }
-    // Find values that are shared by multiple types (same value > 0)
-    const vals = [d.nfe, d.cte, d.cteos, d.mdfe, d.nfse].filter(v => v > 0)
-    // Group by value to find overlapping ones
-    const valueCounts: Record<number, number> = {}
-    for (const v of vals) valueCounts[v] = (valueCounts[v] || 0) + 1
-    // Find the value where overlap occurs (multiple types with same count)
-    const overlappingValues = Object.entries(valueCounts).filter(([, count]) => count > 1)
-    const overlap = overlappingValues.length > 0 ? Number(overlappingValues[0][0]) : 0
-    result.push({ ...d, overlap })
+    result.push(d)
   }
   return result
 }
 
+const mockChartData = generateMockData()
+
 export function VolumeChart({ empty = false, realData, competenciaId }: { empty?: boolean; realData?: VolumeDataPoint[]; competenciaId?: string }) {
   const hasReal = realData && realData.some(d => d.nfe + d.cte + d.cteos + d.mdfe + d.nfse > 0)
-  const chartData: ChartDataPoint[] = hasReal ? buildMonthDays(realData, competenciaId) : mockChartData
+  const chartData: VolumeDataPoint[] = hasReal ? buildMonthDays(realData, competenciaId) : mockChartData
 
   return (
     <Card className="transition-shadow hover:shadow-md">
@@ -117,8 +102,30 @@ export function VolumeChart({ empty = false, realData, competenciaId }: { empty?
             <p className="text-sm text-muted-foreground">Nenhum dado disponível.</p>
           </div>
         ) : (
-        <ChartContainer config={lineConfig} className="h-[300px] w-full">
-          <LineChart data={chartData} margin={{ top: 4, right: 30, bottom: 0, left: -20 }}>
+        <ChartContainer config={areaConfig} className="h-[300px] w-full">
+          <AreaChart data={chartData} margin={{ top: 4, right: 30, bottom: 0, left: -20 }}>
+            <defs>
+              <linearGradient id="fillNfe" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--color-nfe)" stopOpacity={0.7} />
+                <stop offset="100%" stopColor="var(--color-nfe)" stopOpacity={0.2} />
+              </linearGradient>
+              <linearGradient id="fillCte" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--color-cte)" stopOpacity={0.7} />
+                <stop offset="100%" stopColor="var(--color-cte)" stopOpacity={0.2} />
+              </linearGradient>
+              <linearGradient id="fillCteos" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--color-cteos)" stopOpacity={0.7} />
+                <stop offset="100%" stopColor="var(--color-cteos)" stopOpacity={0.2} />
+              </linearGradient>
+              <linearGradient id="fillMdfe" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--color-mdfe)" stopOpacity={0.7} />
+                <stop offset="100%" stopColor="var(--color-mdfe)" stopOpacity={0.2} />
+              </linearGradient>
+              <linearGradient id="fillNfse" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--color-nfse)" stopOpacity={0.7} />
+                <stop offset="100%" stopColor="var(--color-nfse)" stopOpacity={0.2} />
+              </linearGradient>
+            </defs>
             <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-muted" />
             <XAxis
               dataKey="date"
@@ -137,13 +144,12 @@ export function VolumeChart({ empty = false, realData, competenciaId }: { empty?
             />
             <ChartTooltip content={<ChartTooltipContent />} />
             <ChartLegend content={<ChartLegendContent />} />
-            <Line dataKey="nfse" type="monotone" stroke="var(--color-nfse)" strokeWidth={2} dot={{ r: 3, fill: "var(--color-nfse)", strokeWidth: 0 }} activeDot={{ r: 6 }} connectNulls={false} />
-            <Line dataKey="mdfe" type="monotone" stroke="var(--color-mdfe)" strokeWidth={2} dot={{ r: 3, fill: "var(--color-mdfe)", strokeWidth: 0 }} activeDot={{ r: 6 }} connectNulls={false} />
-            <Line dataKey="cteos" type="monotone" stroke="var(--color-cteos)" strokeWidth={2} dot={{ r: 3, fill: "var(--color-cteos)", strokeWidth: 0 }} activeDot={{ r: 6 }} connectNulls={false} />
-            <Line dataKey="cte" type="monotone" stroke="var(--color-cte)" strokeWidth={2.5} dot={{ r: 3, fill: "var(--color-cte)", strokeWidth: 0 }} activeDot={{ r: 7 }} connectNulls={false} />
-            <Line dataKey="nfe" type="monotone" stroke="var(--color-nfe)" strokeWidth={2.5} dot={{ r: 3, fill: "var(--color-nfe)", strokeWidth: 0 }} activeDot={{ r: 7 }} connectNulls={false} />
-            <Line dataKey="overlap" type="monotone" stroke="var(--color-overlap)" strokeWidth={0} dot={{ r: 6, fill: "var(--color-overlap)", strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 8 }} connectNulls={false} />
-          </LineChart>
+            <Area dataKey="nfe" type="monotone" stackId="1" fill="url(#fillNfe)" stroke="var(--color-nfe)" strokeWidth={1.5} />
+            <Area dataKey="cte" type="monotone" stackId="1" fill="url(#fillCte)" stroke="var(--color-cte)" strokeWidth={1.5} />
+            <Area dataKey="cteos" type="monotone" stackId="1" fill="url(#fillCteos)" stroke="var(--color-cteos)" strokeWidth={1.5} />
+            <Area dataKey="mdfe" type="monotone" stackId="1" fill="url(#fillMdfe)" stroke="var(--color-mdfe)" strokeWidth={1.5} />
+            <Area dataKey="nfse" type="monotone" stackId="1" fill="url(#fillNfse)" stroke="var(--color-nfse)" strokeWidth={1.5} />
+          </AreaChart>
         </ChartContainer>
         )}
       </CardContent>
