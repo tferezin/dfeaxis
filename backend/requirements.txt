@@ -1,6 +1,6 @@
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
-supabase==2.11.0
+supabase==2.29.0
 python-multipart==0.0.20
 apscheduler==3.10.4
 zeep==4.3.1
