@@ -1342,12 +1342,13 @@ def start_scheduler() -> BackgroundScheduler:
             day=1,
             hour=2,
             minute=0,
+            timezone="America/Sao_Paulo",
             id="monthly_snapshot_reset",
             name="Billing: snapshot do mes anterior + reset contador (dia 1)",
             replace_existing=True,
         )
         logger.info(
-            "monthly_snapshot_reset_job agendado: dia 1 as 02:00 UTC"
+            "monthly_snapshot_reset_job agendado: dia 1 as 02:00 SP (05:00 UTC)"
         )
     except Exception as exc:  # noqa: BLE001
         logger.warning(
@@ -1368,11 +1369,12 @@ def start_scheduler() -> BackgroundScheduler:
             day=5,
             hour=2,
             minute=0,
+            timezone="America/Sao_Paulo",
             id="monthly_overage",
             name="Billing: apuracao + faturamento excedente (dia 5)",
             replace_existing=True,
         )
-        logger.info("monthly_overage_job agendado: dia 5 as 02:00 UTC")
+        logger.info("monthly_overage_job agendado: dia 5 as 02:00 SP (05:00 UTC)")
     except Exception as exc:  # noqa: BLE001
         logger.warning(
             "Nao foi possivel agendar monthly_overage_job: %s", exc

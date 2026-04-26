@@ -1,6 +1,10 @@
 """Job dia 1: snapshot do mes anterior + reset do contador mensal.
 
-Roda as 02:00 UTC do dia 1 de cada mes.
+Roda as 02:00 do dia 1 de cada mes em **horario de Sao Paulo** (05:00 UTC).
+Importante usar SP tz: o usuario ve o "mes" no fuso local. Se o job
+rodasse antes da meia-noite SP (ex: 02:00 UTC = 23:00 SP do dia 30),
+docs capturados entre 23:00-23:59 SP do dia 30 nao entrariam no snapshot
+do mes que acabou — bug fiscal/financeiro.
 
 Fluxo:
 1. Snapshot — pra cada tenant com subscription ativa:
@@ -23,17 +27,28 @@ Separamos snapshot (dia 1) de faturamento (dia 5) porque:
 from __future__ import annotations
 
 import logging
-from datetime import date
+from datetime import date, datetime
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 from db.supabase import get_supabase_client
 
 logger = logging.getLogger(__name__)
 
+# Modelo de billing e baseado no calendario brasileiro (mes do tenant =
+# mes em horario de Sao Paulo). Calculos de "hoje" e "mes anterior"
+# DEVEM usar SP tz, nao UTC, mesmo se o servidor estiver em UTC.
+_BR_TZ = ZoneInfo("America/Sao_Paulo")
+
+
+def _today_br() -> date:
+    """Data corrente no fuso de Sao Paulo (UTC-3)."""
+    return datetime.now(_BR_TZ).date()
+
 
 def _previous_month_first_day() -> date:
-    """Retorna o primeiro dia do mes anterior ao atual."""
-    today = date.today()
+    """Retorna o primeiro dia do mes anterior ao atual (em SP tz)."""
+    today = _today_br()
     if today.month == 1:
         return date(today.year - 1, 12, 1)
     return date(today.year, today.month - 1, 1)

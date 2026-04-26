@@ -1,9 +1,9 @@
 """Job dia 5: apuracao + faturamento do excedente do mes anterior.
 
-Roda as 02:00 UTC do dia 5 de cada mes. Por convencao atual, billing_day = 5
-pra todos os tenants (configuracao padronizada). Se no futuro os tenants
-puderem escolher billing_day diferente (10/15), este job filtrara por
-billing_day=today.day.
+Roda as 02:00 do dia 5 de cada mes em **horario de Sao Paulo** (05:00 UTC).
+Por convencao atual, billing_day = 5 pra todos os tenants (configuracao
+padronizada). Se no futuro os tenants puderem escolher billing_day
+diferente (10/15), este job filtrara por billing_day=today.day em SP tz.
 
 Depende do snapshot feito no dia 1 (monthly_snapshot_reset_job). Aqui a
 gente apenas le esse snapshot e processa:
@@ -30,8 +30,9 @@ Idempotencia: filtro `stripe_invoice_item_id IS NULL` garante que rodar
 from __future__ import annotations
 
 import logging
-from datetime import date
+from datetime import date, datetime
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 from db.supabase import get_supabase_client
 from services.billing.plans import get_plan_by_price_id
@@ -39,10 +40,18 @@ from services.billing.stripe_client import get_stripe
 
 logger = logging.getLogger(__name__)
 
+# Vide monthly_snapshot_reset_job — billing usa calendario SP, nao UTC.
+_BR_TZ = ZoneInfo("America/Sao_Paulo")
+
+
+def _today_br() -> date:
+    """Data corrente no fuso de Sao Paulo (UTC-3)."""
+    return datetime.now(_BR_TZ).date()
+
 
 def _previous_month_first_day() -> date:
-    """Retorna o primeiro dia do mes anterior ao atual."""
-    today = date.today()
+    """Retorna o primeiro dia do mes anterior ao atual (em SP tz)."""
+    today = _today_br()
     if today.month == 1:
         return date(today.year - 1, 12, 1)
     return date(today.year, today.month - 1, 1)
@@ -225,10 +234,10 @@ def process_monthly_overage() -> None:
             continue
 
         # Filtro de billing_day — so processa tenants cujo billing_day e
-        # hoje. Hoje por padrao e 5 pra todos os tenants; mantemos a
-        # validacao pra preparar o futuro onde tenants poderao escolher
-        # entre 5/10/15 e isso vai rodar em dias diferentes.
-        today = date.today()
+        # hoje (em SP tz). Hoje por padrao e 5 pra todos os tenants;
+        # mantemos a validacao pra preparar o futuro onde tenants poderao
+        # escolher entre 5/10/15 e isso vai rodar em dias diferentes.
+        today = _today_br()
         if tenant.get("billing_day") != today.day:
             continue
 
