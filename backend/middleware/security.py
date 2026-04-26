@@ -8,7 +8,7 @@ import time
 import uuid
 from collections import defaultdict
 from contextvars import ContextVar
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import Request, HTTPException, Security
 from fastapi.security import APIKeyHeader
@@ -426,8 +426,12 @@ async def verify_trial_active(request: Request, auth: dict) -> None:
             past_due_dt = datetime.fromisoformat(
                 past_due_raw.replace("Z", "+00:00")
             )
-            days_since = (now - past_due_dt).days
-            if days_since <= 5:
+            # Usa timedelta direto pra comparar (precisao de microssegundos),
+            # nao .days que trunca pra baixo. Antes: cliente que falhou as
+            # 14:00 era bloqueado so as 14:00 do dia 11 em vez de no dia 10
+            # as 14:00 (off-by-one de ate 24h).
+            elapsed = now - past_due_dt
+            if elapsed <= timedelta(days=5):
                 # Dentro da tolerancia — libera tudo
                 return
             # Passou dos 5 dias: soft block.
@@ -439,7 +443,7 @@ async def verify_trial_active(request: Request, auth: dict) -> None:
                 detail={
                     "message": _PAYMENT_OVERDUE_MESSAGE,
                     "code": "PAYMENT_OVERDUE",
-                    "days_since_failure": days_since,
+                    "days_since_failure": elapsed.days,
                 },
             )
 
