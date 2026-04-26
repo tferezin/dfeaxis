@@ -44,11 +44,14 @@ async def upload_certificate(
     user_id = auth.get("user_id")
     client_ip = request.client.host if request.client else None
 
-    # Validate CNPJ
+    # Validate CNPJ — mensagens de _validate_cnpj sao user-facing intencionais
+    # ("CNPJ invalido", "CNPJ deve ter 14 digitos"). Nao tem leak de path/internals.
     try:
         cnpj = _validate_cnpj(cnpj)
     except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        # Mensagem da exception e segura — vem de validacao de input,
+        # nao de stacktrace. Limita tamanho defensivamente.
+        raise HTTPException(status_code=422, detail=str(e)[:200])
 
     # Validate file extension
     filename = pfx_file.filename or ""

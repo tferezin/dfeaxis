@@ -60,7 +60,8 @@ DELETE_ORDER = [
     ("api_keys", "tenant_id"),
     ("billing_events", "tenant_id"),
     ("monthly_overage_charges", "tenant_id"),
-    ("chat_messages", "tenant_id"),  # via FK soft (chat_conversations.tenant_id)
+    # chat_messages NAO tem coluna tenant_id direta — eh apagado via
+    # ON DELETE CASCADE quando deletar chat_conversations.
     ("chat_leads", "tenant_id"),
     ("chat_conversations", "tenant_id"),
 ]

@@ -24,14 +24,18 @@ const SECURITY_HEADERS = [
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      // unsafe-inline em script-src e exigido pelo GTM/GA inline tags.
-      // Migrar pra nonce-based CSP num passo futuro (requer refator).
-      "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://js.stripe.com https://challenges.cloudflare.com",
-      "connect-src 'self' https://*.supabase.co https://*.supabase.in https://api.stripe.com https://www.google-analytics.com https://region1.google-analytics.com https://challenges.cloudflare.com",
+      // unsafe-inline em script-src e exigido pelo GTM/GA + bootstrap
+      // inline da Clarity. Migrar pra nonce-based CSP num passo futuro.
+      "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://js.stripe.com https://challenges.cloudflare.com https://www.clarity.ms",
+      // connect-src cobre XHR/fetch — clarity.ms uploads de sessao usam
+      // wildcard subdomain (*.clarity.ms = b.clarity.ms etc).
+      "connect-src 'self' https://*.supabase.co https://*.supabase.in https://api.stripe.com https://www.google-analytics.com https://region1.google-analytics.com https://challenges.cloudflare.com https://*.clarity.ms https://www.clarity.ms",
       "frame-src https://js.stripe.com https://hooks.stripe.com https://challenges.cloudflare.com",
       "img-src 'self' data: https: blob:",
-      "style-src 'self' 'unsafe-inline'",
-      "font-src 'self' data:",
+      // Google Fonts CSS vem de fonts.googleapis.com (stylesheet externo).
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      // Arquivos .woff2 das Fonts vem de fonts.gstatic.com.
+      "font-src 'self' data: https://fonts.gstatic.com",
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self' https://checkout.stripe.com",

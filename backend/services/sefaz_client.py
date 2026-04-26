@@ -14,6 +14,7 @@ from typing import Optional
 
 import requests
 from lxml import etree
+from services.xml_safety import safe_fromstring
 from zeep import Client as ZeepClient
 from zeep.transports import Transport
 
@@ -340,7 +341,7 @@ class SefazClient:
                 # MDF-e: raw_response para evitar ComplexType
                 with client.settings(raw_response=True):
                     raw_resp = client.service[service_name](**{param_name: xml_request})
-                raw_root = etree.fromstring(raw_resp.content)
+                raw_root = safe_fromstring(raw_resp.content)
                 # Busca retDistDFeInt dentro do SOAP envelope
                 response = raw_root.find(f".//{{{ns}}}retDistDFeInt")
                 if response is None:
@@ -394,9 +395,9 @@ class SefazClient:
         """Faz parse da resposta SOAP da SEFAZ."""
         # A resposta pode ser string XML, etree Element, ou objeto zeep
         if isinstance(response, str):
-            root = etree.fromstring(response.encode())
+            root = safe_fromstring(response.encode())
         elif isinstance(response, bytes):
-            root = etree.fromstring(response)
+            root = safe_fromstring(response)
         elif isinstance(response, etree._Element):
             root = response
         elif hasattr(response, '_raw_elements'):
@@ -506,7 +507,7 @@ class SefazClient:
     def _extract_chave(self, xml_str: str, tipo: str) -> Optional[str]:
         """Extrai chave de acesso (44 dígitos) do XML do documento."""
         try:
-            root = etree.fromstring(xml_str.encode())
+            root = safe_fromstring(xml_str.encode())
             ns = NAMESPACES[tipo]
             # Tenta encontrar a chave em vários caminhos possíveis
             for tag in ["chNFe", "chCTe", "chMDFe", "chave"]:

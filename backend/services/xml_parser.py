@@ -142,8 +142,10 @@ def _safe_parse(xml_str: str) -> Optional[etree._Element]:
             xml_bytes = xml_str.encode("utf-8")
         else:
             xml_bytes = xml_str
-        # recover=True tolera XML ligeiramente malformado
-        parser = etree.XMLParser(recover=True, remove_blank_text=False)
+        # Parser endurecido (XXE / billion laughs / SSRF). recover=True
+        # tolera XML ligeiramente malformado (alguns chegam truncados do SEFAZ).
+        from services.xml_safety import safe_xml_parser
+        parser = safe_xml_parser(recover=True, remove_blank_text=False)
         root = etree.fromstring(xml_bytes, parser=parser)
         return root
     except (etree.XMLSyntaxError, UnicodeDecodeError, ValueError) as exc:

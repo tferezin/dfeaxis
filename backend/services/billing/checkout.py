@@ -69,7 +69,6 @@ _DEFAULT_ALLOWED_HOSTS = (
     "dfeaxis.com.br",
     "www.dfeaxis.com.br",
     "localhost:3000",
-    "frontend-henna-five-35.vercel.app",
 )
 _DEFAULT_FALLBACK_URL = "https://dfeaxis.com.br/dashboard?checkout=success"
 

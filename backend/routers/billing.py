@@ -122,12 +122,13 @@ async def checkout(
                 "error_code": "INVALID_PRICE_ID",
             },
         )
-    except RuntimeError as e:
+    except RuntimeError:
         # Stripe not configured
-        raise HTTPException(status_code=503, detail=str(e))
-    except Exception as e:
+        logger.exception("checkout: Stripe nao configurado pra tenant %s", tenant_id)
+        raise HTTPException(status_code=503, detail="Servico de pagamento indisponivel")
+    except Exception:
         logger.exception("checkout failed for tenant %s", tenant_id)
-        raise HTTPException(status_code=500, detail=f"checkout failed: {e}")
+        raise HTTPException(status_code=500, detail="Erro ao criar sessao de checkout")
 
     return CheckoutResponse(session_id=session["id"], url=session["url"])
 
@@ -146,13 +147,19 @@ async def portal(auth: dict = Depends(verify_jwt_token)):
     tenant_id = auth["tenant_id"]
     try:
         session = create_portal_session(tenant_id=tenant_id)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e))
-    except Exception as e:
+    except ValueError:
+        # Cliente sem stripe_customer_id (nunca pagou) — mensagem amigavel
+        logger.info("portal: tenant %s sem stripe_customer_id", tenant_id)
+        raise HTTPException(
+            status_code=400,
+            detail="Voce ainda nao tem assinatura ativa. Assine um plano primeiro.",
+        )
+    except RuntimeError:
+        logger.exception("portal: Stripe nao configurado pra tenant %s", tenant_id)
+        raise HTTPException(status_code=503, detail="Servico de pagamento indisponivel")
+    except Exception:
         logger.exception("portal failed for tenant %s", tenant_id)
-        raise HTTPException(status_code=500, detail=f"portal failed: {e}")
+        raise HTTPException(status_code=500, detail="Erro ao acessar portal de cobranca")
 
     return PortalResponse(session_id=session["id"], url=session["url"])
 
@@ -187,12 +194,13 @@ async def webhook(request: Request):
         )
     except Exception as e:
         # Stripe will retry on non-2xx — return 400 for invalid sig,
-        # 500 for handler errors
+        # 500 for handler errors. Detail generico — nao vaza msg interna
+        # pra Stripe Dashboard / tracebacks.
         msg = str(e)
         if "signature" in msg.lower() or "Invalid" in msg:
             logger.warning("Invalid webhook signature: %s", msg)
             raise HTTPException(status_code=400, detail="Invalid signature")
         logger.exception("Webhook processing failed")
-        raise HTTPException(status_code=500, detail=f"webhook failed: {msg}")
+        raise HTTPException(status_code=500, detail="Webhook processing failed")
 
     return result

@@ -62,7 +62,19 @@ class NfseClient:
 
     @property
     def base_url(self) -> str:
+        # Compat: callers antigos sem tenant_id. Prefira _safe_base_url(tenant_id).
         return NFSE_ADN_ENDPOINTS[self.ambiente]
+
+    def _safe_base_url(self, tenant_id: str | None) -> str:
+        """Mesma logica de base_url MAS aplica admin_guards.safe_ambiente.
+
+        Defesa em profundidade: se a env SEFAZ_AMBIENTE virar '1' por engano
+        e o tenant_id for da blacklist (conta admin LINKTI), forca '2'
+        (homologacao) automaticamente. Espelha o pattern do sefaz_client.
+        """
+        from admin_guards import safe_ambiente
+        effective = safe_ambiente(self.ambiente, tenant_id=tenant_id)
+        return NFSE_ADN_ENDPOINTS[effective]
 
     def _decrypt_and_get_pfx(
         self,
@@ -147,7 +159,7 @@ class NfseClient:
         try:
             with temp_cert_files(pfx_bytes, pfx_password) as (cert_path, key_path):
                 session = self._create_mtls_session(cert_path, key_path)
-                url = f"{self.base_url}/contribuintes/DFe/0"
+                url = f"{self._safe_base_url(tenant_id)}/contribuintes/DFe/0"
                 params = {"tipoNSU": "DISTRIBUICAO"}
                 resp = session.get(url, params=params, timeout=ADN_TIMEOUT)
 
@@ -201,7 +213,7 @@ class NfseClient:
         try:
             with temp_cert_files(pfx_bytes, pfx_password) as (cert_path, key_path):
                 session = self._create_mtls_session(cert_path, key_path)
-                url = f"{self.base_url}/contribuintes/NFSe/{chave_acesso}/Eventos"
+                url = f"{self._safe_base_url(tenant_id)}/contribuintes/NFSe/{chave_acesso}/Eventos"
                 resp = session.get(url, timeout=ADN_TIMEOUT)
 
             latency_ms = int((time.time() - start_time) * 1000)
@@ -256,7 +268,7 @@ class NfseClient:
         try:
             with temp_cert_files(pfx_bytes, pfx_password) as (cert_path, key_path):
                 session = self._create_mtls_session(cert_path, key_path)
-                url = f"{self.base_url}/contribuintes/DFe/{ult_nsu}"
+                url = f"{self._safe_base_url(tenant_id)}/contribuintes/DFe/{ult_nsu}"
                 params = {"tipoNSU": "DISTRIBUICAO"}
                 resp = session.get(url, params=params, timeout=ADN_TIMEOUT)
 

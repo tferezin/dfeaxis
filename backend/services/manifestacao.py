@@ -23,6 +23,7 @@ from cryptography.hazmat.primitives.serialization import Encoding, pkcs12
 
 import requests
 from lxml import etree
+from services.xml_safety import safe_fromstring
 
 from admin_guards import safe_ambiente
 from services.cert_manager import decrypt_pfx, temp_cert_files
@@ -238,7 +239,7 @@ class ManifestacaoService:
         if resp.status_code == 500:
             # SEFAZ returns SOAP Faults with HTTP 500 — try to parse
             try:
-                fault_root = etree.fromstring(resp.content)
+                fault_root = safe_fromstring(resp.content)
                 # Try SOAP 1.2 fault
                 fault_msg = None
                 for elem in fault_root.iter():
@@ -441,9 +442,9 @@ class ManifestacaoService:
         Precisamos do cStat do EVENTO, não do lote.
         """
         if isinstance(response, str):
-            root = etree.fromstring(response.encode())
+            root = safe_fromstring(response.encode())
         elif isinstance(response, bytes):
-            root = etree.fromstring(response)
+            root = safe_fromstring(response)
         else:
             root = response
 
