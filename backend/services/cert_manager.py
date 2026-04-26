@@ -9,6 +9,7 @@ v2 binary layout (stored as hex string):
 """
 
 import hashlib
+import logging
 import os
 import re
 import tempfile
@@ -21,6 +22,8 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.serialization import pkcs12
 from cryptography.x509.oid import ExtensionOID
+
+logger = logging.getLogger(__name__)
 
 _PBKDF2_ITERATIONS_V2 = 600_000
 _PBKDF2_ITERATIONS_V1 = 100_000
@@ -138,6 +141,65 @@ def decrypt_pfx(encrypted: bytes, iv_or_none, tenant_id: str) -> bytes:
         # v1 legacy path
         key = _derive_key_v1(tenant_id)
         return _decrypt_cbc(encrypted, iv_or_none, key)
+
+
+# ---------------------------------------------------------------------------
+# Item M3: Lazy migration v1 -> v2
+# ---------------------------------------------------------------------------
+
+def decrypt_pfx_with_migration(
+    pfx_encrypted_str: str,
+    pfx_iv: str | bytes | None,
+    tenant_id: str,
+    cert_id: str | None = None,
+) -> bytes:
+    """Decifra PFX e re-cifra como v2 se ainda esta em v1 (lazy migration).
+
+    Detecta automaticamente o formato:
+      - "v2:..." (prefixo) -> decrypt direto, sem migracao
+      - bare hex sem prefixo -> v1 legacy, decrypt + re-encrypt + UPDATE
+        do row em `certificates` (se cert_id passado)
+
+    A migracao e best-effort: se o UPDATE falhar, ainda retornamos o
+    plaintext (o decrypt funcionou). O logger registra cada migracao
+    pra a gente acompanhar quantos certs foram convertidos.
+    """
+    # v2 path — sem migracao necessaria
+    if pfx_encrypted_str.startswith(_VERSION_PREFIX_V2):
+        blob = bytes.fromhex(pfx_encrypted_str[len(_VERSION_PREFIX_V2) :])
+        return decrypt_pfx(blob, None, tenant_id)
+
+    # v1 legacy path — decrypt usando IV separado
+    enc_bytes = bytes.fromhex(pfx_encrypted_str)
+    iv_bytes = (
+        bytes.fromhex(pfx_iv) if isinstance(pfx_iv, str) else pfx_iv
+    )
+    pfx_bytes = decrypt_pfx(enc_bytes, iv_bytes, tenant_id)
+
+    # Lazy migration: re-encrypt como v2 e atualiza a row.
+    # Best-effort — se falhar, log + segue (cliente nao percebe).
+    if cert_id:
+        try:
+            new_blob, _meta = encrypt_pfx(pfx_bytes, tenant_id)
+            new_hex = f"{_VERSION_PREFIX_V2}{new_blob.hex()}"
+            # Import tardio pra evitar ciclo (db.supabase importa varios)
+            from db.supabase import get_supabase_client
+            sb = get_supabase_client()
+            sb.table("certificates").update({
+                "pfx_encrypted": new_hex,
+                "pfx_iv": None,  # nao usado mais em v2
+            }).eq("id", cert_id).execute()
+            logger.info(
+                "PFX cert_id=%s tenant=%s migrado v1->v2",
+                cert_id, tenant_id,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.error(
+                "lazy migration v1->v2 falhou cert_id=%s tenant=%s: %s",
+                cert_id, tenant_id, exc,
+            )
+
+    return pfx_bytes
 
 
 # ---------------------------------------------------------------------------
