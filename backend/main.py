@@ -108,12 +108,13 @@ app = FastAPI(
 
 # --- Middleware (order matters — outermost first) ---
 
-# CORS — sanitise origins, use explicit methods and headers
+# CORS — sanitise origins, use explicit methods and headers.
+# A9: removido fallback hardcoded pra `https://frontend-henna-five-35.vercel.app`.
+# Origens devem vir 100% de `CORS_ORIGINS` env. Se a env estiver vazia
+# em prod, o frontend ve CORS error e a gente e avisado — falha em vez
+# de allowlist permissiva acidental.
 raw_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
 cors_origins = [o.strip().rstrip("/") for o in raw_origins if o.strip()]
-# Always allow the Vercel frontend
-if "https://frontend-henna-five-35.vercel.app" not in cors_origins:
-    cors_origins.append("https://frontend-henna-five-35.vercel.app")
 logger.info(f"CORS origins: {cors_origins}")
 
 app.add_middleware(

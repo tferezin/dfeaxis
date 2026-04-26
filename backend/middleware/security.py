@@ -91,6 +91,26 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
 
 # --- Rate Limiting Middleware ---
 
+def _get_client_ip(request: Request) -> str:
+    """Extrai IP do cliente real, mesmo atras de proxy (Railway/Vercel).
+
+    `request.client.host` retorna o IP do proxy quando o backend roda atras
+    de Railway/Vercel/Cloudflare — todos os requests parecem vir do mesmo
+    IP, anulando o rate-limit por IP. Lemos primeiro `X-Forwarded-For`,
+    pegando o PRIMEIRO IP da lista (cliente original; os subsequentes sao
+    proxies intermediarios). Fallback para `request.client.host` quando o
+    header nao existe (dev local sem proxy).
+
+    Trade-off: header pode ser forjado se o backend estiver exposto
+    diretamente. Em Railway o trafego sempre passa pelo edge da Railway,
+    entao confiar em XFF e seguro nesse setup.
+    """
+    forwarded = request.headers.get("x-forwarded-for", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """Rate limiting em memória com limites por tipo de endpoint.
 
@@ -103,9 +123,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.requests: dict[str, list[float]] = defaultdict(list)
 
     async def dispatch(self, request: Request, call_next):
-        # Rate limit baseado na API key ou IP
+        # Rate limit baseado na API key ou IP (real, atras de proxy).
         api_key = request.headers.get("X-API-Key")
-        client_id = api_key or (request.client.host if request.client else "unknown")
+        client_id = api_key or _get_client_ip(request)
 
         now = time.time()
         window_start = now - self.window_seconds
@@ -118,7 +138,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         max_requests = get_endpoint_limit(request.url.path)
 
         if len(self.requests[client_id]) >= max_requests:
-            client_ip = request.client.host if request.client else "unknown"
+            client_ip = _get_client_ip(request)
             logger.warning(
                 "Rate limit exceeded",
                 extra={
@@ -294,7 +314,13 @@ async def verify_jwt_token(request: Request) -> dict:
             detail={"message": "No tenant associated with this account", "error_code": "TENANT_NOT_FOUND"},
         )
 
-    return {"tenant_id": tenant_id, "user_id": user.id}
+    # email incluido no auth context (A2). Permite que `should_block_prod`
+    # (admin_guards) e o endpoint /me/is-admin operem sem nova ida ao Auth.
+    return {
+        "tenant_id": tenant_id,
+        "user_id": user.id,
+        "email": (user.email or "").lower(),
+    }
 
 
 # --- Paths exempt from trial expiration check ---

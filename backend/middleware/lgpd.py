@@ -79,13 +79,16 @@ def audit_log(
 
     try:
         sb = get_supabase_client()
+        # `details` e jsonb na tabela — supabase-py serializa o dict pra JSON.
+        # Antes faziamos json.dumps aqui, o que gerava double-encode (string
+        # JSON dentro de uma coluna jsonb). Corrigido em A6.
         row = {
             "tenant_id": tenant_id,
             "user_id": user_id,
             "action": action,
             "resource_type": resource_type,
             "resource_id": resource_id,
-            "details": json.dumps(details) if details else None,
+            "details": details if details else None,
             "ip_address": ip_address,
         }
         sb.table("audit_log").insert(row).execute()
