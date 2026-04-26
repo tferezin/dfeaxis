@@ -113,6 +113,15 @@ async def checkout(
             cancel_url=body.cancel_url,
             billing_day=billing_day,
         )
+    except ValueError as e:
+        # R3: price_id desconhecido (fora do catalogo) — 400 com msg clara
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": str(e),
+                "error_code": "INVALID_PRICE_ID",
+            },
+        )
     except RuntimeError as e:
         # Stripe not configured
         raise HTTPException(status_code=503, detail=str(e))

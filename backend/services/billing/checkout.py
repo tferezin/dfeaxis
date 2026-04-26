@@ -38,8 +38,10 @@ from __future__ import annotations
 
 import calendar
 import logging
+import os
 from datetime import datetime, timezone
 from typing import Literal
+from urllib.parse import urlparse
 
 from config import settings
 
@@ -57,6 +59,76 @@ PRORATION_MIN_CENTS = 5000  # R$ 50,00
 # Por enquanto qualquer outro valor e ignorado e sobreescrito pra 5.
 DEFAULT_BILLING_DAY = 5
 _ALLOWED_BILLING_DAYS = (5, 10, 15)
+
+
+# ---------------------------------------------------------------------------
+# Redirect URL allowlist (R4 — defesa contra open redirect via Stripe checkout)
+# ---------------------------------------------------------------------------
+
+_DEFAULT_ALLOWED_HOSTS = (
+    "dfeaxis.com.br",
+    "www.dfeaxis.com.br",
+    "localhost:3000",
+    "frontend-henna-five-35.vercel.app",
+)
+_DEFAULT_FALLBACK_URL = "https://dfeaxis.com.br/dashboard?checkout=success"
+
+
+def _allowed_redirect_hosts() -> tuple[str, ...]:
+    """Le ALLOWED_REDIRECT_HOSTS do env (csv), fallback pros hosts default."""
+    raw = os.getenv("ALLOWED_REDIRECT_HOSTS", "").strip()
+    if not raw:
+        return _DEFAULT_ALLOWED_HOSTS
+    parsed = tuple(h.strip().lower() for h in raw.split(",") if h.strip())
+    return parsed or _DEFAULT_ALLOWED_HOSTS
+
+
+def _validate_redirect_url(url: str | None, fallback: str) -> str:
+    """Valida URL de redirect contra allowlist. Rejeita open redirect.
+
+    Cliente passa success_url/cancel_url no body do checkout request, e Stripe
+    redireciona o usuario pra esse URL apos checkout. Se nao validamos, atacante
+    pode passar `https://evil.com` e usar checkout legitimo da DFeAxis pra
+    fazer phishing (URL na barra do browser comeca com checkout.stripe.com).
+
+    Regras:
+    - URL ausente -> usa fallback
+    - URL sem scheme http(s) -> usa fallback
+    - hostname (com port se houver) nao na allowlist -> usa fallback + warning
+    - URL valido -> retorna como veio
+    """
+    if not url:
+        return fallback
+
+    try:
+        parsed = urlparse(url)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("URL de redirect invalida (%s): %s — usando fallback", url, exc)
+        return fallback
+
+    if parsed.scheme not in ("http", "https"):
+        logger.warning(
+            "URL de redirect com scheme nao-http (%s) — usando fallback",
+            parsed.scheme,
+        )
+        return fallback
+
+    if not parsed.netloc:
+        logger.warning("URL de redirect sem host (%s) — usando fallback", url)
+        return fallback
+
+    # netloc inclui port se houver. Comparacao case-insensitive.
+    netloc = parsed.netloc.lower()
+    allowed = _allowed_redirect_hosts()
+    if netloc not in allowed:
+        logger.warning(
+            "URL de redirect para host nao permitido (%s) — usando fallback. "
+            "Allowlist: %s",
+            netloc, ",".join(allowed),
+        )
+        return fallback
+
+    return url
 
 
 def _compute_next_billing_anchor(
@@ -236,8 +308,31 @@ def create_checkout_session(
     com trial_end (trial bloqueia cobranca via subscription). Entao:
     Invoice avulsa separada via webhook.
     """
+    # R3: valida price_id contra catalogo ANTES de criar Customer / chamar
+    # Stripe. Cliente nao pode criar checkout pra price_id arbitrario (ex:
+    # outro produto, plano descontinuado, price desativado). Stripe ate
+    # aceita price_id qualquer e cobra, mas dai a gente fatura/contabilidade
+    # interna fica torta. Faz sense reusar a mesma allowlist do catalogo.
+    if mode == "subscription":
+        if not get_plan_by_price_id(price_id):
+            raise ValueError(
+                f"price_id {price_id} nao esta no catalogo de planos"
+            )
+
     customer_id = ensure_customer(tenant_id)
     stripe = get_stripe()
+
+    # R4: valida success_url/cancel_url contra allowlist pra evitar open
+    # redirect via checkout legitimo (atacante usa nosso checkout pra
+    # phishing redirecionando pra dominio dele).
+    safe_success_url = _validate_redirect_url(
+        success_url or settings.stripe_checkout_success_url,
+        fallback=_DEFAULT_FALLBACK_URL,
+    )
+    safe_cancel_url = _validate_redirect_url(
+        cancel_url or settings.stripe_checkout_cancel_url,
+        fallback=_DEFAULT_FALLBACK_URL,
+    )
 
     # Por enquanto todos os tenants cobram dia 5 (unica data suportada pelo
     # monthly_overage_job). Se no futuro suportarmos 10/15, a validacao
@@ -318,8 +413,8 @@ def create_checkout_session(
         mode=mode,
         customer=customer_id,
         line_items=[{"price": price_id, "quantity": 1}],
-        success_url=success_url or settings.stripe_checkout_success_url,
-        cancel_url=cancel_url or settings.stripe_checkout_cancel_url,
+        success_url=safe_success_url,
+        cancel_url=safe_cancel_url,
         client_reference_id=tenant_id,
         metadata=session_metadata,
         allow_promotion_codes=True,
