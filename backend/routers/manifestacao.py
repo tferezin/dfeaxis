@@ -3,10 +3,10 @@
 import logging
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from db.supabase import get_supabase_client
-from middleware.lgpd import mask_cnpj
+from middleware.lgpd import audit_log, mask_cnpj
 from middleware.security import verify_api_key, verify_jwt_or_api_key, verify_jwt_token, verify_jwt_with_trial
 from models.schemas import (
     DocumentoPendenteOut,
@@ -211,6 +211,7 @@ async def historico_manifestacao(
 async def enviar_manifestacao(
     body: ManifestacaoRequest,
     auth: dict = Depends(verify_jwt_or_api_key),
+    request: Request = None,
 ):
     """Envia evento de manifestação para uma NF-e.
 
@@ -289,6 +290,30 @@ async def enviar_manifestacao(
         "user_id": auth.get("user_id"),
         "api_key_id": auth.get("api_key_id"),
     }).execute()
+
+    # A5: audit_log estruturado em audit_log table (LGPD trail) — em paralelo
+    # ao manifestacao_events (que e mais especifico do dominio fiscal).
+    # request pode ser None quando chamado via batch (chamada interna).
+    client_ip = (
+        request.client.host
+        if request and request.client
+        else None
+    )
+    audit_log(
+        tenant_id=tenant_id,
+        user_id=auth.get("user_id"),
+        action=f"manifestacao.{body.tipo_evento}",
+        resource_type="document",
+        resource_id=str(doc_id),
+        details={
+            "chave_acesso": body.chave_acesso,
+            "tipo_evento": body.tipo_evento,
+            "cstat": result.cstat,
+            "success": result.success,
+            "source": source,
+        },
+        ip_address=client_ip,
+    )
 
     return ManifestacaoResponse(
         chave_acesso=body.chave_acesso,

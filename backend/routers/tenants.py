@@ -1,14 +1,18 @@
 """Endpoints de tenant/onboarding."""
 
+import logging
 import os
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
 
 from admin_guards import should_block_prod
 from db.supabase import get_supabase_client
+from middleware.lgpd import audit_log
 from middleware.security import verify_jwt_token
 from models.schemas import TenantRegisterRequest
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -115,6 +119,7 @@ async def get_tenant(auth: dict = Depends(verify_jwt_token)):
 
 @router.patch("/tenants/settings")
 async def update_settings(
+    request: Request,
     polling_mode: str = Body(None, pattern=r"^(manual|auto)$"),
     manifestacao_mode: str = Body(None, pattern=r"^(auto_ciencia|manual)$"),
     sefaz_ambiente: str = Body(None, pattern=r"^(1|2)$"),
@@ -138,6 +143,18 @@ async def update_settings(
         raise HTTPException(status_code=400, detail="Nenhum campo para atualizar")
 
     sb = get_supabase_client()
+
+    # A5: snapshot dos valores ANTES de mudar — vai pro audit_log pra
+    # forensics (especialmente sefaz_ambiente que é o campo mais sensível).
+    old_values: dict = {}
+    try:
+        old_res = sb.table("tenants").select(
+            "polling_mode, manifestacao_mode, sefaz_ambiente"
+        ).eq("id", auth["tenant_id"]).single().execute()
+        if old_res.data:
+            old_values = {k: old_res.data.get(k) for k in updates.keys()}
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Failed to load previous settings for audit: %s", exc)
 
     # Guard 1 (commit 047dfb0): conta admin (LINKTI/BEIERSDORF) NUNCA
     # pode ir pra prod — identidade hardcoded no admin_guards.py.
@@ -180,6 +197,24 @@ async def update_settings(
 
     if not result.data:
         raise HTTPException(status_code=404, detail="Tenant não encontrado")
+
+    # A5: registra auditoria — especialmente importante pra sefaz_ambiente
+    # (LGPD/forensics: quem virou prod e quando). Falha em audit nunca derruba
+    # o request (`audit_log` ja captura excecoes internamente).
+    client_ip = request.client.host if request.client else None
+    audit_log(
+        tenant_id=auth["tenant_id"],
+        user_id=auth.get("user_id"),
+        action="tenant.settings_updated",
+        resource_type="tenant",
+        resource_id=auth["tenant_id"],
+        details={
+            "changes": updates,
+            "old_values": old_values,
+            "is_prod_switch": updates.get("sefaz_ambiente") == "1",
+        },
+        ip_address=client_ip,
+    )
 
     return result.data[0]
 
