@@ -346,19 +346,29 @@ def _on_invoice_paid(invoice: dict) -> str | None:
     a 30/31), independente do billing_day do tenant ser 5, 10 ou 15.
 
     Stripe manda invoice.paid tanto na compra inicial quanto em cada renewal.
-    Aqui sincroniza sub + limpa past_due_since (se estava em dunning, pagou
-    agora, reset).
+    Aqui sincroniza sub + limpa past_due_since SE a subscription voltou
+    pra status='active' (defesa contra: Invoice avulsa de overage paga
+    enquanto a renewal principal ainda ta em dunning, ou eventual
+    consistency entre invoice.paid e customer.subscription.updated).
     """
     subscription_id = invoice.get("subscription")
     if not subscription_id:
+        # Invoice avulsa (ProRata, overage anual) — sem subscription
+        # vinculada. Nao mexe em past_due_since; quem decide isso e o
+        # invoice.paid da subscription principal.
         return None
     stripe = get_stripe()
     sub = stripe.Subscription.retrieve(subscription_id)
     sync_subscription_to_db(sub)
 
     tenant_id = (sub.get("metadata") or {}).get("tenant_id")
-    if tenant_id:
-        # Limpa past_due_since — pagou, sai do dunning
+    sub_status = sub.get("status")
+
+    # Defensive: so limpa past_due_since se a sub estiver active.
+    # Se sub.status ainda e 'past_due' (Stripe ainda nao reconciliou ou
+    # esta invoice paga e antiga, nao a renewal corrente), preserva o
+    # past_due_since pra continuar bloqueando ate a renewal real ser paga.
+    if tenant_id and sub_status == "active":
         try:
             sb = get_supabase_client()
             sb.table("tenants").update({"past_due_since": None}).eq(
@@ -369,6 +379,12 @@ def _on_invoice_paid(invoice: dict) -> str | None:
                 "nao consegui limpar past_due_since pra tenant=%s: %s",
                 tenant_id, exc,
             )
+    elif tenant_id and sub_status != "active":
+        logger.info(
+            "invoice.paid recebida mas sub=%s ainda esta status=%s — "
+            "preservando past_due_since pra tenant=%s",
+            subscription_id, sub_status, tenant_id,
+        )
 
     return tenant_id
 
