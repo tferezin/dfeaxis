@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from db.supabase import get_supabase_client
 from middleware.lgpd import mask_cnpj
-from middleware.security import verify_api_key
+from middleware.security import verify_api_key_with_trial
 from models.schemas import NfseOut, NfseListResponse, NfsePollingResponse
 from services.cert_manager import decrypt_password
 from services.nfse_client import nfse_client
@@ -67,7 +67,7 @@ async def listar_nfse(
     data_inicio: str = Query(..., description="Data inicio YYYY-MM-DD"),
     data_fim: str = Query(..., description="Data fim YYYY-MM-DD"),
     pagina: int = Query(1, ge=1, description="Pagina de resultados"),
-    auth: dict = Depends(verify_api_key),
+    auth: dict = Depends(verify_api_key_with_trial),
 ):
     """Lista NFS-e recebidas por um CNPJ em um periodo.
 
@@ -126,7 +126,7 @@ async def listar_nfse(
 @router.get("/nfse/{chave}")
 async def consultar_nfse_por_chave(
     chave: str,
-    auth: dict = Depends(verify_api_key),
+    auth: dict = Depends(verify_api_key_with_trial),
 ):
     """Consulta uma NFS-e especifica por chave de acesso."""
     tenant_id = auth["tenant_id"]
@@ -207,7 +207,7 @@ async def consultar_nfse_por_chave(
 @router.post("/nfse/polling", response_model=NfsePollingResponse)
 async def trigger_nfse_polling(
     cnpj: str = Query(..., min_length=14, max_length=14),
-    auth: dict = Depends(verify_api_key),
+    auth: dict = Depends(verify_api_key_with_trial),
 ):
     """Dispara consulta de distribuicao NFS-e no ADN (similar ao polling SEFAZ).
 

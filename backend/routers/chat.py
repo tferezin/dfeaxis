@@ -631,13 +631,15 @@ def _send_escalation_email(
 async def escalate_conversation(body: EscalateRequest):
     """Marca a conversa como escalada pro time humano + envia e-mail pro suporte.
 
-    Não requer auth — qualquer um pode escalar a própria conversa (landing ou
-    dashboard). O backend valida que a conversation_id é válida.
+    Não requer JWT/API key (a conversa pode ser anônima — landing), mas exige
+    que a conversa tenha SIDO IDENTIFICADA antes:
 
-    A escalação é passo FINAL: o bot já tentou resolver antes. O bot só
-    oferece este endpoint quando determina que não consegue ajudar (ex:
-    pergunta de contrato customizado, dúvida além do escopo, erro técnico
-    persistente). Usuários não devem conseguir escalar trivialmente.
+    - Landing: precisa ter lead capture (linha em chat_leads associada).
+    - Dashboard: tenant_id setado na conversa (criado via /chat/dashboard).
+
+    A11: sem essa proteção, qualquer um podia disparar emails pra
+    `SUPPORT_EMAIL` em loop, virando vetor de spam. A escalação é passo
+    final, depois do bot ja ter conversado com um lead identificado.
     """
     sb = get_supabase_client()
 
@@ -652,6 +654,34 @@ async def escalate_conversation(body: EscalateRequest):
         raise HTTPException(status_code=500, detail="Erro ao processar escalação")
 
     conv = conv_res.data[0]
+
+    # A11: gate de identificacao. Conversa precisa ter origem identificavel
+    # (lead capture na landing OU tenant logado no dashboard) — caso contrario
+    # qualquer ator anonimo pode disparar email pro suporte em loop.
+    ctx = conv.get("context")
+    if ctx == "dashboard":
+        if not conv.get("tenant_id"):
+            raise HTTPException(
+                status_code=401,
+                detail="Conversa dashboard sem tenant — escalacao bloqueada",
+            )
+    else:
+        # Landing (ou qualquer outro context anonimo): exige lead capturado.
+        try:
+            lead_res = sb.table("chat_leads").select("id").eq(
+                "conversation_id", body.conversation_id
+            ).limit(1).execute()
+        except Exception as exc:
+            logger.error("escalate lead lookup failed: %s", exc)
+            raise HTTPException(status_code=500, detail="Erro ao validar conversa")
+        if not (lead_res.data or []):
+            raise HTTPException(
+                status_code=401,
+                detail=(
+                    "Escalacao requer captura de lead antes. "
+                    "Use /chat/landing/lead pra identificar."
+                ),
+            )
 
     # Idempotência: se já foi escalada, não reenvia email
     already_escalated = conv.get("escalated_to_human", False)
