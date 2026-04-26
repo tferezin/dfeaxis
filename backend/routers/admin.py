@@ -365,14 +365,25 @@ async def admin_tenant_detail(
     """Full detail for a single tenant."""
     sb = get_supabase_client()
 
-    # Tenant base data
-    tenant_res = sb.table("tenants").select("*").eq("id", tenant_id).execute()
+    # Item M10: lista explicita de colunas em vez de SELECT *. Reduz
+    # blast radius se uma coluna sensivel nova for adicionada na tabela
+    # (ex: secret token, reset link). Adicionar aqui explicitamente quando
+    # for de fato necessario expor pro admin UI.
+    tenant_res = sb.table("tenants").select(
+        "id, company_name, cnpj, plan, subscription_status, "
+        "trial_active, trial_blocked_at, trial_blocked_reason, "
+        "trial_expires_at, docs_consumidos_trial, docs_consumidos_mes, "
+        "docs_included_mes, max_cnpjs, sefaz_ambiente, "
+        "stripe_customer_id, stripe_subscription_id, current_period_end, "
+        "past_due_since, polling_mode, billing_day, "
+        "created_at, updated_at"
+    ).eq("id", tenant_id).execute()
     if not tenant_res.data:
         raise HTTPException(status_code=404, detail="Tenant not found")
 
     tenant = tenant_res.data[0]
 
-    # Mask sensitive fields
+    # Mask sensitive fields (CNPJ aparece, mas mascarado pra logs/UI)
     if tenant.get("cnpj"):
         tenant["cnpj"] = mask_cnpj(tenant["cnpj"])
 

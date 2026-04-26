@@ -351,6 +351,38 @@ async def receive_official_document(
     sb = get_supabase_client()
     tenant_id = auth["tenant_id"]
 
+    # Item M9: valida que o CNPJ destinatario do XML pertence ao tenant.
+    # Sem essa checagem, um cliente legitimo poderia enviar um XML com
+    # cnpj_dest de outra empresa pra "envenenar" o cofre alheio (ainda que
+    # filtrado por tenant_id na hora de listar, o documento existiria no
+    # registro). Exigir certificado ativo pro CNPJ garante que o tenant
+    # so ingere docs dos seus proprios CNPJs.
+    cert_check = (
+        sb.table("certificates")
+        .select("id")
+        .eq("tenant_id", tenant_id)
+        .eq("cnpj", cnpj_dest)
+        .limit(1)
+        .execute()
+    )
+    if not cert_check.data:
+        from middleware.lgpd import mask_cnpj as _mask_cnpj
+        logger.warning(
+            "SAP DRC receive: cnpj_dest fora do tenant",
+            extra={
+                "tenant_id": tenant_id,
+                "cnpj_dest_masked": _mask_cnpj(cnpj_dest),
+                "chave_masked": chave[:8] + "..." + chave[-4:],
+            },
+        )
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                f"CNPJ destinatario {_mask_cnpj(cnpj_dest)} nao pertence "
+                "a este tenant. Cadastre o certificado correspondente."
+            ),
+        )
+
     # Check if document already exists for this tenant
     existing = (
         sb.table("documents")
