@@ -52,25 +52,32 @@ def handle_webhook_event(
 
     event_id: str = event["id"]
     event_type: str = event["type"]
+    obj = event["data"]["object"]
 
-    # Idempotency check — if we've seen this event_id, skip
-    if _is_duplicate(event_id):
-        logger.info("Webhook %s already processed (idempotent skip)", event_id)
+    # Claim atômico ANTES do dispatch — evita race condition em entregas
+    # paralelas do Stripe. UNIQUE constraint em billing_events.stripe_event_id
+    # serializa: apenas um worker insere, os outros recebem dup error e
+    # fazem skip. Sem isso, 2 webhooks idênticos chegando junto poderiam
+    # ambos passar pelo _is_duplicate antes do _record_event e cobrar 2x.
+    if not _record_event(event_id, event_type, obj, tenant_id=None):
+        logger.info("Webhook %s already claimed (idempotent skip)", event_id)
         return {"status": "duplicate", "event_id": event_id}
 
     if event_type not in HANDLED_EVENTS:
         logger.debug("Webhook %s ignored (type=%s)", event_id, event_type)
-        _record_event(event_id, event_type, event["data"]["object"], tenant_id=None)
         return {"status": "ignored", "event_id": event_id, "event_type": event_type}
 
     try:
-        tenant_id = _dispatch(event_type, event["data"]["object"])
+        tenant_id = _dispatch(event_type, obj)
     except Exception as exc:  # noqa: BLE001
         logger.exception("Webhook %s failed during dispatch: %s", event_id, exc)
-        # Don't record on failure so retry can re-process
+        # Solta o claim pra Stripe poder retentar e reprocessar.
+        _release_claim(event_id)
         raise
 
-    _record_event(event_id, event_type, event["data"]["object"], tenant_id=tenant_id)
+    # Sucesso — atualiza tenant_id no row já inserido (audit)
+    if tenant_id:
+        _set_event_tenant(event_id, tenant_id)
     return {
         "status": "processed",
         "event_id": event_id,
@@ -264,15 +271,10 @@ def _fire_ga4_purchase(
     Separado do handler principal para facilitar teste unitário e isolamento
     de erros (o caller já faz try/except).
 
-    Idempotência: retries do Stripe são sequenciais, mas a janela entre a
-    verificação de duplicata em `handle_webhook_event` e o insert em
-    `_record_event` permite race condition teórica. Contra isso, confiamos
-    em 2 camadas:
-      1. `billing_events.stripe_event_id` tem UNIQUE constraint (insert race
-         resolvido pelo banco)
-      2. O GA4 deduplica eventos `purchase` pelo `transaction_id` — vamos
-         usar `subscription.id` como transaction_id justamente pra ativar
-         esse mecanismo de segurança adicional.
+    Idempotência: o claim atômico em billing_events (insert ANTES do dispatch)
+    já previne entregas paralelas chegarem aqui em duplicado. Como segunda
+    camada, GA4 deduplica `purchase` por `transaction_id` — usamos
+    `subscription.id` justamente pra ativar essa proteção adicional.
     """
     # Busca ga_client_id do tenant (capturado no cookie _ga durante signup).
     ga_client_id: str | None = None
@@ -419,6 +421,8 @@ def _on_invoice_failed(invoice: dict) -> str | None:
 # ---------------------------------------------------------------------------
 
 def _is_duplicate(event_id: str) -> bool:
+    """Verifica se o event_id já foi gravado. Mantido pra compat com testes —
+    fluxo de produção usa o claim atômico via _record_event direto."""
     sb = get_supabase_client()
     res = (
         sb.table("billing_events")
@@ -435,7 +439,13 @@ def _record_event(
     event_type: str,
     payload: dict,
     tenant_id: str | None,
-) -> None:
+) -> bool:
+    """INSERT no billing_events. Retorna True se gravou, False se já existia.
+
+    Atua como **claim atômico** — quando chamado antes do dispatch, a
+    UNIQUE constraint em stripe_event_id serializa entregas paralelas:
+    apenas um worker insere, os outros recebem False e fazem skip.
+    """
     sb = get_supabase_client()
     try:
         sb.table("billing_events").insert(
@@ -446,8 +456,42 @@ def _record_event(
                 "payload": json.loads(json.dumps(payload, default=str)),
             }
         ).execute()
+        return True
     except Exception as exc:  # noqa: BLE001
-        # If the row already exists (race condition between two webhook
-        # deliveries), the UNIQUE constraint will reject — that's fine.
-        if "duplicate" not in str(exc).lower() and "23505" not in str(exc):
-            logger.error("Failed to record billing_event %s: %s", event_id, exc)
+        msg = str(exc).lower()
+        if "duplicate" in msg or "23505" in str(exc) or "already exists" in msg:
+            return False
+        logger.error("Failed to record billing_event %s: %s", event_id, exc)
+        # Erros não-UNIQUE propagam — não queremos prosseguir achando
+        # que claimamos quando na verdade falhou.
+        raise
+
+
+def _release_claim(event_id: str) -> None:
+    """DELETE row pra permitir retry do Stripe quando dispatch falhou.
+    Best-effort: se DELETE falhar, Stripe vai retentar e o retry vai cair
+    no caminho 'duplicate' — não é o ideal, mas não causa cobrança errada."""
+    sb = get_supabase_client()
+    try:
+        sb.table("billing_events").delete().eq(
+            "stripe_event_id", event_id
+        ).execute()
+    except Exception as exc:  # noqa: BLE001
+        logger.error(
+            "Failed to release claim for %s (Stripe retry vai ser ignorado): %s",
+            event_id, exc,
+        )
+
+
+def _set_event_tenant(event_id: str, tenant_id: str) -> None:
+    """UPDATE tenant_id no row já claimado. Best-effort (audit only)."""
+    sb = get_supabase_client()
+    try:
+        sb.table("billing_events").update({"tenant_id": tenant_id}).eq(
+            "stripe_event_id", event_id
+        ).execute()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "Failed to update tenant_id for billing_event %s: %s",
+            event_id, exc,
+        )
