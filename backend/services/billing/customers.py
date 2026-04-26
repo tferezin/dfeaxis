@@ -34,6 +34,10 @@ def ensure_customer(tenant_id: str) -> str:
         return tenant.data["stripe_customer_id"]
 
     stripe = get_stripe()
+    # Item M2: idempotency_key elimina race condition entre 2 requests
+    # paralelas pro mesmo tenant. Stripe garante que mesmo idempotency_key
+    # sempre retorna o mesmo Customer (mesmo objeto, sem duplicacao).
+    # Mais simples e barato que advisory lock no Postgres.
     customer = stripe.Customer.create(
         email=tenant.data.get("email"),
         name=tenant.data.get("company_name"),
@@ -42,6 +46,7 @@ def ensure_customer(tenant_id: str) -> str:
             "tenant_id": tenant_id,
             "cnpj": tenant.data.get("cnpj") or "",
         },
+        idempotency_key=f"customer-{tenant_id}",
     )
 
     sb.table("tenants").update(

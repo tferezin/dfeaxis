@@ -30,6 +30,12 @@ HANDLED_EVENTS = {
     "customer.subscription.deleted",
     "invoice.paid",
     "invoice.payment_failed",
+    # Item M1 — incidentes operacionais que precisam de tratamento explicito.
+    # Reembolso e chargeback indicam que o pagamento foi revertido pelo
+    # banco/cliente; tratamos como past_due pra suspender acesso ate o
+    # cliente regularizar via /billing/portal.
+    "charge.refunded",
+    "charge.dispute.created",
 }
 
 
@@ -103,6 +109,13 @@ def _dispatch(event_type: str, obj: dict[str, Any]) -> str | None:
 
     if event_type == "invoice.payment_failed":
         return _on_invoice_failed(obj)
+
+    # Item M1: refund e dispute — incidentes operacionais.
+    if event_type == "charge.refunded":
+        return _on_charge_refunded(obj)
+
+    if event_type == "charge.dispute.created":
+        return _on_charge_dispute(obj)
 
     return None
 
@@ -436,6 +449,97 @@ def _on_invoice_failed(invoice: dict) -> str | None:
                 tenant_id, exc,
             )
 
+    return tenant_id
+
+
+# ---------------------------------------------------------------------------
+# Item M1: handlers de incidentes operacionais (refund / chargeback)
+# ---------------------------------------------------------------------------
+
+def _lookup_tenant_by_customer(customer_id: str | None) -> str | None:
+    """Resolve tenant_id a partir do Stripe customer_id."""
+    if not customer_id:
+        return None
+    sb = get_supabase_client()
+    try:
+        res = (
+            sb.table("tenants")
+            .select("id")
+            .eq("stripe_customer_id", customer_id)
+            .limit(1)
+            .execute()
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.error("lookup tenant by customer falhou: %s", exc)
+        return None
+    if res.data:
+        return res.data[0]["id"]
+    return None
+
+
+def _mark_past_due(tenant_id: str, reason: str) -> None:
+    """Marca tenant como past_due + stampa past_due_since (idempotente).
+
+    Usado por refund e dispute. Preserva past_due_since se ja setado pra
+    nao resetar a contagem do dunning (regra 5+5).
+    """
+    sb = get_supabase_client()
+    try:
+        current = sb.table("tenants").select(
+            "past_due_since, subscription_status"
+        ).eq("id", tenant_id).single().execute()
+        existing = current.data or {}
+        updates: dict = {"subscription_status": "past_due"}
+        if not existing.get("past_due_since"):
+            updates["past_due_since"] = datetime.now(timezone.utc).isoformat()
+        sb.table("tenants").update(updates).eq("id", tenant_id).execute()
+        logger.warning(
+            "tenant=%s marcado past_due (motivo=%s)", tenant_id, reason,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.error(
+            "falha ao marcar tenant=%s past_due (%s): %s",
+            tenant_id, reason, exc,
+        )
+
+
+def _on_charge_refunded(charge: dict) -> str | None:
+    """charge.refunded — pagamento estornado. Suspende acesso ate regularizar.
+
+    Stripe dispara este evento tanto pra refund total quanto parcial. Pra
+    simplificar, qualquer refund coloca o tenant em past_due — se for
+    legitimo (refund parcial agendado), suporte regulariza manualmente
+    via admin. Se for fraude/dispute, ja esta bloqueado.
+    """
+    customer_id = charge.get("customer")
+    tenant_id = _lookup_tenant_by_customer(customer_id)
+    amount_refunded = charge.get("amount_refunded") or 0
+    logger.error(
+        "REFUND charge=%s customer=%s tenant=%s amount_refunded_cents=%s",
+        charge.get("id"), customer_id, tenant_id, amount_refunded,
+    )
+    if tenant_id:
+        _mark_past_due(tenant_id, reason="charge.refunded")
+    return tenant_id
+
+
+def _on_charge_dispute(charge: dict) -> str | None:
+    """charge.dispute.created — chargeback. Incidente serio: bloqueia + alerta.
+
+    Chargeback significa que o cliente disputou a cobranca no banco. Stripe
+    cobra fee de ~$15 USD por dispute, alem de risco de churn forcado.
+    Bloqueamos imediatamente — suporte humano precisa entrar em contato.
+    """
+    customer_id = charge.get("customer")
+    tenant_id = _lookup_tenant_by_customer(customer_id)
+    amount = charge.get("amount") or 0
+    logger.critical(
+        "CHARGEBACK charge=%s customer=%s tenant=%s amount_cents=%s "
+        "ATENCAO: contato com suporte necessario",
+        charge.get("id"), customer_id, tenant_id, amount,
+    )
+    if tenant_id:
+        _mark_past_due(tenant_id, reason="charge.dispute.created")
     return tenant_id
 
 
