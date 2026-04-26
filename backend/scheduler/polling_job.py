@@ -1412,6 +1412,33 @@ def start_scheduler() -> BackgroundScheduler:
     except Exception as exc:  # noqa: BLE001
         logger.warning("Não foi possível agendar pfx_cleanup_job: %s", exc)
 
+    # LGPD: cleanup de XMLs expirados (dia 1 — depois do snapshot do mes
+    # anterior pra nao deletar XML que ainda vai ser auditado). Usa a
+    # function `cleanup_expired_documents` do banco, que aplica a politica
+    # de retencao definida nas migrations (default 90d apos delivered).
+    # A8: job estava sumido — XML ficava acumulando indefinidamente.
+    try:
+        def _cleanup_expired_xmls() -> None:
+            sb = get_supabase_client()
+            sb.rpc("cleanup_expired_documents").execute()
+
+        scheduler.add_job(
+            _cleanup_expired_xmls,
+            "cron",
+            day=1,
+            hour=3,
+            minute=0,
+            timezone="America/Sao_Paulo",
+            id="cleanup_xml_expired",
+            name="LGPD: cleanup de XMLs expirados (dia 1, depois do snapshot)",
+            replace_existing=True,
+        )
+        logger.info("cleanup_xml_expired agendado: dia 1 as 03:00 SP")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "Nao foi possivel agendar cleanup_xml_expired: %s", exc
+        )
+
     # NFe Polling v2: two background jobs for the 2-step SEFAZ flow
     # Em homologação (SEFAZ_AMBIENTE=2) NÃO agenda — captura é manual.
     import os
