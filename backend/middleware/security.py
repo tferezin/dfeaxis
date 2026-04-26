@@ -328,16 +328,20 @@ def _is_trial_exempt(path: str) -> bool:
 #
 # Endpoints de WRITE (captura nova, manifestacao nova, upload de cert) sao
 # bloqueados normalmente — cliente so volta ao fluxo completo apos pagar.
+# Convencao: paths terminando em "/" sao PREFIXOS (qualquer subpath casa).
+# Paths sem "/" final sao MATCH EXATO (so o path em si). Isso evita que
+# um POST futuro tipo `/manifestacao/historico/{id}/ack` casse o exempt
+# `/manifestacao/historico` por substring acidentalmente.
 _PAST_DUE_EXEMPT_PATHS = (
-    "/billing/",       # portal, checkout — tudo de pagar
-    "/alerts",
-    "/tenants/me",
-    "/tenants/settings",
-    "/credits/",       # ver saldo
-    "/chat/",          # suporte
-    "/sefaz/status",   # health
-    "/manifestacao/historico",
-    "/manifestacao/pendentes",
+    "/billing/",                # portal, checkout — qualquer subpath
+    "/alerts",                  # exato
+    "/tenants/me",              # exato
+    "/tenants/settings",        # exato
+    "/credits/",                # qualquer subpath (saldo, etc)
+    "/chat/",                   # suporte — qualquer subpath
+    "/sefaz/status",            # exato
+    "/manifestacao/historico",  # exato (so listagem; ack/etc devem bloquear)
+    "/manifestacao/pendentes",  # exato
 )
 
 # Metodos HTTP sempre liberados em past_due — read-only nunca bloqueia.
@@ -346,17 +350,27 @@ _PAST_DUE_EXEMPT_PATHS = (
 _PAST_DUE_READ_ONLY_METHODS = ("GET", "HEAD", "OPTIONS")
 
 
+def _path_matches_exempt(path: str, exempt: str) -> bool:
+    """Match com semantica clara:
+    - exempt termina em "/" → prefix match (libera subpaths)
+    - exempt sem "/" → match exato apenas
+    """
+    if exempt.endswith("/"):
+        return path.startswith(exempt)
+    return path == exempt
+
+
 def _is_past_due_exempt(request: Request) -> bool:
     """Libera request quando past_due. Regra:
     - GET/HEAD/OPTIONS: sempre libera (read-only nao bloqueia)
-    - POST/PUT/DELETE/PATCH: so libera se path esta em _PAST_DUE_EXEMPT_PATHS
-      (billing, chat, settings)
+    - POST/PUT/DELETE/PATCH: so libera se path bate com _PAST_DUE_EXEMPT_PATHS
+      (billing, chat, settings) — ver semantica em _path_matches_exempt
     """
     method = request.method.upper()
     if method in _PAST_DUE_READ_ONLY_METHODS:
         return True
     path = request.url.path
-    return any(exempt in path for exempt in _PAST_DUE_EXEMPT_PATHS)
+    return any(_path_matches_exempt(path, exempt) for exempt in _PAST_DUE_EXEMPT_PATHS)
 
 
 # Mensagem unificada pra trial bloqueado (cap OU tempo). Decisão de

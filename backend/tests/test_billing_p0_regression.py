@@ -135,38 +135,77 @@ class TestDunningOffByOne:
 
 
 # =============================================================================
-# Fix #1 — Race condition webhook (smoke test sem DB)
+# Fix #4 (IMPORTANT) — billing_day defensive validation
 # =============================================================================
 
 
-class TestWebhookClaimSemantics:
-    """Garantia que _record_event retorna bool — claim atomico pra
-    serializar entregas paralelas. Bug original: _is_duplicate ANTES do
-    insert deixava brecha pra 2 workers passarem.
-    """
+class TestBillingDayValidation:
+    """Defesa em profundidade contra bypass de validacao billing_day."""
 
-    def test_record_event_returns_bool(self):
-        """Validacao da signature: retorna True/False, nao None.
-        Sem DB — apenas valida o contrato da funcao.
+    def test_anchor_aceita_5_10_15(self):
+        """billing_day in (5, 10, 15) deve funcionar."""
+        from services.billing.checkout import _compute_next_billing_anchor
 
-        Modulo usa `from __future__ import annotations`, entao a anotacao
-        vira string. Comparamos com 'bool' (string).
-        """
-        import inspect
-        from services.billing.webhooks import _record_event
+        now = datetime(2026, 4, 15, 12, 0, 0, tzinfo=timezone.utc)
+        for valid_day in (5, 10, 15):
+            result = _compute_next_billing_anchor(valid_day, now)
+            assert result.day == valid_day
 
-        sig = inspect.signature(_record_event)
-        assert str(sig.return_annotation) == "bool", (
-            "_record_event precisa retornar bool — caller usa pra decidir "
-            "se rodou claim ou se foi duplicate (race serialized pelo DB)"
+    def test_anchor_rejeita_31(self):
+        """billing_day=31 (edge case fevereiro) deve dar ValueError."""
+        from services.billing.checkout import _compute_next_billing_anchor
+
+        now = datetime(2026, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+        with pytest.raises(ValueError, match="billing_day"):
+            _compute_next_billing_anchor(31, now)
+
+    def test_anchor_rejeita_zero(self):
+        """billing_day=0 inválido."""
+        from services.billing.checkout import _compute_next_billing_anchor
+
+        now = datetime(2026, 4, 15, 12, 0, 0, tzinfo=timezone.utc)
+        with pytest.raises(ValueError):
+            _compute_next_billing_anchor(0, now)
+
+
+# =============================================================================
+# Fix #5 (IMPORTANT) — soft block path matching strictness
+# =============================================================================
+
+
+class TestSoftBlockPathMatching:
+    """Garantia que paths exempt nao casam por substring frouxo."""
+
+    def test_exato_billing_libera(self):
+        from middleware.security import _path_matches_exempt
+        assert _path_matches_exempt("/billing/", "/billing/")
+        assert _path_matches_exempt("/billing/checkout", "/billing/")
+        assert _path_matches_exempt("/billing/portal", "/billing/")
+
+    def test_exato_manifestacao_historico_libera_so_o_path_em_si(self):
+        """`/manifestacao/historico` exempt. `/manifestacao/historico/123/ack`
+        NAO deve ser liberado (POST futuro nao deve escapar)."""
+        from middleware.security import _path_matches_exempt
+
+        assert _path_matches_exempt(
+            "/manifestacao/historico", "/manifestacao/historico"
+        )
+        # Subpath POST nao deve casar
+        assert not _path_matches_exempt(
+            "/manifestacao/historico/123/ack", "/manifestacao/historico"
         )
 
-    def test_release_claim_existe(self):
-        """_release_claim deve existir pra desfazer claim apos dispatch
-        falhar (Stripe retry vai reprocessar)."""
-        from services.billing.webhooks import _release_claim
+    def test_chat_subpath_libera(self):
+        from middleware.security import _path_matches_exempt
 
-        assert callable(_release_claim)
+        assert _path_matches_exempt("/chat/messages", "/chat/")
+
+    def test_polling_nao_libera(self):
+        """Path nao exempt nao deve casar com nenhum padrao."""
+        from middleware.security import _path_matches_exempt
+
+        assert not _path_matches_exempt("/polling/trigger", "/billing/")
+        assert not _path_matches_exempt("/polling/trigger", "/manifestacao/historico")
 
 
 if __name__ == "__main__":

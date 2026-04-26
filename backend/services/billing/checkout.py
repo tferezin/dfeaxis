@@ -56,6 +56,7 @@ PRORATION_MIN_CENTS = 5000  # R$ 50,00
 # No futuro podemos aceitar 10/15 — o schema ja tem a coluna billing_day.
 # Por enquanto qualquer outro valor e ignorado e sobreescrito pra 5.
 DEFAULT_BILLING_DAY = 5
+_ALLOWED_BILLING_DAYS = (5, 10, 15)
 
 
 def _compute_next_billing_anchor(
@@ -68,9 +69,17 @@ def _compute_next_billing_anchor(
     seguinte. O ProRata dos dias restantes do mes corrente e cobrado a
     parte (Invoice avulsa imediata).
 
-    Quando billing_day nao existe no mes seguinte (ex: 31 em Fev), usa o
-    ultimo dia — mas billing_day so aceita 5/10/15 entao nao acontece.
+    Quando billing_day nao existe no mes seguinte (ex: 31 em Fev), usaria
+    o ultimo dia. Mas defensivamente: validamos billing_day in (5, 10, 15)
+    pra prevenir bypass futuro (ex: novo endpoint que nao valida, ou
+    write direto no banco). Assim nao precisamos confiar no caller.
     """
+    if billing_day not in _ALLOWED_BILLING_DAYS:
+        raise ValueError(
+            f"billing_day deve ser um de {_ALLOWED_BILLING_DAYS}, "
+            f"recebido {billing_day}"
+        )
+
     # Sempre pula pro mes seguinte
     if now.month == 12:
         year, month = now.year + 1, 1
