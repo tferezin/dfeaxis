@@ -150,15 +150,22 @@ def _on_checkout_completed(session: dict) -> str | None:
             session.get("id"), exc,
         )
 
-    # Cria Invoice avulsa de ProRata se agendada no checkout. Nao falha o
-    # webhook se nao der — logamos e seguimos, subscription ja foi criada.
+    # Cria Invoice avulsa de ProRata se agendada no checkout.
+    # IMPORTANTE (A1, segurança): se falhar, propaga a exception. O Stripe
+    # vai retentar o webhook ate 3 dias com backoff exponencial — assim a
+    # ProRata nao se perde silenciosamente. Trade-off: subscription ja foi
+    # sincronizada no DB (tenant ve "active"), mas isso ja era o caso antes;
+    # a diferenca e que agora a cobranca acontece no retry em vez de virar
+    # zero. _release_claim no _dispatch ira liberar o claim pra retry.
     try:
         _create_prorata_invoice_from_metadata(session=session, subscription=sub)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.error(
-            "prorata invoice failed for tenant=%s session=%s: %s",
+            "prorata invoice failed for tenant=%s session=%s — propagando "
+            "pra Stripe retentar webhook: %s",
             tenant_id, session.get("id"), exc,
         )
+        raise
 
     # Dispara purchase no GA4 via Measurement Protocol.
     # Tracking NUNCA pode quebrar o webhook — qualquer erro vira warning log.
