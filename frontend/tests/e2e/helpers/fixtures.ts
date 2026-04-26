@@ -230,6 +230,26 @@ export async function simulatePaymentSuccess(tenantId: string): Promise<void> {
   })
 }
 
+/**
+ * Simulates a tenant in past_due state with N days elapsed since first failure.
+ * Used to test soft block boundary (5 days tolerance, blocked from day 6).
+ */
+export async function simulatePastDue(
+  tenantId: string,
+  daysAgo: number = 7
+): Promise<void> {
+  const pastDueSince = new Date(
+    Date.now() - daysAgo * 24 * 60 * 60 * 1000
+  ).toISOString()
+  await updateTenant(tenantId, {
+    subscription_status: "past_due",
+    past_due_since: pastDueSince,
+    trial_active: false,
+    trial_blocked_at: null,
+    trial_blocked_reason: null,
+  })
+}
+
 /** Simulates trial time expiration: trial_expires_at moves to past. */
 export async function simulateTimeExpired(tenantId: string): Promise<void> {
   const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
