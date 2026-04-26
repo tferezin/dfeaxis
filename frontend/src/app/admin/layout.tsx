@@ -11,8 +11,11 @@ import {
   ChevronLeft,
 } from "lucide-react"
 import { getSupabase } from "@/lib/supabase"
+import { apiFetch } from "@/lib/api"
 
-const ADMIN_EMAILS = ["ferezinth@hotmail.com", "ferezaeai@gmail.com"]
+// A14: ADMIN_EMAILS removido do bundle. Gate server-side via /me/is-admin.
+// Mesmo que o atacante driblasse o redirect aqui, todos os endpoints
+// /admin/* exigem _verify_admin no backend (defesa em profundidade).
 
 const adminNav = [
   { title: "Dashboard", href: "/admin", icon: LayoutDashboard },
@@ -36,7 +39,12 @@ export default function AdminLayout({
         const {
           data: { user },
         } = await sb.auth.getUser()
-        if (user && ADMIN_EMAILS.includes(user.email ?? "")) {
+        if (!user) {
+          router.replace("/dashboard")
+          return
+        }
+        const res = await apiFetch<{ is_admin: boolean }>("/me/is-admin")
+        if (res?.is_admin) {
           setAuthorized(true)
         } else {
           router.replace("/dashboard")

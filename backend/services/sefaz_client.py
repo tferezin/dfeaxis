@@ -19,7 +19,10 @@ from zeep.transports import Transport
 
 from admin_guards import safe_ambiente
 from middleware.lgpd import mask_cnpj
-from services.cert_manager import decrypt_pfx, temp_cert_files
+from services.cert_manager import (
+    decrypt_pfx_with_migration,
+    temp_cert_files,
+)
 from services.circuit_breaker import circuit_breaker
 
 logger = logging.getLogger(__name__)
@@ -46,6 +49,32 @@ NAMESPACES = {
     "cte": "http://www.portalfiscal.inf.br/cte",
     "mdfe": "http://www.portalfiscal.inf.br/mdfe",
 }
+
+
+def _lookup_cert_id(tenant_id: str, cnpj: str) -> str | None:
+    """Busca o id do certificado ativo deste tenant+cnpj.
+
+    Usado pra lazy migration v1->v2 (item M3): quando o decrypt detectar
+    formato v1, sabemos qual row atualizar com o blob v2.
+    Best-effort: se a busca falhar, retorna None e a migracao e pulada.
+    """
+    try:
+        from db.supabase import get_supabase_client
+        sb = get_supabase_client()
+        res = (
+            sb.table("certificates")
+            .select("id")
+            .eq("tenant_id", tenant_id)
+            .eq("cnpj", cnpj)
+            .eq("is_active", True)
+            .limit(1)
+            .execute()
+        )
+        if res.data:
+            return res.data[0]["id"]
+    except Exception:
+        pass
+    return None
 
 
 def _refine_tipo_by_schema(tipo_consulta: str, schema: str) -> str:
@@ -136,17 +165,21 @@ class SefazClient:
                 latency_ms=0,
             )
 
-        # Decifra o .pfx — auto-detect v1/v2 format
-        pfx_encrypted_str = pfx_encrypted if isinstance(pfx_encrypted, str) else pfx_encrypted.hex() if isinstance(pfx_encrypted, bytes) else str(pfx_encrypted)
-
-        if pfx_encrypted_str.startswith("v2:"):
-            blob = bytes.fromhex(pfx_encrypted_str[3:])
-            pfx_bytes = decrypt_pfx(blob, None, tenant_id)
-        else:
-            # Legacy v1: pfx_encrypted and pfx_iv are separate hex strings
-            enc_bytes = bytes.fromhex(pfx_encrypted_str) if isinstance(pfx_encrypted_str, str) else pfx_encrypted
-            iv_bytes = bytes.fromhex(pfx_iv) if isinstance(pfx_iv, str) else pfx_iv
-            pfx_bytes = decrypt_pfx(enc_bytes, iv_bytes, tenant_id)
+        # Decifra o .pfx — auto-detect v1/v2 + lazy migration (item M3).
+        # Se o blob esta em v1, decrypt_pfx_with_migration faz o re-encrypt
+        # como v2 e atualiza a row em `certificates` (best-effort).
+        pfx_encrypted_str = (
+            pfx_encrypted if isinstance(pfx_encrypted, str)
+            else pfx_encrypted.hex() if isinstance(pfx_encrypted, bytes)
+            else str(pfx_encrypted)
+        )
+        cert_id_for_migration = _lookup_cert_id(tenant_id, cnpj)
+        pfx_bytes = decrypt_pfx_with_migration(
+            pfx_encrypted_str=pfx_encrypted_str,
+            pfx_iv=pfx_iv,
+            tenant_id=tenant_id,
+            cert_id=cert_id_for_migration,
+        )
 
         # Defesa em profundidade: força homolog se a conta (tenant_id)
         # está na blacklist hardcoded (admin_guards.py). Se chegar aqui
@@ -202,16 +235,19 @@ class SefazClient:
                 documents=[], latency_ms=0,
             )
 
-        # Decifra o .pfx — auto-detect v1/v2 format
-        pfx_encrypted_str = pfx_encrypted if isinstance(pfx_encrypted, str) else pfx_encrypted.hex() if isinstance(pfx_encrypted, bytes) else str(pfx_encrypted)
-
-        if pfx_encrypted_str.startswith("v2:"):
-            blob = bytes.fromhex(pfx_encrypted_str[3:])
-            pfx_bytes = decrypt_pfx(blob, None, tenant_id)
-        else:
-            enc_bytes = bytes.fromhex(pfx_encrypted_str) if isinstance(pfx_encrypted_str, str) else pfx_encrypted
-            iv_bytes = bytes.fromhex(pfx_iv) if isinstance(pfx_iv, str) else pfx_iv
-            pfx_bytes = decrypt_pfx(enc_bytes, iv_bytes, tenant_id)
+        # Decifra o .pfx — auto-detect v1/v2 + lazy migration (item M3).
+        pfx_encrypted_str = (
+            pfx_encrypted if isinstance(pfx_encrypted, str)
+            else pfx_encrypted.hex() if isinstance(pfx_encrypted, bytes)
+            else str(pfx_encrypted)
+        )
+        cert_id_for_migration = _lookup_cert_id(tenant_id, cnpj)
+        pfx_bytes = decrypt_pfx_with_migration(
+            pfx_encrypted_str=pfx_encrypted_str,
+            pfx_iv=pfx_iv,
+            tenant_id=tenant_id,
+            cert_id=cert_id_for_migration,
+        )
 
         # Defesa em profundidade: força homolog se a conta (tenant_id) está
         # na blacklist hardcoded (admin_guards.py). Mesmo guard do

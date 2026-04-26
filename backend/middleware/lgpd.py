@@ -79,13 +79,16 @@ def audit_log(
 
     try:
         sb = get_supabase_client()
+        # `details` e jsonb na tabela — supabase-py serializa o dict pra JSON.
+        # Antes faziamos json.dumps aqui, o que gerava double-encode (string
+        # JSON dentro de uma coluna jsonb). Corrigido em A6.
         row = {
             "tenant_id": tenant_id,
             "user_id": user_id,
             "action": action,
             "resource_type": resource_type,
             "resource_id": resource_id,
-            "details": json.dumps(details) if details else None,
+            "details": details if details else None,
             "ip_address": ip_address,
         }
         sb.table("audit_log").insert(row).execute()
@@ -175,6 +178,13 @@ def _is_sanitize_whitelisted(path: str) -> bool:
     return any(path.startswith(prefix) for prefix in _SANITIZE_WHITELIST_PREFIXES)
 
 
+# Item M11: cap de tamanho pra evitar DoS por buferizacao integral.
+# Antes, qualquer response — mesmo de 100MB — era acumulada em memoria
+# pra rodar o regex. Atacante autenticado podia disparar endpoint que
+# retorna lote grande e estourar RAM da instancia.
+_SANITIZER_MAX_BUFFER = 1_000_000  # 1MB e suficiente pra responses JSON de UI
+
+
 class ResponseSanitizerMiddleware(BaseHTTPMiddleware):
     """Scans JSON response bodies and masks accidentally leaked sensitive data.
 
@@ -198,13 +208,55 @@ class ResponseSanitizerMiddleware(BaseHTTPMiddleware):
         if _is_sanitize_whitelisted(request.url.path):
             return response
 
-        # Read body
+        # Item M11: respostas grandes pulam sanitizacao pra prevenir DoS.
+        # Content-Length pode nao estar setado em respostas chunked — nesse
+        # caso buferiza com o cap em loop, e se estourar, retorna a resposta
+        # completa sem sanitizar (preserva funcionalidade > completeza).
+        content_length_str = response.headers.get("content-length")
+        if content_length_str:
+            try:
+                if int(content_length_str) > _SANITIZER_MAX_BUFFER:
+                    logger.warning(
+                        "Response > %d bytes — skipping sanitization (path=%s)",
+                        _SANITIZER_MAX_BUFFER, request.url.path,
+                    )
+                    return response
+            except ValueError:
+                pass
+
+        # Read body com cap. Se estourar durante a leitura, drena o resto
+        # e retorna sem sanitizar (garante que o cliente recebe a resposta
+        # integra).
         body = b""
+        oversized = False
         async for chunk in response.body_iterator:
             if isinstance(chunk, bytes):
                 body += chunk
             else:
                 body += chunk.encode("utf-8")
+            if len(body) > _SANITIZER_MAX_BUFFER:
+                oversized = True
+                # Continua drenando pra nao deixar iterator pendente
+                async for rest in response.body_iterator:
+                    body += (
+                        rest if isinstance(rest, bytes)
+                        else rest.encode("utf-8")
+                    )
+                break
+
+        if oversized:
+            logger.warning(
+                "Response excedeu cap durante leitura — sanitizacao skipped "
+                "(path=%s size=%d)",
+                request.url.path, len(body),
+            )
+            # Retorna response com body original; headers preservados.
+            return Response(
+                content=body,
+                status_code=response.status_code,
+                headers=dict(response.headers),
+                media_type=response.media_type,
+            )
 
         try:
             text = body.decode("utf-8")

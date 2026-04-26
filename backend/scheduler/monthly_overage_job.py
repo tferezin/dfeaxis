@@ -81,11 +81,20 @@ def _create_invoice_item(
     rate_cents: int,
     ciclo_mes: date,
 ) -> Optional[str]:
-    """Cria InvoiceItem pendurado no Stripe."""
+    """Cria InvoiceItem pendurado no Stripe.
+
+    Idempotency: usa tenant_id + ciclo_mes como chave. Se o job rodar 2x no
+    mesmo dia (ex: retry apos crash), Stripe retorna o MESMO InvoiceItem ao
+    inves de criar duplicado. O filtro `stripe_invoice_item_id IS NULL` ja
+    cobre o caso normal, mas idempotency_key e segunda camada de defesa
+    (race condition entre query + create, scheduler agendado em 2 instancias
+    por engano, etc).
+    """
     description = (
         f"Excedente de documentos — {ciclo_mes.strftime('%m/%Y')} "
         f"({excedente_docs} docs x R$ {rate_cents / 100:.2f})"
     )
+    idempotency_key = f"overage-item-{tenant_id}-{ciclo_mes.isoformat()}"
     try:
         invoice_item = stripe.InvoiceItem.create(
             customer=customer_id,
@@ -98,6 +107,7 @@ def _create_invoice_item(
                 "excedente_docs": str(excedente_docs),
                 "type": "monthly_overage",
             },
+            idempotency_key=idempotency_key,
         )
         return invoice_item.id
     except Exception as exc:

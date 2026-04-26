@@ -6,6 +6,7 @@ Uses service_role Supabase client for cross-tenant queries.
 
 import logging
 import os
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -13,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from db.supabase import get_supabase_client
 from middleware.lgpd import mask_cnpj
+from middleware.security import verify_jwt_token
 from services.billing.plans import DEFAULT_PLAN_CATALOG
 
 logger = logging.getLogger("dfeaxis.admin")
@@ -29,6 +31,11 @@ _ADMIN_EMAILS_RAW = os.getenv(
 ADMIN_EMAILS: set[str] = {
     e.strip().lower() for e in _ADMIN_EMAILS_RAW.split(",") if e.strip()
 }
+
+# A7: caracteres que abrem injection no PostgREST `or_` (vírgula separa
+# operandos, parenteses iniciam grupos, asterisco e wildcard, backslash
+# escapa quote). Bloqueamos esses; o resto (`%`/`_`) e escapado.
+_ADMIN_SEARCH_FORBIDDEN = re.compile(r"[,*()\\]")
 
 # Plan price lookup (monthly_amount_cents by plan key)
 _PLAN_PRICES: dict[str, int] = {
@@ -315,9 +322,20 @@ async def admin_list_tenants(
         query = query.eq("subscription_status", status)
 
     if search:
-        # Supabase ilike for partial text search
+        # Supabase `or_` aceita string que e injetada na query — caracteres
+        # como `,*()\\` permitem expandir o filtro alem do esperado (SQLi
+        # tipo PostgREST). A7: rejeita esses caracteres + escapa metacaracteres
+        # do LIKE (% e _) pra que `search='100%'` cace literal "100%" e nao
+        # vire wildcard. Faixa permitida: alfanumerico + espaco + .@-+ (essas
+        # ultimas sao validas em emails/razao social).
+        if _ADMIN_SEARCH_FORBIDDEN.search(search):
+            raise HTTPException(
+                status_code=400,
+                detail="search contem caracteres invalidos",
+            )
+        escaped = search.replace("%", r"\%").replace("_", r"\_")
         query = query.or_(
-            f"company_name.ilike.%{search}%,email.ilike.%{search}%"
+            f"company_name.ilike.%{escaped}%,email.ilike.%{escaped}%"
         )
 
     query = query.order("created_at", desc=True).range(offset, offset + limit - 1)
@@ -347,14 +365,25 @@ async def admin_tenant_detail(
     """Full detail for a single tenant."""
     sb = get_supabase_client()
 
-    # Tenant base data
-    tenant_res = sb.table("tenants").select("*").eq("id", tenant_id).execute()
+    # Item M10: lista explicita de colunas em vez de SELECT *. Reduz
+    # blast radius se uma coluna sensivel nova for adicionada na tabela
+    # (ex: secret token, reset link). Adicionar aqui explicitamente quando
+    # for de fato necessario expor pro admin UI.
+    tenant_res = sb.table("tenants").select(
+        "id, company_name, cnpj, plan, subscription_status, "
+        "trial_active, trial_blocked_at, trial_blocked_reason, "
+        "trial_expires_at, docs_consumidos_trial, docs_consumidos_mes, "
+        "docs_included_mes, max_cnpjs, sefaz_ambiente, "
+        "stripe_customer_id, stripe_subscription_id, current_period_end, "
+        "past_due_since, polling_mode, billing_day, "
+        "created_at, updated_at"
+    ).eq("id", tenant_id).execute()
     if not tenant_res.data:
         raise HTTPException(status_code=404, detail="Tenant not found")
 
     tenant = tenant_res.data[0]
 
-    # Mask sensitive fields
+    # Mask sensitive fields (CNPJ aparece, mas mascarado pra logs/UI)
     if tenant.get("cnpj"):
         tenant["cnpj"] = mask_cnpj(tenant["cnpj"])
 
@@ -671,3 +700,27 @@ async def admin_expiring_certificates(
         })
 
     return {"certificates": certs, "count": len(certs)}
+
+
+# ---------------------------------------------------------------------------
+# 9. GET /me/is-admin — checa se o user logado e admin (server-side)
+# ---------------------------------------------------------------------------
+#
+# A14: ate aqui o frontend tinha um array `ADMIN_EMAILS` hardcoded em
+# `app-sidebar.tsx` e `admin/layout.tsx`. Bundle publico expunha quem e
+# admin do produto — atacante so precisava abrir o JS na DevTools pra ver
+# os emails (uteis pra phishing/social engineering targetting). Endpoint
+# server-side desloca a checagem pro backend, que ja tem as regras em
+# `ADMIN_EMAILS` env. Frontend so recebe `{is_admin: bool}`.
+# Depende de A2 (email no auth context).
+
+@router.get("/me/is-admin")
+async def me_is_admin(auth: dict = Depends(verify_jwt_token)):
+    """Retorna se o usuario autenticado e admin do DFeAxis.
+
+    Frontend usa esse endpoint pra decidir se renderiza o link "Admin" no
+    sidebar e pra gate na pagina /admin. Server-side por design — antes
+    a lista de admins vinha hardcoded no bundle (A14).
+    """
+    email = (auth.get("email") or "").lower()
+    return {"is_admin": email in ADMIN_EMAILS}

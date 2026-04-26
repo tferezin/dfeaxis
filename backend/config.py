@@ -17,10 +17,6 @@ class Settings(BaseSettings):
     allowed_hosts: str = "localhost"
     cors_origins: str = "http://localhost:3000"
 
-    # MercadoPago
-    mp_access_token: str = ""
-    mp_webhook_secret: str = ""
-
     # Resend (transactional email)
     resend_api_key: str = ""
     resend_from_email: str = "DFeAxis <noreply@dfeaxis.com.br>"

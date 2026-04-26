@@ -32,6 +32,29 @@ router = APIRouter()
 NFE_NS = "http://www.portalfiscal.inf.br/nfe"
 NS = {"nfe": NFE_NS}
 
+
+def _safe_xml_parser() -> etree.XMLParser:
+    """Parser endurecido contra XXE / billion laughs / SSRF via DTD.
+
+    - resolve_entities=False: bloqueia expansao de entidades (XXE classico
+      e billion laughs). XMLs de NFe nao usam entidades customizadas.
+    - no_network=True: bloqueia SYSTEM/PUBLIC com URL externa (DTD/entity
+      external resolution faz o parser fazer GET pra URL atacante).
+    - huge_tree=False: rejeita arvores absurdamente grandes que exigiriam
+      muita memoria pra parsear (defesa em profundidade junto do max_length
+      do schema Pydantic).
+    - load_dtd=False: nao processa DTD declarado inline. NFe nao usa.
+
+    Como sap_drc recebe XML de cliente (push model), nao podemos confiar.
+    Aplicar este parser em TODA chamada etree.fromstring/parse no router.
+    """
+    return etree.XMLParser(
+        resolve_entities=False,
+        no_network=True,
+        huge_tree=False,
+        load_dtd=False,
+    )
+
 # UF code -> state abbreviation mapping (IBGE codes)
 UF_CODE_MAP = {
     "11": "RO", "12": "AC", "13": "AM", "14": "RR", "15": "PA",
@@ -56,7 +79,10 @@ def parse_nfe_xml(xml_str: str) -> dict:
     Returns a dict with keys matching NotaFiscalFragment field names.
     """
     try:
-        root = etree.fromstring(xml_str)
+        root = etree.fromstring(
+            xml_str.encode("utf-8") if isinstance(xml_str, str) else xml_str,
+            _safe_xml_parser(),
+        )
     except etree.XMLSyntaxError:
         return {}
 
@@ -141,7 +167,10 @@ def parse_nfe_xml(xml_str: str) -> dict:
 def _extract_chave_from_xml(xml_str: str) -> str:
     """Extract the chave de acesso (access key) from an NF-e XML string."""
     try:
-        root = etree.fromstring(xml_str)
+        root = etree.fromstring(
+            xml_str.encode("utf-8") if isinstance(xml_str, str) else xml_str,
+            _safe_xml_parser(),
+        )
     except etree.XMLSyntaxError:
         return ""
 
@@ -166,7 +195,10 @@ def _extract_chave_from_xml(xml_str: str) -> str:
 def _extract_cnpj_dest_from_xml(xml_str: str) -> str:
     """Extract the CNPJ destinatario from an NF-e XML string."""
     try:
-        root = etree.fromstring(xml_str)
+        root = etree.fromstring(
+            xml_str.encode("utf-8") if isinstance(xml_str, str) else xml_str,
+            _safe_xml_parser(),
+        )
     except etree.XMLSyntaxError:
         return ""
 
@@ -318,6 +350,38 @@ async def receive_official_document(
 
     sb = get_supabase_client()
     tenant_id = auth["tenant_id"]
+
+    # Item M9: valida que o CNPJ destinatario do XML pertence ao tenant.
+    # Sem essa checagem, um cliente legitimo poderia enviar um XML com
+    # cnpj_dest de outra empresa pra "envenenar" o cofre alheio (ainda que
+    # filtrado por tenant_id na hora de listar, o documento existiria no
+    # registro). Exigir certificado ativo pro CNPJ garante que o tenant
+    # so ingere docs dos seus proprios CNPJs.
+    cert_check = (
+        sb.table("certificates")
+        .select("id")
+        .eq("tenant_id", tenant_id)
+        .eq("cnpj", cnpj_dest)
+        .limit(1)
+        .execute()
+    )
+    if not cert_check.data:
+        from middleware.lgpd import mask_cnpj as _mask_cnpj
+        logger.warning(
+            "SAP DRC receive: cnpj_dest fora do tenant",
+            extra={
+                "tenant_id": tenant_id,
+                "cnpj_dest_masked": _mask_cnpj(cnpj_dest),
+                "chave_masked": chave[:8] + "..." + chave[-4:],
+            },
+        )
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                f"CNPJ destinatario {_mask_cnpj(cnpj_dest)} nao pertence "
+                "a este tenant. Cadastre o certificado correspondente."
+            ),
+        )
 
     # Check if document already exists for this tenant
     existing = (

@@ -22,7 +22,7 @@ from middleware.security import (
     RateLimitMiddleware,
     request_id_ctx,
 )
-from routers import documents, certificates, polling, credits, api_keys, tenants, manifestacao, nfse, sap_drc, billing, chat, admin, alerts
+from routers import documents, certificates, polling, api_keys, tenants, manifestacao, nfse, sap_drc, billing, chat, admin, alerts
 from scheduler.polling_job import start_scheduler, stop_scheduler
 
 
@@ -108,12 +108,13 @@ app = FastAPI(
 
 # --- Middleware (order matters — outermost first) ---
 
-# CORS — sanitise origins, use explicit methods and headers
+# CORS — sanitise origins, use explicit methods and headers.
+# A9: removido fallback hardcoded pra `https://frontend-henna-five-35.vercel.app`.
+# Origens devem vir 100% de `CORS_ORIGINS` env. Se a env estiver vazia
+# em prod, o frontend ve CORS error e a gente e avisado — falha em vez
+# de allowlist permissiva acidental.
 raw_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
 cors_origins = [o.strip().rstrip("/") for o in raw_origins if o.strip()]
-# Always allow the Vercel frontend
-if "https://frontend-henna-five-35.vercel.app" not in cors_origins:
-    cors_origins.append("https://frontend-henna-five-35.vercel.app")
 logger.info(f"CORS origins: {cors_origins}")
 
 app.add_middleware(
@@ -206,7 +207,6 @@ async def global_exception_handler(request: Request, exc: Exception):
 app.include_router(documents.router, prefix="/api/v1", tags=["Documentos"])
 app.include_router(certificates.router, prefix="/api/v1", tags=["Certificados"])
 app.include_router(polling.router, prefix="/api/v1", tags=["Polling"])
-app.include_router(credits.router, prefix="/api/v1", tags=["Créditos"])
 app.include_router(api_keys.router, prefix="/api/v1", tags=["API Keys"])
 app.include_router(tenants.router, prefix="/api/v1", tags=["Tenants"])
 app.include_router(manifestacao.router, prefix="/api/v1", tags=["Manifestação"])

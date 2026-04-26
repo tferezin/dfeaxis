@@ -26,6 +26,7 @@ import {
 } from "lucide-react"
 
 import { supabase } from "@/lib/supabase"
+import { apiFetch } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import { useSettings } from "@/hooks/use-settings"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -248,20 +249,25 @@ function UserFooter() {
   )
 }
 
-const ADMIN_EMAILS = ["ferezinth@hotmail.com", "ferezaeai@gmail.com"]
-
+// A14: lista de admins removida do bundle. Server-side via /me/is-admin —
+// evita que o bundle publico exponha emails de admins (vetor de phishing).
 export function AppSidebar() {
   const pathname = usePathname()
   const { settings } = useSettings()
   const [isAdmin, setIsAdmin] = React.useState(false)
 
   React.useEffect(() => {
-    if (supabase) {
-      supabase.auth.getUser().then(({ data }) => {
-        if (data.user && ADMIN_EMAILS.includes(data.user.email ?? "")) {
-          setIsAdmin(true)
-        }
+    if (!supabase) return
+    let cancelled = false
+    apiFetch<{ is_admin: boolean }>("/me/is-admin")
+      .then((res) => {
+        if (!cancelled) setIsAdmin(Boolean(res?.is_admin))
       })
+      .catch(() => {
+        if (!cancelled) setIsAdmin(false)
+      })
+    return () => {
+      cancelled = true
     }
   }, [])
 

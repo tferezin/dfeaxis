@@ -246,20 +246,9 @@ class NfeXmlCompletoResponse(BaseModel):
     results: list[dict] = []
 
 
-# --- Créditos ---
-
-class CreditBalanceResponse(BaseModel):
-    tenant_id: str
-    credits: int
-
-
-class CheckoutRequest(BaseModel):
-    amount: int = Field(gt=0, description="Quantidade de créditos a comprar")
-
-
-class CheckoutResponse(BaseModel):
-    checkout_url: str
-    preference_id: str
+# --- Créditos / MercadoPago ---
+# Schemas removidos junto do router credits.py (legado MercadoPago).
+# Billing atual usa Stripe + classes locais em routers/billing.py.
 
 
 # --- SEFAZ Status ---

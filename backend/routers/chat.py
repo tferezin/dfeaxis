@@ -19,7 +19,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from db.supabase import get_supabase_client
-from middleware.security import verify_jwt_token
+from middleware.security import verify_jwt_token, verify_jwt_with_trial
 from services.chat_service import (
     chat_completion,
     classify_escalation,
@@ -298,6 +298,9 @@ async def chat_landing(body: LandingChatRequest, request: Request, background_ta
     _save_message(sb, conversation_id, "user", last_user_msg.content)
 
     # Chama o modelo
+    # Item M5: detalhes da exceção (tipo + mensagem) sao logados via
+    # logger.exception, mas NAO sao retornados pro cliente — evita leak
+    # de stack trace, paths internos e versoes de libs.
     try:
         result = chat_completion(
             context="landing",
@@ -305,23 +308,22 @@ async def chat_landing(body: LandingChatRequest, request: Request, background_ta
             user_context=None,
         )
     except RuntimeError as exc:
-        logger.error("chat_completion runtime error: %s", exc)
+        logger.error("chat_completion runtime error: %s", exc, exc_info=True)
         raise HTTPException(
             status_code=503,
-            detail=f"Bot temporariamente indisponível: {type(exc).__name__}: {str(exc)[:200]}",
+            detail="Bot temporariamente indisponível. Tente novamente em instantes.",
         )
     except FileNotFoundError as exc:
-        logger.error("chat_completion prompt file missing: %s", exc)
+        logger.error("chat_completion prompt file missing: %s", exc, exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Prompt file missing: {str(exc)[:200]}",
+            detail="Erro de configuração interna. Já estamos ciente.",
         )
     except Exception as exc:
         logger.exception("chat_completion unexpected error: %s", exc)
-        # Retorna tipo da exceção no detail pra debug (sem expor stack trace completo)
         raise HTTPException(
             status_code=500,
-            detail=f"Erro ao processar mensagem: {type(exc).__name__}: {str(exc)[:300]}",
+            detail="Erro ao processar mensagem. Tente novamente.",
         )
 
     # Salva resposta do assistant
@@ -438,7 +440,10 @@ async def chat_dashboard(
     body: DashboardChatRequest,
     request: Request,
     background_tasks: BackgroundTasks,
-    auth: dict = Depends(verify_jwt_token),
+    # Item M4: bloqueia tenant em trial expirado/past_due. Antes usava
+    # verify_jwt_token puro, permitindo cliente bloqueado consumir IA
+    # gratis. Agora cai no mesmo gate de 402 dos outros endpoints.
+    auth: dict = Depends(verify_jwt_with_trial),
 ):
     """Bot técnico do dashboard — autenticado, com contexto do tenant."""
     sb = get_supabase_client()
@@ -477,6 +482,7 @@ async def chat_dashboard(
 
     _save_message(sb, conversation_id, "user", last_user_msg.content)
 
+    # Item M5: mesmo padrao do landing — log estruturado, mensagem generica.
     try:
         result = chat_completion(
             context="dashboard",
@@ -484,23 +490,22 @@ async def chat_dashboard(
             user_context=user_ctx,
         )
     except RuntimeError as exc:
-        logger.error("chat_completion runtime error: %s", exc)
+        logger.error("chat_completion runtime error: %s", exc, exc_info=True)
         raise HTTPException(
             status_code=503,
-            detail=f"Bot temporariamente indisponível: {type(exc).__name__}: {str(exc)[:200]}",
+            detail="Bot temporariamente indisponível. Tente novamente em instantes.",
         )
     except FileNotFoundError as exc:
-        logger.error("chat_completion prompt file missing: %s", exc)
+        logger.error("chat_completion prompt file missing: %s", exc, exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Prompt file missing: {str(exc)[:200]}",
+            detail="Erro de configuração interna. Já estamos ciente.",
         )
     except Exception as exc:
         logger.exception("chat_completion unexpected error: %s", exc)
-        # Retorna tipo da exceção no detail pra debug (sem expor stack trace completo)
         raise HTTPException(
             status_code=500,
-            detail=f"Erro ao processar mensagem: {type(exc).__name__}: {str(exc)[:300]}",
+            detail="Erro ao processar mensagem. Tente novamente.",
         )
 
     _save_message(
@@ -631,13 +636,15 @@ def _send_escalation_email(
 async def escalate_conversation(body: EscalateRequest):
     """Marca a conversa como escalada pro time humano + envia e-mail pro suporte.
 
-    Não requer auth — qualquer um pode escalar a própria conversa (landing ou
-    dashboard). O backend valida que a conversation_id é válida.
+    Não requer JWT/API key (a conversa pode ser anônima — landing), mas exige
+    que a conversa tenha SIDO IDENTIFICADA antes:
 
-    A escalação é passo FINAL: o bot já tentou resolver antes. O bot só
-    oferece este endpoint quando determina que não consegue ajudar (ex:
-    pergunta de contrato customizado, dúvida além do escopo, erro técnico
-    persistente). Usuários não devem conseguir escalar trivialmente.
+    - Landing: precisa ter lead capture (linha em chat_leads associada).
+    - Dashboard: tenant_id setado na conversa (criado via /chat/dashboard).
+
+    A11: sem essa proteção, qualquer um podia disparar emails pra
+    `SUPPORT_EMAIL` em loop, virando vetor de spam. A escalação é passo
+    final, depois do bot ja ter conversado com um lead identificado.
     """
     sb = get_supabase_client()
 
@@ -652,6 +659,34 @@ async def escalate_conversation(body: EscalateRequest):
         raise HTTPException(status_code=500, detail="Erro ao processar escalação")
 
     conv = conv_res.data[0]
+
+    # A11: gate de identificacao. Conversa precisa ter origem identificavel
+    # (lead capture na landing OU tenant logado no dashboard) — caso contrario
+    # qualquer ator anonimo pode disparar email pro suporte em loop.
+    ctx = conv.get("context")
+    if ctx == "dashboard":
+        if not conv.get("tenant_id"):
+            raise HTTPException(
+                status_code=401,
+                detail="Conversa dashboard sem tenant — escalacao bloqueada",
+            )
+    else:
+        # Landing (ou qualquer outro context anonimo): exige lead capturado.
+        try:
+            lead_res = sb.table("chat_leads").select("id").eq(
+                "conversation_id", body.conversation_id
+            ).limit(1).execute()
+        except Exception as exc:
+            logger.error("escalate lead lookup failed: %s", exc)
+            raise HTTPException(status_code=500, detail="Erro ao validar conversa")
+        if not (lead_res.data or []):
+            raise HTTPException(
+                status_code=401,
+                detail=(
+                    "Escalacao requer captura de lead antes. "
+                    "Use /chat/landing/lead pra identificar."
+                ),
+            )
 
     # Idempotência: se já foi escalada, não reenvia email
     already_escalated = conv.get("escalated_to_human", False)
