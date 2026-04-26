@@ -9,6 +9,7 @@ import uuid
 from collections import defaultdict
 from contextvars import ContextVar
 from datetime import datetime, timedelta, timezone
+from threading import Lock
 
 from fastapi import Request, HTTPException, Security
 from fastapi.security import APIKeyHeader
@@ -71,6 +72,20 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         )
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Content-Security-Policy"] = "default-src 'self'"
+        # Item M8: bloqueio explicito de capabilities sensiveis. A API nao
+        # usa camera, mic, geolocation nem Payment Request — bloquear
+        # impede que injection futura (ex: XSS via XML refletido) consiga
+        # ativar essas APIs no contexto da pagina.
+        response.headers["Permissions-Policy"] = (
+            "camera=(), microphone=(), geolocation=(), payment=(), "
+            "usb=(), magnetometer=(), accelerometer=(), gyroscope=()"
+        )
+        # COOP/CORP — isola o contexto contra cross-origin attacks (Spectre,
+        # window.opener leaks). same-origin no COOP forca uma BrowsingContext
+        # group separado pra cada origin; CORP bloqueia outras origins de
+        # carregar a resposta como recurso.
+        response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+        response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
         return response
 
 
@@ -234,10 +249,67 @@ async def verify_api_key(request: Request, api_key: str = Security(api_key_heade
 
 # --- JWT Authentication (dashboard) ---
 
+# Item M7: cache em memoria pro resultado do sb.auth.get_user(token).
+# Antes, cada request fazia HTTP roundtrip pro Supabase Auth (~80-200ms).
+# Com TTL curto (30s), a maioria das chamadas em sequencia (carregar
+# dashboard, listar docs, etc) usa o cache. Se o token for invalidado
+# (logout), o pior caso e o usuario continuar acessando por ate 30s —
+# trade-off aceitavel pra reducao drastica de latencia + carga.
+#
+# Key: hash do token (SHA256 do prefixo). Nao guardamos o token raw em
+# memoria nem o hash completo pra dificultar exfiltracao por dump.
+_JWT_CACHE_TTL_SECONDS = 30
+_jwt_cache: dict[str, tuple[float, dict]] = {}
+_jwt_cache_lock = Lock()
+_JWT_CACHE_MAX_ENTRIES = 10_000  # cap pra evitar OOM em cenarios anomalos
+
+
+def _jwt_cache_key(token: str) -> str:
+    """Hash truncado do token. Nao colide na pratica e protege contra
+    dump de memoria (impossivel reverter pro token original)."""
+    return hashlib.sha256(token.encode()).hexdigest()[:32]
+
+
+def _jwt_cache_get(token: str) -> dict | None:
+    """Retorna entry valida do cache (user_dict) ou None se miss/expirado."""
+    key = _jwt_cache_key(token)
+    now = time.time()
+    with _jwt_cache_lock:
+        entry = _jwt_cache.get(key)
+        if not entry:
+            return None
+        expires_at, user_dict = entry
+        if now >= expires_at:
+            _jwt_cache.pop(key, None)
+            return None
+        return user_dict
+
+
+def _jwt_cache_put(token: str, user_dict: dict) -> None:
+    """Armazena resultado validado. Faz GC simples se passou do cap."""
+    key = _jwt_cache_key(token)
+    now = time.time()
+    with _jwt_cache_lock:
+        # GC defensivo: remove entries expiradas pra controlar memoria
+        if len(_jwt_cache) >= _JWT_CACHE_MAX_ENTRIES:
+            expired = [
+                k for k, (exp, _) in _jwt_cache.items() if now >= exp
+            ]
+            for k in expired:
+                _jwt_cache.pop(k, None)
+            # Ainda cheio? evicta entry mais antiga (FIFO simples)
+            if len(_jwt_cache) >= _JWT_CACHE_MAX_ENTRIES:
+                oldest = min(_jwt_cache.items(), key=lambda kv: kv[1][0])[0]
+                _jwt_cache.pop(oldest, None)
+        _jwt_cache[key] = (now + _JWT_CACHE_TTL_SECONDS, user_dict)
+
+
 async def verify_jwt_token(request: Request) -> dict:
     """Valida JWT do Supabase Auth e retorna tenant_id.
 
     Catches specific exceptions and logs failures without exposing the token.
+    Item M7: usa cache em memoria com TTL=30s pra reduzir HTTP roundtrips
+    pro Supabase Auth.
     """
     client_ip = request.client.host if request.client else "unknown"
     path = request.url.path
@@ -254,6 +326,13 @@ async def verify_jwt_token(request: Request) -> dict:
         )
 
     token = auth_header.split(" ", 1)[1]
+
+    # Cache hit: retorna direto sem chamar Supabase nem refazer lookup
+    # do tenant. user_dict ja contem {"tenant_id": ..., "user_id": ...}.
+    cached = _jwt_cache_get(token)
+    if cached is not None:
+        return cached
+
     sb = get_supabase_client()
 
     try:
@@ -316,11 +395,20 @@ async def verify_jwt_token(request: Request) -> dict:
 
     # email incluido no auth context (A2). Permite que `should_block_prod`
     # (admin_guards) e o endpoint /me/is-admin operem sem nova ida ao Auth.
-    return {
+    auth_dict = {
         "tenant_id": tenant_id,
         "user_id": user.id,
         "email": (user.email or "").lower(),
     }
+
+    # Item M7: popula cache so depois de tudo validado.
+    # Nao cacheia o caminho /tenants/register (tenant_id pode ser None
+    # nesse fluxo — o estado muda apos register, nao queremos servir
+    # cache stale).
+    if tenant_id is not None:
+        _jwt_cache_put(token, auth_dict)
+
+    return auth_dict
 
 
 # --- Paths exempt from trial expiration check ---
