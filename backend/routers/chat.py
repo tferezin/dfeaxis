@@ -19,7 +19,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from db.supabase import get_supabase_client
-from middleware.security import verify_jwt_token
+from middleware.security import verify_jwt_token, verify_jwt_with_trial
 from services.chat_service import (
     chat_completion,
     classify_escalation,
@@ -298,6 +298,9 @@ async def chat_landing(body: LandingChatRequest, request: Request, background_ta
     _save_message(sb, conversation_id, "user", last_user_msg.content)
 
     # Chama o modelo
+    # Item M5: detalhes da exceção (tipo + mensagem) sao logados via
+    # logger.exception, mas NAO sao retornados pro cliente — evita leak
+    # de stack trace, paths internos e versoes de libs.
     try:
         result = chat_completion(
             context="landing",
@@ -305,23 +308,22 @@ async def chat_landing(body: LandingChatRequest, request: Request, background_ta
             user_context=None,
         )
     except RuntimeError as exc:
-        logger.error("chat_completion runtime error: %s", exc)
+        logger.error("chat_completion runtime error: %s", exc, exc_info=True)
         raise HTTPException(
             status_code=503,
-            detail=f"Bot temporariamente indisponível: {type(exc).__name__}: {str(exc)[:200]}",
+            detail="Bot temporariamente indisponível. Tente novamente em instantes.",
         )
     except FileNotFoundError as exc:
-        logger.error("chat_completion prompt file missing: %s", exc)
+        logger.error("chat_completion prompt file missing: %s", exc, exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Prompt file missing: {str(exc)[:200]}",
+            detail="Erro de configuração interna. Já estamos ciente.",
         )
     except Exception as exc:
         logger.exception("chat_completion unexpected error: %s", exc)
-        # Retorna tipo da exceção no detail pra debug (sem expor stack trace completo)
         raise HTTPException(
             status_code=500,
-            detail=f"Erro ao processar mensagem: {type(exc).__name__}: {str(exc)[:300]}",
+            detail="Erro ao processar mensagem. Tente novamente.",
         )
 
     # Salva resposta do assistant
@@ -438,7 +440,10 @@ async def chat_dashboard(
     body: DashboardChatRequest,
     request: Request,
     background_tasks: BackgroundTasks,
-    auth: dict = Depends(verify_jwt_token),
+    # Item M4: bloqueia tenant em trial expirado/past_due. Antes usava
+    # verify_jwt_token puro, permitindo cliente bloqueado consumir IA
+    # gratis. Agora cai no mesmo gate de 402 dos outros endpoints.
+    auth: dict = Depends(verify_jwt_with_trial),
 ):
     """Bot técnico do dashboard — autenticado, com contexto do tenant."""
     sb = get_supabase_client()
@@ -477,6 +482,7 @@ async def chat_dashboard(
 
     _save_message(sb, conversation_id, "user", last_user_msg.content)
 
+    # Item M5: mesmo padrao do landing — log estruturado, mensagem generica.
     try:
         result = chat_completion(
             context="dashboard",
@@ -484,23 +490,22 @@ async def chat_dashboard(
             user_context=user_ctx,
         )
     except RuntimeError as exc:
-        logger.error("chat_completion runtime error: %s", exc)
+        logger.error("chat_completion runtime error: %s", exc, exc_info=True)
         raise HTTPException(
             status_code=503,
-            detail=f"Bot temporariamente indisponível: {type(exc).__name__}: {str(exc)[:200]}",
+            detail="Bot temporariamente indisponível. Tente novamente em instantes.",
         )
     except FileNotFoundError as exc:
-        logger.error("chat_completion prompt file missing: %s", exc)
+        logger.error("chat_completion prompt file missing: %s", exc, exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Prompt file missing: {str(exc)[:200]}",
+            detail="Erro de configuração interna. Já estamos ciente.",
         )
     except Exception as exc:
         logger.exception("chat_completion unexpected error: %s", exc)
-        # Retorna tipo da exceção no detail pra debug (sem expor stack trace completo)
         raise HTTPException(
             status_code=500,
-            detail=f"Erro ao processar mensagem: {type(exc).__name__}: {str(exc)[:300]}",
+            detail="Erro ao processar mensagem. Tente novamente.",
         )
 
     _save_message(
