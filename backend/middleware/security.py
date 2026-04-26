@@ -50,7 +50,7 @@ def get_endpoint_limit(path: str) -> int:
 
     # Read endpoints (GET on documents, balance, certificates list, logs, sefaz status)
     if any(segment in path for segment in (
-        "/documentos", "/credits/balance", "/certificates", "/logs", "/sefaz/status",
+        "/documentos", "/certificates", "/logs", "/sefaz/status",
     )):
         return 100
 
@@ -304,7 +304,6 @@ _TRIAL_EXEMPT_PATHS = (
     "/tenants/settings",
     "/tenants/register",
     "/tenants/trial-status",
-    "/credits/",
 )
 
 
@@ -337,7 +336,6 @@ _PAST_DUE_EXEMPT_PATHS = (
     "/alerts",                  # exato
     "/tenants/me",              # exato
     "/tenants/settings",        # exato
-    "/credits/",                # qualquer subpath (saldo, etc)
     "/chat/",                   # suporte — qualquer subpath
     "/sefaz/status",            # exato
     "/manifestacao/historico",  # exato (so listagem; ack/etc devem bloquear)

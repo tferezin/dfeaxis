@@ -22,7 +22,7 @@ from middleware.security import (
     RateLimitMiddleware,
     request_id_ctx,
 )
-from routers import documents, certificates, polling, credits, api_keys, tenants, manifestacao, nfse, sap_drc, billing, chat, admin, alerts
+from routers import documents, certificates, polling, api_keys, tenants, manifestacao, nfse, sap_drc, billing, chat, admin, alerts
 from scheduler.polling_job import start_scheduler, stop_scheduler
 
 
@@ -206,7 +206,6 @@ async def global_exception_handler(request: Request, exc: Exception):
 app.include_router(documents.router, prefix="/api/v1", tags=["Documentos"])
 app.include_router(certificates.router, prefix="/api/v1", tags=["Certificados"])
 app.include_router(polling.router, prefix="/api/v1", tags=["Polling"])
-app.include_router(credits.router, prefix="/api/v1", tags=["Créditos"])
 app.include_router(api_keys.router, prefix="/api/v1", tags=["API Keys"])
 app.include_router(tenants.router, prefix="/api/v1", tags=["Tenants"])
 app.include_router(manifestacao.router, prefix="/api/v1", tags=["Manifestação"])
