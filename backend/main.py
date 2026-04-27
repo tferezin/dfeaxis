@@ -317,13 +317,17 @@ async def _check_resend() -> DependencyStatus:
     try:
         import httpx
 
+        # GET /emails/{id} aceita chave com permissao "Sending access" (que e
+        # o minimo necessario pro app); /domains exige "Full access". Usamos
+        # um UUID zerado: 401 = chave invalida, 404 = chave valida + email
+        # nao existe (esperado).
         async with httpx.AsyncClient(timeout=2.0) as client:
             resp = await client.get(
-                "https://api.resend.com/domains",
+                "https://api.resend.com/emails/00000000-0000-0000-0000-000000000000",
                 headers={"Authorization": f"Bearer {settings.resend_api_key}"},
             )
         latency_ms = int((time.perf_counter() - start) * 1000)
-        if resp.status_code == 200:
+        if resp.status_code in (200, 404):
             return DependencyStatus(
                 name="resend", status="ok", latency_ms=latency_ms
             )
