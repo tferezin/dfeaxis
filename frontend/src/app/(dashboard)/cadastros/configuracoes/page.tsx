@@ -1,11 +1,22 @@
 "use client"
 
 import { useState } from "react"
-import { Save, Clock, Globe, Bell, AlertTriangle, Eye, FileCheck } from "lucide-react"
+import { Save, Clock, Globe, Bell, AlertTriangle, Eye, FileCheck, Loader2 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { useSettings } from "@/hooks/use-settings"
+import { supabase } from "@/lib/supabase"
+import { apiFetch } from "@/lib/api"
 
 type SelectOption = { value: string; label: string; description?: string }
 
@@ -61,8 +72,92 @@ export default function ConfiguracoesPage() {
   const { settings, updateSettings } = useSettings()
   const [saved, setSaved] = useState(false)
 
+  // Modal de confirmação obrigatório ao mudar de Homologação → Produção:
+  // pede senha + checkbox de ciência da cobrança antes de chamar a API.
+  const [prodModalOpen, setProdModalOpen] = useState(false)
+  const [prodPassword, setProdPassword] = useState("")
+  const [prodAcknowledged, setProdAcknowledged] = useState(false)
+  const [prodSubmitting, setProdSubmitting] = useState(false)
+  const [prodError, setProdError] = useState<string | null>(null)
+
+  const persistAmbiente = async (next: "1" | "2") => {
+    updateSettings({ sefazAmbiente: next })
+    try {
+      await apiFetch("/tenants/settings", {
+        method: "PATCH",
+        body: JSON.stringify({ sefaz_ambiente: parseInt(next, 10) }),
+      })
+    } catch (e) {
+      console.error("[DFeAxis] Falha ao persistir ambiente no backend:", e)
+      throw e
+    }
+  }
+
+  const handleAmbienteChange = (next: string) => {
+    const value = next as "1" | "2"
+    if (value === settings.sefazAmbiente) return
+
+    if (value === "1") {
+      // Mudança pra Produção exige confirmação por senha + ciência da cobrança
+      setProdPassword("")
+      setProdAcknowledged(false)
+      setProdError(null)
+      setProdModalOpen(true)
+      return
+    }
+
+    // Mudança pra Homologação é caminho seguro — direto
+    persistAmbiente("2").catch(() => {
+      // updateSettings já refletiu o estado local; o erro é só log
+    })
+  }
+
+  const confirmProdSwitch = async () => {
+    setProdError(null)
+
+    if (!prodAcknowledged) {
+      setProdError("Confirme o aviso de cobrança pra prosseguir.")
+      return
+    }
+    if (!prodPassword) {
+      setProdError("Informe sua senha pra confirmar.")
+      return
+    }
+    if (!supabase) {
+      setProdError("Sistema indisponível. Tente novamente em instantes.")
+      return
+    }
+
+    setProdSubmitting(true)
+    try {
+      const { data: userData } = await supabase.auth.getUser()
+      const email = userData.user?.email
+      if (!email) {
+        setProdError("Sessão expirada. Faça login novamente.")
+        return
+      }
+
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password: prodPassword,
+      })
+      if (signInError) {
+        setProdError("Senha incorreta.")
+        return
+      }
+
+      await persistAmbiente("1")
+      setProdModalOpen(false)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
+    } catch {
+      setProdError("Não foi possível ativar Produção. Tente novamente.")
+    } finally {
+      setProdSubmitting(false)
+    }
+  }
+
   const handleSave = () => {
-    // Settings already persisted via useSettings — this would call the API
     setSaved(true)
     setTimeout(() => setSaved(false), 3000)
   }
@@ -142,7 +237,7 @@ export default function ConfiguracoesPage() {
                 },
               ]}
               value={settings.sefazAmbiente}
-              onChange={(v) => updateSettings({ sefazAmbiente: v as "1" | "2" })}
+              onChange={handleAmbienteChange}
             />
 
             {settings.sefazAmbiente === "1" && (
@@ -244,6 +339,79 @@ export default function ConfiguracoesPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={prodModalOpen} onOpenChange={setProdModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Ativar Ambiente de Produção</DialogTitle>
+            <DialogDescription>
+              Esta mudança afeta o serviço real e gera cobrança por documento capturado.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+              <AlertTriangle className="size-4 text-amber-600 mt-0.5 shrink-0" />
+              <div className="text-xs text-amber-900 space-y-1">
+                <p><strong>Ao ativar Produção:</strong></p>
+                <ul className="list-disc pl-4 space-y-0.5">
+                  <li>O DFeAxis passará a capturar documentos fiscais reais da SEFAZ</li>
+                  <li>Cada documento capturado será contabilizado e cobrado conforme seu plano</li>
+                  <li>Documentos acima do limite mensal geram overage</li>
+                </ul>
+              </div>
+            </div>
+
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={prodAcknowledged}
+                onChange={(e) => setProdAcknowledged(e.target.checked)}
+                className="mt-0.5 shrink-0"
+              />
+              <span className="text-sm">
+                Entendo que documentos capturados em Produção serão cobrados conforme meu plano contratado.
+              </span>
+            </label>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="prod-password" className="text-sm font-medium">
+                Confirme sua senha
+              </Label>
+              <Input
+                id="prod-password"
+                type="password"
+                placeholder="Sua senha de acesso"
+                value={prodPassword}
+                onChange={(e) => setProdPassword(e.target.value)}
+                autoComplete="current-password"
+              />
+              <p className="text-xs text-muted-foreground">
+                Pedimos a senha pra ter certeza de que é você quem está autorizando a mudança.
+              </p>
+            </div>
+
+            {prodError && (
+              <p className="text-sm text-destructive">{prodError}</p>
+            )}
+          </div>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setProdModalOpen(false)}
+              disabled={prodSubmitting}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={confirmProdSwitch}
+              disabled={prodSubmitting || !prodAcknowledged || !prodPassword}
+            >
+              {prodSubmitting && <Loader2 className="mr-2 size-4 animate-spin" />}
+              Ativar Produção
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

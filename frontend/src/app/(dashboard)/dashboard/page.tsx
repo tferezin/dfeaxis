@@ -17,8 +17,8 @@ import { FinancialCard } from "@/components/dashboard/financial-card"
 import { VolumeChart } from "@/components/dashboard/volume-chart"
 import { RecentDocuments } from "@/components/dashboard/recent-documents"
 import { TrialCounter } from "@/components/trial-counter"
-import { EnvToggle } from "@/components/env-toggle"
 import { PendentesPanel } from "@/components/pendentes-panel"
+import { EnvIndicator } from "@/components/env-indicator"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { useSettings } from "@/hooks/use-settings"
 import { useTrial } from "@/hooks/use-trial"
@@ -123,9 +123,12 @@ export default function DashboardPage() {
     [selectedCompetencia, isAllCompetencia]
   )
 
-  // Ambiente filter — documents don't have an ambiente column, so when
-  // Producao is selected we show an empty state (no prod docs exist yet).
-  const sefazAmbiente = settings.sefazAmbiente // "1" = prod, "2" = hom
+  // Filtro de VISUALIZAÇÃO local — independe do ambiente ativo de captura
+  // (esse é controlado em Configurações). O usuário pode olhar para os dados
+  // de Homologação ou Produção sem alterar o que o backend está capturando.
+  // Inicializa com o ambiente ativo, mas a partir daí é estado local.
+  const [viewEnv, setViewEnv] = useState<"1" | "2">(settings.sefazAmbiente)
+  const sefazAmbiente = viewEnv
   const isProd = sefazAmbiente === "1"
 
   // Monthly usage — always load so "Uso do mês" card works for both trial and active
@@ -466,7 +469,7 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <EnvToggle />
+          <EnvIndicator value={viewEnv} onChange={setViewEnv} />
           <button className="inline-flex items-center gap-2 rounded-lg border bg-background px-2.5 py-1.5 text-xs font-medium shadow-sm transition-colors hover:bg-muted">
             <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
             <span>{showMock ? "Tech Solutions Ltda" : (realCompanyName || "Empresa")}</span>
