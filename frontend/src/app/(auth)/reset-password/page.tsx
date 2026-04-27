@@ -20,19 +20,19 @@ import {
  * Página de redefinição de senha — callback do magic link enviado por
  * `supabase.auth.resetPasswordForEmail()`.
  *
- * Fluxo:
- *   1. Usuário clica no link no e-mail → chega aqui com `#access_token=...&type=recovery`
- *      no URL fragment.
- *   2. O cliente JS do Supabase detecta o fragment automaticamente
- *      (`detectSessionInUrl: true`, default) e dispara o evento
- *      `PASSWORD_RECOVERY` via `onAuthStateChange`.
- *   3. Nesse momento o usuário está em uma "recovery session" — pode
- *      chamar `updateUser({ password })` para definir nova senha.
- *   4. Após sucesso, redireciona para /login (a sessão é limpa pelo logout).
+ * Fluxo PKCE (atual, com @supabase/ssr):
+ *   1. Usuário clica no link → Supabase /verify redireciona pra
+ *      /reset-password?code=xxx
+ *   2. Trocamos explicitamente o code por uma sessão de recovery via
+ *      `exchangeCodeForSession(code)`. Isso SUBSTITUI qualquer sessão
+ *      antiga que o usuário tivesse no mesmo browser.
+ *   3. Sessão de recovery ativa → libera o form → `updateUser({ password })`
+ *      atualiza a senha no auth.users.
+ *   4. signOut + redirect pra /login pra forçar autenticação explícita
+ *      com a nova credencial.
  *
- * Se o usuário chegar aqui SEM o token de recovery (ex: digitou direto na
- * URL), mostramos uma mensagem pedindo pra voltar e iniciar o fluxo
- * novamente.
+ * Fallback p/ flow implicit (#access_token=...&type=recovery): mantemos o
+ * listener PASSWORD_RECOVERY caso o backend volte a usar implicit no futuro.
  */
 export default function ResetPasswordPage() {
   const router = useRouter()
@@ -41,31 +41,61 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [success, setSuccess] = React.useState(false)
-  // Começa assumindo ausente — o evento PASSWORD_RECOVERY vai marcar como
-  // presente se o token for válido.
   const [recoveryReady, setRecoveryReady] = React.useState(false)
+  const [exchanging, setExchanging] = React.useState(true)
 
   React.useEffect(() => {
-    if (!supabase) return
+    const client = supabase
+    if (!client) {
+      setExchanging(false)
+      return
+    }
 
-    // Supabase parse automaticamente o fragment da URL e dispara
-    // onAuthStateChange com event='PASSWORD_RECOVERY' quando o token
-    // é válido.
-    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+    let cancelled = false
+
+    const { data: sub } = client.auth.onAuthStateChange((event) => {
       if (event === "PASSWORD_RECOVERY") {
         setRecoveryReady(true)
       }
     })
 
-    // Também checamos o hash imediatamente — se já tiver sessão ativa
-    // de recovery (usuário já autenticado via fragment), libera o form.
-    supabase.auth.getSession().then(({ data }) => {
+    const setup = async () => {
+      const url = new URL(window.location.href)
+      const code = url.searchParams.get("code")
+
+      if (code) {
+        // PKCE: troca explícita do code pela sessão de recovery. Sem isso,
+        // `getSession()` retornaria uma sessão antiga (ex: login regular
+        // ainda ativo no mesmo browser) e `updateUser` operaria no JWT
+        // errado — atualizando NADA na conta correta.
+        const { error: exchangeError } = await client.auth.exchangeCodeForSession(code)
+        if (cancelled) return
+        if (exchangeError) {
+          setExchanging(false)
+          return
+        }
+        // Limpa o ?code= da URL (boa higiene, evita reuse acidental).
+        window.history.replaceState({}, "", "/reset-password")
+        setRecoveryReady(true)
+        setExchanging(false)
+        return
+      }
+
+      // Sem ?code= — pode ser flow implicit (#access_token=...) ou usuário
+      // entrou direto. Se houver sessão (ex: PASSWORD_RECOVERY já parseado
+      // do fragment), libera o form.
+      const { data } = await client.auth.getSession()
+      if (cancelled) return
       if (data.session) {
         setRecoveryReady(true)
       }
-    })
+      setExchanging(false)
+    }
+
+    setup()
 
     return () => {
+      cancelled = true
       sub.subscription.unsubscribe()
     }
   }, [])
@@ -144,6 +174,12 @@ export default function ResetPasswordPage() {
               <div className="flex flex-col gap-4 text-center">
                 <p className="text-sm text-green-600 font-medium">
                   Senha redefinida com sucesso! Redirecionando para o login...
+                </p>
+              </div>
+            ) : exchanging ? (
+              <div className="flex flex-col gap-4 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Validando link de recuperação...
                 </p>
               </div>
             ) : !recoveryReady ? (
