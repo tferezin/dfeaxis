@@ -28,8 +28,10 @@ const SECURITY_HEADERS = [
       // inline da Clarity. Migrar pra nonce-based CSP num passo futuro.
       "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://js.stripe.com https://challenges.cloudflare.com https://www.clarity.ms",
       // connect-src cobre XHR/fetch — clarity.ms uploads de sessao usam
-      // wildcard subdomain (*.clarity.ms = b.clarity.ms etc).
-      "connect-src 'self' https://*.supabase.co https://*.supabase.in https://api.stripe.com https://www.google-analytics.com https://region1.google-analytics.com https://challenges.cloudflare.com https://*.clarity.ms https://www.clarity.ms",
+      // wildcard subdomain (*.clarity.ms = b.clarity.ms etc). api.dfeaxis.com.br
+      // e o backend FastAPI prod; dfeaxis-production.up.railway.app e o
+      // fallback hardcoded em paginas que ainda nao usam NEXT_PUBLIC_API_URL.
+      "connect-src 'self' https://api.dfeaxis.com.br https://dfeaxis-production.up.railway.app https://*.supabase.co https://*.supabase.in https://api.stripe.com https://www.google-analytics.com https://region1.google-analytics.com https://challenges.cloudflare.com https://*.clarity.ms https://www.clarity.ms",
       "frame-src https://js.stripe.com https://hooks.stripe.com https://challenges.cloudflare.com",
       "img-src 'self' data: https: blob:",
       // Google Fonts CSS vem de fonts.googleapis.com (stylesheet externo).
