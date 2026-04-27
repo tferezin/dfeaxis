@@ -317,33 +317,47 @@ async def _check_resend() -> DependencyStatus:
     try:
         import httpx
 
-        # GET /emails/{id} aceita chave com permissao "Sending access" (que e
-        # o minimo necessario pro app); /domains exige "Full access". Usamos
-        # um UUID zerado: 401 = chave invalida, 404 = chave valida + email
-        # nao existe (esperado).
+        # POST /emails com payload vazio aceita chave "Sending access" (que e
+        # o minimo necessario pro app). Resend valida auth ANTES do payload:
+        # 401 = chave invalida; 422 = chave valida + payload invalido (= ok,
+        # esperado); 403 = sem permissao. Nao envia email real porque a
+        # validacao falha antes do dispatch. /domains exigia "Full access" e
+        # gerava falso-degraded.
         async with httpx.AsyncClient(timeout=2.0) as client:
-            resp = await client.get(
-                "https://api.resend.com/emails/00000000-0000-0000-0000-000000000000",
-                headers={"Authorization": f"Bearer {settings.resend_api_key}"},
+            resp = await client.post(
+                "https://api.resend.com/emails",
+                headers={
+                    "Authorization": f"Bearer {settings.resend_api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={},
             )
         latency_ms = int((time.perf_counter() - start) * 1000)
-        if resp.status_code in (200, 404):
+        if resp.status_code == 422:
+            # Chave aceita, payload rejeitado pelo validator — exatamente o
+            # que queremos como sinal de "auth ok".
             return DependencyStatus(
                 name="resend", status="ok", latency_ms=latency_ms
             )
         if resp.status_code == 401:
-            # Endpoint reachable but key invalid — infra up, config wrong.
             return DependencyStatus(
                 name="resend",
                 status="degraded",
                 latency_ms=latency_ms,
                 error="Invalid API key",
             )
+        if resp.status_code == 403:
+            return DependencyStatus(
+                name="resend",
+                status="degraded",
+                latency_ms=latency_ms,
+                error="Insufficient permissions (need Sending access)",
+            )
         return DependencyStatus(
             name="resend",
             status="degraded",
             latency_ms=latency_ms,
-            error=f"HTTP {resp.status_code}",
+            error=f"HTTP {resp.status_code}: {resp.text[:120]}",
         )
     except Exception as exc:
         latency_ms = int((time.perf_counter() - start) * 1000)
