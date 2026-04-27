@@ -26,12 +26,17 @@ const SECURITY_HEADERS = [
       "default-src 'self'",
       // unsafe-inline em script-src e exigido pelo GTM/GA + bootstrap
       // inline da Clarity. Migrar pra nonce-based CSP num passo futuro.
-      "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://js.stripe.com https://challenges.cloudflare.com https://www.clarity.ms",
+      // googleads.g.doubleclick.net e www.google.com sao usados pelo Google
+      // Ads (AW-17594501081) pra conversion pixel + remarketing collect.
+      // scripts.clarity.ms e o novo dominio do bootstrap da Clarity.
+      "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://js.stripe.com https://challenges.cloudflare.com https://www.clarity.ms https://scripts.clarity.ms https://googleads.g.doubleclick.net https://www.google.com",
       // connect-src cobre XHR/fetch — clarity.ms uploads de sessao usam
       // wildcard subdomain (*.clarity.ms = b.clarity.ms etc). api.dfeaxis.com.br
       // e o backend FastAPI prod; dfeaxis-production.up.railway.app e o
       // fallback hardcoded em paginas que ainda nao usam NEXT_PUBLIC_API_URL.
-      "connect-src 'self' https://api.dfeaxis.com.br https://dfeaxis-production.up.railway.app https://*.supabase.co https://*.supabase.in https://api.stripe.com https://www.google-analytics.com https://region1.google-analytics.com https://challenges.cloudflare.com https://*.clarity.ms https://www.clarity.ms",
+      // www.google.com + googleads.g.doubleclick.net sao endpoints de
+      // conversao/remarketing do Google Ads (/ccm/collect, /rmkt/collect).
+      "connect-src 'self' https://api.dfeaxis.com.br https://dfeaxis-production.up.railway.app https://*.supabase.co https://*.supabase.in https://api.stripe.com https://www.google-analytics.com https://region1.google-analytics.com https://www.google.com https://googleads.g.doubleclick.net https://challenges.cloudflare.com https://*.clarity.ms https://www.clarity.ms https://scripts.clarity.ms",
       "frame-src https://js.stripe.com https://hooks.stripe.com https://challenges.cloudflare.com",
       "img-src 'self' data: https: blob:",
       // Google Fonts CSS vem de fonts.googleapis.com (stylesheet externo).
