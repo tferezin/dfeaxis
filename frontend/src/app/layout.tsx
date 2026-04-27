@@ -18,9 +18,11 @@ export const metadata: Metadata = {
   description: "Captura automática de documentos fiscais da SEFAZ. API REST para SAP DRC, TOTVS, Oracle e qualquer ERP. Trial grátis.",
 }
 
-// IDs mantidos em sync com frontend/public/landing-v3.html (bloco DFEAXIS_TRACKING).
-// Quando for rotacionar/trocar ID, atualize nos dois lugares.
+// IDs mantidos em sync com frontend/public/landing-v3.html e landing-v4.html
+// (bloco DFEAXIS_TRACKING). Quando for rotacionar/trocar ID, atualize nos
+// tres lugares.
 const GA4_ID = "G-XZTRG63C53"
+const GOOGLE_ADS_ID = "AW-17594501081"
 const CLARITY_ID = "wb36mtmtue"
 const GTM_ID = process.env.NEXT_PUBLIC_GTM_ID || "GTM-PLACEHOLDER"
 const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID || "PIXEL_PLACEHOLDER"
@@ -48,7 +50,8 @@ export default function RootLayout({
 function gtag(){dataLayer.push(arguments);}
 window.gtag = gtag;
 gtag('js', new Date());
-gtag('config', '${GA4_ID}', { send_page_view: true });`}
+gtag('config', '${GA4_ID}', { send_page_view: true });
+${isReal(GOOGLE_ADS_ID) ? `gtag('config', '${GOOGLE_ADS_ID}');` : ''}`}
             </Script>
           </>
         )}
