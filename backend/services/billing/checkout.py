@@ -362,9 +362,16 @@ def create_checkout_session(
             )
         else:
             # Plano mensal: modelo mes calendario
-            # - Subscription ancora no dia 5 do mes seguinte (trial_end ate la)
-            # - Proration padrao Stripe desabilitado
+            # - Subscription com trial_end no dia 5 do mes seguinte: nao
+            #   cobra ate la, e quando trial_end expira, Stripe inicia o
+            #   primeiro ciclo de billing automaticamente — proximos
+            #   ciclos ficam ancorados nesse mesmo dia (5 do mes).
             # - ProRata proprio sera cobrada via Invoice avulsa (se >= R$ 50)
+            #
+            # IMPORTANTE: Stripe NAO aceita billing_cycle_anchor + trial_end
+            # ao mesmo tempo (erro: "You may only specify one of these
+            # parameters"). Como trial_end ja determina quando o primeiro
+            # ciclo comeca, anchor fica implicito. Resultado e equivalente.
             now = datetime.now(timezone.utc)
             anchor = _compute_next_billing_anchor(billing_day, now)
             anchor_ts = int(anchor.timestamp())
@@ -372,8 +379,6 @@ def create_checkout_session(
                 price_id, now
             )
 
-            subscription_data["billing_cycle_anchor"] = anchor_ts
-            subscription_data["proration_behavior"] = "none"
             subscription_data["trial_end"] = anchor_ts
             session_metadata["plan_period"] = "monthly"
 
