@@ -489,7 +489,7 @@ export default function CapturaManualPage() {
       <div>
         <div className="flex items-center gap-2">
           <h1 className="text-2xl font-semibold tracking-tight">Captura Manual</h1>
-          <Badge variant="secondary" className="text-[10px]">Temporário</Badge>
+          <Badge variant="outline" className="text-[10px] border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-300">Homolog</Badge>
         </div>
         <p className="text-sm text-muted-foreground mt-1">
           Teste a conexão com a SEFAZ e capture documentos.

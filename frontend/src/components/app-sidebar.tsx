@@ -118,7 +118,7 @@ const navigation: NavSection[] = [
   {
     label: "Execução",
     items: [
-      { title: "Captura Manual", href: "/execucao/captura", icon: Play },
+      { title: "Captura Manual — Homolog", href: "/execucao/captura", icon: Play },
       { title: "Manifestação", href: "/historico/manifestacao", icon: FileCheck },
     ],
   },
