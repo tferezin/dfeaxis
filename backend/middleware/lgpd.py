@@ -251,10 +251,16 @@ class ResponseSanitizerMiddleware(BaseHTTPMiddleware):
                 request.url.path, len(body),
             )
             # Retorna response com body original; headers preservados.
+            # Content-Length removido pra Starlette recalcular se body
+            # passou por reencode (defesa em profundidade).
+            new_headers = {
+                k: v for k, v in response.headers.items()
+                if k.lower() not in ("content-length", "content-encoding")
+            }
             return Response(
                 content=body,
                 status_code=response.status_code,
-                headers=dict(response.headers),
+                headers=new_headers,
                 media_type=response.media_type,
             )
 
@@ -265,10 +271,22 @@ class ResponseSanitizerMiddleware(BaseHTTPMiddleware):
         except (UnicodeDecodeError, Exception):
             pass  # leave body as-is if we can't process it
 
-        # Rebuild response with sanitized body
+        # Rebuild response with sanitized body.
+        # CRITICO: remover Content-Length original e Content-Encoding antes
+        # de reconstruir. Sanitizacao pode mudar tamanho do body (ex: mascarar
+        # CNPJ "12345678000190" -> "12345678***" = 11 vs 14 bytes), entao
+        # manter Content-Length antigo causa HTTP/2 PROTOCOL_ERROR no cliente
+        # (server promete N bytes, envia N±X). Bug encontrado em stress test
+        # de 5 agentes paralelos: GET /api/v1/tenants/me reproducia
+        # ChunkedEncodingError 100% do tempo. Starlette recalcula a partir
+        # de len(body) quando o header nao esta presente.
+        new_headers = {
+            k: v for k, v in response.headers.items()
+            if k.lower() not in ("content-length", "content-encoding")
+        }
         return Response(
             content=body,
             status_code=response.status_code,
-            headers=dict(response.headers),
+            headers=new_headers,
             media_type=response.media_type,
         )
