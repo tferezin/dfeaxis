@@ -52,43 +52,71 @@ export default function ResetPasswordPage() {
     }
 
     let cancelled = false
+    let resolved = false
 
-    const { data: sub } = client.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") {
-        setRecoveryReady(true)
+    const markReady = () => {
+      if (resolved || cancelled) return
+      resolved = true
+      // Limpa eventual ?code= da URL após sessão estabelecida.
+      if (window.location.search.includes("code=")) {
+        window.history.replaceState({}, "", "/reset-password")
+      }
+      setRecoveryReady(true)
+      setExchanging(false)
+    }
+
+    // O @supabase/ssr (createBrowserClient) faz exchange PKCE automático
+    // ao detectar ?code= na URL. O evento dispara aqui antes (ou depois)
+    // do nosso setup() — qualquer um que chegar primeiro libera o form.
+    const { data: sub } = client.auth.onAuthStateChange((event, session) => {
+      if (
+        (event === "PASSWORD_RECOVERY" ||
+          event === "SIGNED_IN" ||
+          event === "INITIAL_SESSION") &&
+        session
+      ) {
+        markReady()
       }
     })
 
     const setup = async () => {
+      // Dá uma janela curta pro auto-exchange do client terminar.
+      // Sem isso, getSession() pode retornar null mesmo com ?code= válido
+      // ainda em processamento.
+      await new Promise((r) => setTimeout(r, 250))
+      if (cancelled || resolved) return
+
+      const { data } = await client.auth.getSession()
+      if (cancelled || resolved) return
+
+      if (data.session) {
+        markReady()
+        return
+      }
+
+      // Sessão ainda não veio. Se há ?code= na URL, tenta exchange explícito
+      // como fallback (caso o auto não tenha rodado por algum motivo).
       const url = new URL(window.location.href)
       const code = url.searchParams.get("code")
 
       if (code) {
-        // PKCE: troca explícita do code pela sessão de recovery. Sem isso,
-        // `getSession()` retornaria uma sessão antiga (ex: login regular
-        // ainda ativo no mesmo browser) e `updateUser` operaria no JWT
-        // errado — atualizando NADA na conta correta.
         const { error: exchangeError } = await client.auth.exchangeCodeForSession(code)
-        if (cancelled) return
-        if (exchangeError) {
-          setExchanging(false)
+        if (cancelled || resolved) return
+        if (!exchangeError) {
+          markReady()
           return
         }
-        // Limpa o ?code= da URL (boa higiene, evita reuse acidental).
-        window.history.replaceState({}, "", "/reset-password")
-        setRecoveryReady(true)
-        setExchanging(false)
-        return
+        // Exchange falhou — pode ser que o auto-exchange já consumiu o code.
+        // Re-checa sessão antes de declarar "link inválido".
+        const { data: retry } = await client.auth.getSession()
+        if (cancelled || resolved) return
+        if (retry.session) {
+          markReady()
+          return
+        }
       }
 
-      // Sem ?code= — pode ser flow implicit (#access_token=...) ou usuário
-      // entrou direto. Se houver sessão (ex: PASSWORD_RECOVERY já parseado
-      // do fragment), libera o form.
-      const { data } = await client.auth.getSession()
-      if (cancelled) return
-      if (data.session) {
-        setRecoveryReady(true)
-      }
+      // Sem code e sem sessão — link inválido de fato.
       setExchanging(false)
     }
 

@@ -84,20 +84,46 @@ test.describe("Password reset flow", () => {
   test("página /reset-password mostra mensagem de link inválido quando acessada sem token", async ({
     page,
   }) => {
-    // Acesso direto sem fragment de recovery — o client não vai receber
-    // o evento PASSWORD_RECOVERY, então deve mostrar a mensagem de "link
-    // inválido".
+    // Acesso direto sem ?code= e sem fragment de recovery — não há sessão,
+    // o exchange PKCE não é tentado, e a página deve cair no estado
+    // "link inválido".
     await page.goto("/reset-password")
 
-    // Aguarda o componente renderizar (useEffect do onAuthStateChange roda
-    // no mount, mas sem token não dispara PASSWORD_RECOVERY).
     await expect(
       page.getByText(/link de recuperação expirou ou é inválido/i)
     ).toBeVisible({ timeout: 5_000 })
 
-    // CTA pra solicitar novo link
     await expect(
       page.getByRole("link", { name: /solicitar novo link/i })
     ).toBeVisible()
   })
+
+  test("/reset-password?code=xxx mostra link inválido se exchange falhar e não houver sessão", async ({
+    page,
+  }) => {
+    // Code expirado/já usado e sem sessão criada — fallback "link inválido"
+    await page.route(/\/auth\/v1\/token\?grant_type=pkce/, async (route) => {
+      await route.fulfill({
+        status: 400,
+        contentType: "application/json",
+        body: JSON.stringify({
+          error: "invalid_grant",
+          error_description: "Invalid PKCE code",
+        }),
+      })
+    })
+
+    await page.goto("/reset-password?code=invalid-code")
+
+    await expect(
+      page.getByText(/link de recuperação expirou ou é inválido/i)
+    ).toBeVisible({ timeout: 15_000 })
+  })
+
+  // NOTA: testes E2E do fluxo completo "exchange OK → form aparece → updateUser
+  // → sucesso" exigem mockar o storage do code_verifier (PKCE) que o
+  // @supabase/ssr cria via cookie HTTP-only. Isso é frágil de mockar via
+  // page.route. A validação real do flow é feita manualmente em prod com
+  // e-mail real (Resend → Gmail/Hotmail) ou via teste de integração com
+  // Supabase Admin API gerando link de recovery — fica pra próxima.
 })
