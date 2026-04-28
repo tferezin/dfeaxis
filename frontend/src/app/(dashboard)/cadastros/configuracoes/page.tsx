@@ -307,13 +307,14 @@ export default function ConfiguracoesPage() {
             <Button variant="outline" onClick={() => setProdModalOpen(false)}>
               Fechar
             </Button>
-            <Button asChild>
-              <a
-                href="mailto:suporte@dfeaxis.com.br?subject=Solicita%C3%A7%C3%A3o%20de%20libera%C3%A7%C3%A3o%20-%20Ambiente%20de%20Produ%C3%A7%C3%A3o&body=Ol%C3%A1%20DFeAxis%2C%0D%0A%0D%0AGostaria%20de%20solicitar%20a%20libera%C3%A7%C3%A3o%20do%20Ambiente%20de%20Produ%C3%A7%C3%A3o%20para%20a%20minha%20conta.%0D%0A%0D%0ACNPJ%3A%20%0D%0ARaz%C3%A3o%20Social%3A%20%0D%0AE-mail%20da%20conta%3A%20%0D%0A%0D%0AObrigado!"
-              >
-                <Mail className="mr-2 size-4" />
-                Enviar e-mail
-              </a>
+            <Button
+              onClick={() => {
+                window.location.href =
+                  "mailto:suporte@dfeaxis.com.br?subject=Solicita%C3%A7%C3%A3o%20de%20libera%C3%A7%C3%A3o%20-%20Ambiente%20de%20Produ%C3%A7%C3%A3o&body=Ol%C3%A1%20DFeAxis%2C%0D%0A%0D%0AGostaria%20de%20solicitar%20a%20libera%C3%A7%C3%A3o%20do%20Ambiente%20de%20Produ%C3%A7%C3%A3o%20para%20a%20minha%20conta.%0D%0A%0D%0ACNPJ%3A%20%0D%0ARaz%C3%A3o%20Social%3A%20%0D%0AE-mail%20da%20conta%3A%20%0D%0A%0D%0AObrigado!"
+              }}
+            >
+              <Mail className="mr-2 size-4" />
+              Enviar e-mail
             </Button>
           </DialogFooter>
         </DialogContent>
