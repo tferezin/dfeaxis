@@ -19,7 +19,8 @@ export default function BillingPage() {
 function BillingPageInner() {
   const search = useSearchParams()
   const checkoutResult = search?.get("checkout")
-  const { subscriptionStatus } = useTrial()
+  const planChanged = search?.get("plan_changed")
+  const { subscriptionStatus, stripePriceId } = useTrial()
   const [error, setError] = React.useState<string | null>(null)
 
   const isActive = subscriptionStatus === "active"
@@ -34,6 +35,19 @@ function BillingPageInner() {
             <p className="font-semibold">Pagamento confirmado!</p>
             <p className="text-xs text-emerald-700">
               Sua assinatura está ativa. A captura automática foi liberada.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Success banner after plan change */}
+      {planChanged === "success" && (
+        <div className="mb-6 flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+          <CheckCircle2 className="size-5 text-emerald-600" />
+          <div>
+            <p className="font-semibold">Plano alterado com sucesso!</p>
+            <p className="text-xs text-emerald-700">
+              A próxima fatura já refletirá o novo plano (com prorata aplicada).
             </p>
           </div>
         </div>
@@ -71,7 +85,11 @@ function BillingPageInner() {
         </div>
       )}
 
-      <PricingTable onError={setError} />
+      <PricingTable
+        onError={setError}
+        subscriptionStatus={subscriptionStatus}
+        currentPriceId={stripePriceId}
+      />
 
       <p className="mt-8 text-center text-xs text-slate-500">
         Precisa de mais de 50 CNPJs ou termos personalizados?{" "}

@@ -24,6 +24,8 @@ interface TrialStatus {
   pastDueDaysRemaining: number | null
   /** true = cliente no soft block (past_due ha mais de 5 dias) */
   isPaymentBlocked: boolean
+  /** Stripe price_id do plano atual (apenas pra subscriptionStatus=active|past_due). */
+  stripePriceId: string | null
   loading: boolean
 }
 
@@ -40,6 +42,7 @@ export function useTrial(): TrialStatus {
     pastDueSince: null,
     pastDueDaysRemaining: null,
     isPaymentBlocked: false,
+    stripePriceId: null,
     loading: true,
   })
 
@@ -59,7 +62,7 @@ export function useTrial(): TrialStatus {
         const { data, error } = await sb
           .from("tenants")
           .select(
-            "trial_active, trial_expires_at, subscription_status, docs_consumidos_trial, trial_cap, trial_blocked_reason, current_period_end, past_due_since"
+            "trial_active, trial_expires_at, subscription_status, docs_consumidos_trial, trial_cap, trial_blocked_reason, current_period_end, past_due_since, stripe_price_id"
           )
           .eq("user_id", user.id)
           .single()
@@ -101,6 +104,7 @@ export function useTrial(): TrialStatus {
           pastDueSince: pastDueRaw,
           pastDueDaysRemaining,
           isPaymentBlocked,
+          stripePriceId: ((data as Record<string, unknown>).stripe_price_id as string | null) ?? null,
           loading: false,
         })
       } catch {

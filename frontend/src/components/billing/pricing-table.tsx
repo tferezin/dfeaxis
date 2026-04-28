@@ -10,6 +10,7 @@ import {
   getPerMonthCents,
   getPriceId,
   createCheckoutSession,
+  changePlan,
   listPlans,
 } from "@/lib/billing"
 
@@ -18,13 +19,28 @@ interface PricingTableProps {
   popular?: string
   /** Callback quando ocorre erro no checkout */
   onError?: (msg: string) => void
+  /** Se o tenant ja paga ('active' ou 'past_due'), usamos /change-plan em vez
+   *  de /checkout — caso contrario o cliente acaba com 2 subscriptions na Stripe.
+   *  Default: undefined (cliente novo, fluxo de checkout). */
+  subscriptionStatus?: string | null
+  /** price_id do plano atual do cliente (se pagante) — usado pra desabilitar
+   *  botao do plano atual e indicar visualmente. */
+  currentPriceId?: string | null
 }
 
-export function PricingTable({ popular = "business", onError }: PricingTableProps) {
+export function PricingTable({
+  popular = "business",
+  onError,
+  subscriptionStatus,
+  currentPriceId,
+}: PricingTableProps) {
   const [plans, setPlans] = React.useState<Plan[]>([])
   const [loading, setLoading] = React.useState(true)
   const [period, setPeriod] = React.useState<BillingPeriod>("monthly")
   const [checkoutLoading, setCheckoutLoading] = React.useState<string | null>(null)
+
+  const isExistingSubscriber =
+    subscriptionStatus === "active" || subscriptionStatus === "past_due"
 
   React.useEffect(() => {
     listPlans()
@@ -36,7 +52,24 @@ export function PricingTable({ popular = "business", onError }: PricingTableProp
       .finally(() => setLoading(false))
   }, [onError])
 
-  const handleCheckout = async (plan: Plan) => {
+  // Extrai mensagem amigavel do erro do backend. apiFetch encapsula como
+  // `Error("API error {status}: {body}")` e o body eh JSON com `detail`.
+  const extractBackendMessage = (err: unknown, fallback: string): string => {
+    if (!(err instanceof Error)) return fallback
+    const match = err.message.match(/^API error \d+:\s*(.+)$/)
+    if (!match) return err.message || fallback
+    try {
+      const parsed = JSON.parse(match[1])
+      const detail = parsed?.detail
+      if (typeof detail === "string" && detail) return detail
+      if (detail && typeof detail.message === "string") return detail.message
+    } catch {
+      /* body nao era JSON */
+    }
+    return fallback
+  }
+
+  const handleSelectPlan = async (plan: Plan) => {
     const priceId = getPriceId(plan, period)
     if (!priceId) {
       onError?.("Plano sem price configurado. Rode o seed do Stripe.")
@@ -44,7 +77,16 @@ export function PricingTable({ popular = "business", onError }: PricingTableProp
     }
     setCheckoutLoading(plan.key)
     try {
-      // Billing day pode ter sido escolhido no overlay de trial expirado.
+      if (isExistingSubscriber) {
+        // Cliente ja pagante → /billing/change-plan via Stripe.Subscription.modify
+        await changePlan(priceId)
+        // Sucesso — recarrega pra refletir novo plano (subscription_status,
+        // max_cnpjs, docs_included etc vem via webhook)
+        window.location.href = "/financeiro/creditos?plan_changed=success"
+        return
+      }
+
+      // Cliente novo (trial/cancelled/expired) → /billing/checkout
       let billingDay: number | undefined
       if (typeof window !== "undefined") {
         const stored = window.sessionStorage.getItem("dfeaxis:billing_day")
@@ -56,8 +98,8 @@ export function PricingTable({ popular = "business", onError }: PricingTableProp
       const session = await createCheckoutSession(priceId, billingDay)
       window.location.href = session.url
     } catch (e) {
-      console.error("Checkout failed", e)
-      onError?.(e instanceof Error ? e.message : "Erro ao iniciar checkout")
+      console.error("Plan selection failed", e)
+      onError?.(extractBackendMessage(e, "Erro ao processar plano"))
       setCheckoutLoading(null)
     }
   }
@@ -129,6 +171,12 @@ export function PricingTable({ popular = "business", onError }: PricingTableProp
           const isPopular = plan.key === popular
           const monthlyCents = getPerMonthCents(plan, period)
           const isLoading = checkoutLoading === plan.key
+          const planPriceId = getPriceId(plan, period)
+          const isCurrentPlan =
+            isExistingSubscriber &&
+            !!currentPriceId &&
+            !!planPriceId &&
+            currentPriceId === planPriceId
 
           return (
             <div
@@ -171,10 +219,12 @@ export function PricingTable({ popular = "business", onError }: PricingTableProp
 
               <button
                 type="button"
-                onClick={() => handleCheckout(plan)}
-                disabled={isLoading}
+                onClick={() => handleSelectPlan(plan)}
+                disabled={isLoading || isCurrentPlan}
                 className={`mt-6 inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                  isPopular
+                  isCurrentPlan
+                    ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : isPopular
                     ? "bg-emerald-600 text-white hover:bg-emerald-700"
                     : "border border-slate-200 bg-white text-slate-900 hover:bg-slate-50"
                 }`}
@@ -182,8 +232,12 @@ export function PricingTable({ popular = "business", onError }: PricingTableProp
                 {isLoading ? (
                   <>
                     <Loader2 className="size-4 animate-spin" />
-                    Redirecionando...
+                    {isExistingSubscriber ? "Alterando..." : "Redirecionando..."}
                   </>
+                ) : isCurrentPlan ? (
+                  "Plano atual"
+                ) : isExistingSubscriber ? (
+                  `Mudar para ${plan.name}`
                 ) : (
                   "Assinar agora"
                 )}
