@@ -85,7 +85,10 @@ export default function ConfiguracoesPage() {
     try {
       await apiFetch("/tenants/settings", {
         method: "PATCH",
-        body: JSON.stringify({ sefaz_ambiente: parseInt(next, 10) }),
+        // Backend valida `sefaz_ambiente: str = Body(pattern=r"^(1|2)$")` —
+        // tem que enviar STRING, não number, senão retorna 422 antes mesmo
+        // dos guards de produção (admin, cert, captura).
+        body: JSON.stringify({ sefaz_ambiente: next }),
       })
     } catch (e) {
       console.error("[DFeAxis] Falha ao persistir ambiente no backend:", e)
