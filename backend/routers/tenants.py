@@ -184,10 +184,10 @@ async def update_settings(
                 raise HTTPException(
                     status_code=403,
                     detail=(
-                        "Acesso à produção SEFAZ ainda não liberado pra esta "
-                        "conta. Entre em contato com o suporte DFeAxis para "
-                        "concluir o onboarding técnico antes de ativar "
-                        "produção. (contato@dfeaxis.com.br)"
+                        "Sua conta ainda não foi liberada para captura em "
+                        "Produção. Envie um e-mail para contato@dfeaxis.com.br "
+                        "solicitando a liberação — nossa equipe revisa o setup "
+                        "do seu CNPJ e certificado e habilita o ambiente."
                     ),
                 )
 
