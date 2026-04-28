@@ -185,7 +185,7 @@ async def update_settings(
                     status_code=403,
                     detail=(
                         "Sua conta ainda não foi liberada para captura em "
-                        "Produção. Envie um e-mail para contato@dfeaxis.com.br "
+                        "Produção. Envie um e-mail para suporte@dfeaxis.com.br "
                         "solicitando a liberação — nossa equipe revisa o setup "
                         "do seu CNPJ e certificado e habilita o ambiente."
                     ),
