@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from config import settings
+from db.supabase import get_supabase_client
 from middleware.security import verify_jwt_token
 from services.billing import (
     create_checkout_session,
@@ -21,6 +22,7 @@ from services.billing import (
     handle_webhook_event,
     load_plans,
 )
+from services.billing.plans import get_plan_by_price_id
 
 logger = logging.getLogger("dfeaxis.routers.billing")
 
@@ -105,6 +107,34 @@ async def checkout(
                 "error_code": "INVALID_BILLING_DAY",
             },
         )
+
+    # Gate proativo: bloqueia escolha de plano com max_cnpjs menor que CNPJs
+    # ja cadastrados. Espelha o gate de certificates.py:146 mas no momento da
+    # escolha, evitando cliente pagar plano errado e ficar sem conseguir
+    # adicionar/operar os CNPJs que ja tem. Downgrade via Customer Portal eh
+    # tratado em config separada (Stripe Dashboard).
+    target = get_plan_by_price_id(body.price_id)
+    if target is not None:
+        sb = get_supabase_client()
+        cert_count = sb.table("certificates").select(
+            "id", count="exact"
+        ).eq("tenant_id", tenant_id).eq("is_active", True).execute().count or 0
+        if cert_count > target.plan.max_cnpjs:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "message": (
+                        f"Voce tem {cert_count} CNPJs cadastrados, mas o plano "
+                        f"{target.plan.name} permite ate {target.plan.max_cnpjs}. "
+                        "Escolha um plano compativel ou remova certificados antes."
+                    ),
+                    "error_code": "PLAN_CNPJ_LIMIT_EXCEEDED",
+                    "cnpj_count": cert_count,
+                    "plan_max_cnpjs": target.plan.max_cnpjs,
+                    "plan_key": target.plan.key,
+                },
+            )
+
     try:
         session = create_checkout_session(
             tenant_id=tenant_id,
