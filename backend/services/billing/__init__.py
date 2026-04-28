@@ -29,6 +29,7 @@ from .portal import create_portal_session
 from .subscriptions import sync_subscription_to_db
 from .webhooks import handle_webhook_event
 from .plans import load_plans, get_plan_by_price_id
+from .change_plan import change_subscription_plan, ChangePlanError
 
 __all__ = [
     "get_stripe",
@@ -39,4 +40,6 @@ __all__ = [
     "handle_webhook_event",
     "load_plans",
     "get_plan_by_price_id",
+    "change_subscription_plan",
+    "ChangePlanError",
 ]

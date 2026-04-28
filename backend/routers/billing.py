@@ -17,6 +17,8 @@ from config import settings
 from db.supabase import get_supabase_client
 from middleware.security import verify_jwt_token
 from services.billing import (
+    ChangePlanError,
+    change_subscription_plan,
     create_checkout_session,
     create_portal_session,
     handle_webhook_event,
@@ -161,6 +163,75 @@ async def checkout(
         raise HTTPException(status_code=500, detail="Erro ao criar sessao de checkout")
 
     return CheckoutResponse(session_id=session["id"], url=session["url"])
+
+
+# ---------------------------------------------------------------------------
+# Authenticated: change plan (existing subscriber)
+# ---------------------------------------------------------------------------
+
+class ChangePlanRequest(BaseModel):
+    price_id: str = Field(..., description="Novo Stripe Price ID (price_...)")
+
+
+class ChangePlanResponseModel(BaseModel):
+    subscription_id: str
+    new_price_id: str
+    previous_price_id: str | None = None
+    status: str | None = None
+    plan_key: str | None = None
+
+
+@router.post(
+    "/billing/change-plan",
+    response_model=ChangePlanResponseModel,
+    status_code=200,
+)
+async def change_plan(
+    body: ChangePlanRequest,
+    auth: dict = Depends(verify_jwt_token),
+):
+    """Troca o plano da assinatura ATIVA do tenant via Stripe.Subscription.modify.
+
+    Usado quando o cliente ja paga e quer upgrade/downgrade. Aplica o mesmo
+    gate de `/billing/checkout` (count de CNPJs vs max_cnpjs do plano alvo).
+
+    Cliente que ainda nao paga (sem stripe_subscription_id) recebe 400 e deve
+    usar /billing/checkout. Cliente cancelled/expired tambem volta pro checkout.
+    """
+    tenant_id = auth["tenant_id"]
+    try:
+        result = change_subscription_plan(
+            tenant_id=tenant_id,
+            new_price_id=body.price_id,
+        )
+    except ChangePlanError as exc:
+        # NOT_A_SUBSCRIBER e SAME_PLAN sao 400 (input do cliente);
+        # PLAN_CNPJ_LIMIT_EXCEEDED e 422 (regra de negocio violada);
+        # SUBSCRIPTION_INACTIVE e 409 (estado invalido).
+        status_map = {
+            "NOT_A_SUBSCRIBER": 400,
+            "INVALID_PRICE_ID": 400,
+            "SAME_PLAN": 400,
+            "PLAN_CNPJ_LIMIT_EXCEEDED": 422,
+            "SUBSCRIPTION_INACTIVE": 409,
+            "SUBSCRIPTION_INVALID_STATE": 500,
+        }
+        raise HTTPException(
+            status_code=status_map.get(exc.code, 400),
+            detail={
+                "message": exc.message,
+                "error_code": exc.code,
+                **exc.extra,
+            },
+        )
+    except RuntimeError:
+        logger.exception("change-plan: Stripe nao configurado pra tenant %s", tenant_id)
+        raise HTTPException(status_code=503, detail="Servico de pagamento indisponivel")
+    except Exception:
+        logger.exception("change-plan failed for tenant %s", tenant_id)
+        raise HTTPException(status_code=500, detail="Erro ao trocar plano")
+
+    return ChangePlanResponseModel(**result)
 
 
 # ---------------------------------------------------------------------------
