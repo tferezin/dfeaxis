@@ -53,6 +53,27 @@ export async function createPortalSession(): Promise<{
   })
 }
 
+export interface ChangePlanResponse {
+  subscription_id: string
+  new_price_id: string
+  previous_price_id: string | null
+  status: string | null
+  plan_key: string | null
+}
+
+/** Troca o plano da assinatura ATIVA via Stripe.Subscription.modify.
+ *
+ *  Use SOMENTE quando o tenant ja tem assinatura ativa (status='active'
+ *  ou 'past_due'). Pra cliente novo (trial), use createCheckoutSession.
+ *  Backend bloqueia 422 PLAN_CNPJ_LIMIT_EXCEEDED se count_certs > max_cnpjs
+ *  do plano alvo. */
+export async function changePlan(priceId: string): Promise<ChangePlanResponse> {
+  return apiFetch<ChangePlanResponse>("/billing/change-plan", {
+    method: "POST",
+    body: JSON.stringify({ price_id: priceId }),
+  })
+}
+
 /** Formats cents → BRL string. */
 export function formatBRL(cents: number): string {
   return new Intl.NumberFormat("pt-BR", {
