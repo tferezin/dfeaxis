@@ -5,6 +5,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
+import { apiFetch } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -41,6 +42,33 @@ export default function LoginPage() {
           setError(authError.message)
         }
         return
+      }
+
+      // Cobre o gap do signup quando email confirmation está ativo:
+      // o /tenants/register só roda no signup se data.session existir, mas
+      // com confirmação por e-mail a session só vem no first login. Sem
+      // essa chamada, o user fica preso (auth user sem tenant → 403 em tudo).
+      // Endpoint é idempotente (retorna already_exists se já tiver tenant).
+      try {
+        const meta = (data.user?.user_metadata ?? {}) as {
+          name?: string
+          phone?: string
+          ga_client_id?: string
+        }
+        await apiFetch("/tenants/register", {
+          method: "POST",
+          body: JSON.stringify({
+            company_name: meta.name || data.user?.email || "Cliente DFeAxis",
+            email: data.user?.email,
+            phone: meta.phone || null,
+            ga_client_id: meta.ga_client_id || null,
+          }),
+        })
+      } catch (registerErr) {
+        // Não bloqueia login — backend retorna 201/already_exists no caso
+        // comum. Falha real (rede, etc) o middleware vai sinalizar nas
+        // próximas requests.
+        console.warn("[DFeAxis] tenant register check on login:", registerErr)
       }
 
       // Full reload to ensure cookies are sent to middleware

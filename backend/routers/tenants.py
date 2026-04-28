@@ -191,6 +191,40 @@ async def update_settings(
                     ),
                 )
 
+        # Guard 3: tenant precisa ter pelo menos 1 certificado A1 cadastrado.
+        # Sem cert nao tem como autenticar SOAP na SEFAZ — a "ativacao" nao
+        # serviria pra nada e ainda permitiria virar prod por engano antes
+        # de configurar o ambiente.
+        cert_res = sb.table("certificates").select(
+            "id", count="exact"
+        ).eq("tenant_id", auth["tenant_id"]).limit(1).execute()
+        cert_count = cert_res.count if cert_res.count is not None else len(cert_res.data or [])
+        if cert_count < 1:
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "Cadastre pelo menos um certificado A1 antes de ativar "
+                    "Produção. (Menu Cadastros → Certificados A1)"
+                ),
+            )
+
+        # Guard 4: tenant precisa ter realizado pelo menos 1 captura em
+        # Homologacao antes de virar prod. Garante que o setup foi testado
+        # end-to-end (cert valido, CNPJ certo, SOAP respondendo) sem o risco
+        # de uma primeira tentativa quebrar em prod e gerar consumo indevido.
+        docs_res = sb.table("documents").select(
+            "id", count="exact"
+        ).eq("tenant_id", auth["tenant_id"]).limit(1).execute()
+        docs_count = docs_res.count if docs_res.count is not None else len(docs_res.data or [])
+        if docs_count < 1:
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "Realize pelo menos uma captura em Homologação antes de "
+                    "ativar Produção. (Menu Execução → Captura Manual)"
+                ),
+            )
+
     result = sb.table("tenants").update(updates).eq(
         "id", auth["tenant_id"]
     ).execute()

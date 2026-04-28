@@ -150,8 +150,26 @@ export default function ConfiguracoesPage() {
       setProdModalOpen(false)
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
-    } catch {
-      setProdError("Não foi possível ativar Produção. Tente novamente.")
+    } catch (err: unknown) {
+      // Backend devolve mensagens explicativas (sem certificado, sem captura
+      // em homolog, prod_access não aprovada, etc.) no campo `detail`. O
+      // apiFetch encapsula como `Error("API error {status}: {body}")` —
+      // extraimos o detail pra mostrar pro usuário.
+      let message = "Não foi possível ativar Produção. Tente novamente."
+      if (err instanceof Error) {
+        const match = err.message.match(/^API error \d+:\s*(.+)$/)
+        if (match) {
+          try {
+            const parsed = JSON.parse(match[1])
+            if (typeof parsed?.detail === "string" && parsed.detail.length > 0) {
+              message = parsed.detail
+            }
+          } catch {
+            // body não era JSON — usa fallback
+          }
+        }
+      }
+      setProdError(message)
     } finally {
       setProdSubmitting(false)
     }
