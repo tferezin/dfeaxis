@@ -162,7 +162,9 @@ export default function CapturaManualPage() {
     .filter(([, v]) => v)
     .map(([k]) => k)
 
-  const cleanCnpj = cnpj.replace(/\D/g, "")
+  // Aceita CNPJ numerico tradicional e alfanumerico (Reforma Tributaria, jul/2026):
+  // mantem letras, remove apenas formatacao, normaliza pra uppercase.
+  const cleanCnpj = cnpj.replace(/[^A-Za-z0-9]/g, "").toUpperCase()
 
   const getBackendUrl = () => {
     const raw = process.env.NEXT_PUBLIC_API_URL || "https://dfeaxis-production.up.railway.app"
