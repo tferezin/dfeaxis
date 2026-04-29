@@ -66,13 +66,18 @@ class DocumentMetadata:
 
 
 def _clean_cnpj(raw: str | None) -> Optional[str]:
-    """Remove não-dígitos e valida que sobraram 14 chars. None se inválido."""
+    """Remove formatacao e valida 14 caracteres alfanumericos. None se invalido.
+
+    Aceita CNPJ numerico tradicional e alfanumerico (Reforma Tributaria,
+    vigente jul/2026): 12 primeiros [A-Z0-9] + 2 ultimos digitos (DV).
+    Letras minusculas sao normalizadas pra maiusculas.
+    """
     if not raw:
         return None
-    digits = re.sub(r"\D", "", raw)
-    if len(digits) != 14:
+    cleaned = re.sub(r"[.\-/\s]", "", raw).upper()
+    if not re.fullmatch(r"[A-Z0-9]{12}[0-9]{2}", cleaned):
         return None
-    return digits
+    return cleaned
 
 
 def _find_text(root: etree._Element, xpath: str, ns: dict) -> Optional[str]:

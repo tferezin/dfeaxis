@@ -19,18 +19,20 @@ logger = logging.getLogger(__name__)
 def mask_cnpj(cnpj: str) -> str:
     """Mask CNPJ for safe logging.
 
-    Formatted:   01.786.983/0003-68 -> XX.XXX.XXX/0003-XX
-    Unformatted: 01786983000368     -> XXXXXXXX0003XX
+    Aceita CNPJ numerico tradicional e alfanumerico (Reforma Tributaria, jul/2026):
+    Formatado numerico:    01.786.983/0003-68 -> XX.XXX.XXX/0003-XX
+    Numerico unformatted:  01786983000368     -> XXXXXXXX0003XX
+    Alfanumerico:          AB12CD34000156     -> XXXXXXXX0001XX
     """
-    # Strip formatting
-    digits = re.sub(r"[.\-/]", "", cnpj.strip())
-    if len(digits) != 14:
+    # Strip formatting e normaliza case
+    cleaned = re.sub(r"[.\-/]", "", cnpj.strip()).upper()
+    if not re.fullmatch(r"[A-Z0-9]{12}[0-9]{2}", cleaned):
         return "CNPJ_INVALID"
     # Keep only filial (positions 8-11), mask the rest
-    masked = "X" * 8 + digits[8:12] + "X" * 2
+    masked = "X" * 8 + cleaned[8:12] + "X" * 2
     # If the original was formatted, return formatted
     if "/" in cnpj or "." in cnpj:
-        return f"XX.XXX.XXX/{digits[8:12]}-XX"
+        return f"XX.XXX.XXX/{cleaned[8:12]}-XX"
     return masked
 
 
@@ -101,10 +103,13 @@ def audit_log(
 # Regex patterns for sensitive data detection
 # ---------------------------------------------------------------------------
 
-# CNPJ: 14 consecutive digits (unformatted) or XX.XXX.XXX/XXXX-XX
-_CNPJ_UNFORMATTED_RE = re.compile(r"\b(\d{14})\b")
+# CNPJ: 14 caracteres alfanumericos (12 primeiros [A-Z0-9] + 2 digitos DV)
+# Aceita numerico tradicional e alfanumerico (Reforma Tributaria, jul/2026).
+# Case-insensitive porque logs podem conter o CNPJ em qualquer case.
+_CNPJ_UNFORMATTED_RE = re.compile(r"\b([A-Z0-9]{12}\d{2})\b", re.IGNORECASE)
 _CNPJ_FORMATTED_RE = re.compile(
-    r"\b(\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2})\b"
+    r"\b([A-Z0-9]{2}\.[A-Z0-9]{3}\.[A-Z0-9]{3}/[A-Z0-9]{4}-\d{2})\b",
+    re.IGNORECASE,
 )
 
 # Email

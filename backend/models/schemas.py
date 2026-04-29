@@ -12,31 +12,41 @@ from pydantic import BaseModel, BeforeValidator, Field
 def _validate_cnpj(value: str) -> str:
     """Valida CNPJ com checksum mod 11.
 
-    Aceita com ou sem formatacao (pontos, barra, hifen).
-    Retorna apenas os 14 digitos.
+    Aceita CNPJ numerico tradicional (14 digitos) e alfanumerico
+    instituido pela Reforma Tributaria (vigente a partir de jul/2026):
+    12 primeiras posicoes em [A-Z0-9], 2 ultimas (DV) sempre numericas.
+
+    Aceita com ou sem formatacao (pontos, barra, hifen). Letras minusculas
+    sao normalizadas pra maiusculas. Retorna 14 caracteres uppercase sem
+    formatacao.
     """
-    # Strip formatting characters
-    cleaned = re.sub(r"[.\-/]", "", str(value).strip())
+    # Strip formatting characters e normaliza pra uppercase
+    cleaned = re.sub(r"[.\-/]", "", str(value).strip()).upper()
 
-    if not cleaned.isdigit() or len(cleaned) != 14:
-        raise ValueError("CNPJ deve conter exatamente 14 digitos")
+    # Aceita 12 primeiras alfanumericas + 2 ultimas (DV) numericas
+    if not re.fullmatch(r"[A-Z0-9]{12}[0-9]{2}", cleaned):
+        raise ValueError(
+            "CNPJ deve conter 14 caracteres (12 alfanumericos + 2 digitos verificadores)"
+        )
 
-    # Rejeita CNPJs com todos os digitos iguais (ex: 00000000000000)
+    # Rejeita CNPJs com todos os caracteres iguais (ex: 00000000000000)
     if len(set(cleaned)) == 1:
         raise ValueError("CNPJ invalido")
 
-    # Calcula primeiro digito verificador
+    # Algoritmo do DV usa ord(c) - 48 (NT 2025.001 RFB):
+    # - Para digitos '0'-'9': ord('0')=48 -> 0, ord('9')=57 -> 9 (idem int(c))
+    # - Para letras 'A'-'Z': ord('A')=65 -> 17, ord('Z')=90 -> 42
+    # CNPJs numericos atuais validam IDENTICO ao algoritmo anterior.
     weights_1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
-    total = sum(int(cleaned[i]) * weights_1[i] for i in range(12))
+    total = sum((ord(cleaned[i]) - 48) * weights_1[i] for i in range(12))
     remainder = total % 11
     digit_1 = 0 if remainder < 2 else 11 - remainder
 
     if int(cleaned[12]) != digit_1:
         raise ValueError("CNPJ invalido: digito verificador incorreto")
 
-    # Calcula segundo digito verificador
     weights_2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
-    total = sum(int(cleaned[i]) * weights_2[i] for i in range(13))
+    total = sum((ord(cleaned[i]) - 48) * weights_2[i] for i in range(13))
     remainder = total % 11
     digit_2 = 0 if remainder < 2 else 11 - remainder
 

@@ -38,8 +38,11 @@ function getValidityColor(days: number) {
 }
 
 function formatCnpj(cnpj: string) {
-  if (cnpj.length !== 14) return cnpj
-  return `${cnpj.slice(0,2)}.${cnpj.slice(2,5)}.${cnpj.slice(5,8)}/${cnpj.slice(8,12)}-${cnpj.slice(12)}`
+  // Aceita CNPJ numerico tradicional e alfanumerico (Reforma Tributaria, jul/2026).
+  // Mascara identica pros dois: AB.123.456/789D-12 ou 12.345.678/0001-95.
+  const cleaned = cnpj.replace(/[^A-Za-z0-9]/g, "").toUpperCase()
+  if (cleaned.length !== 14) return cnpj
+  return `${cleaned.slice(0,2)}.${cleaned.slice(2,5)}.${cleaned.slice(5,8)}/${cleaned.slice(8,12)}-${cleaned.slice(12)}`
 }
 
 export default function CertificadosPage() {
@@ -92,7 +95,8 @@ export default function CertificadosPage() {
     try {
       const form = new FormData()
       form.append("pfx_file", file)
-      form.append("cnpj", formCnpj.replace(/\D/g, ""))
+      // Aceita CNPJ alfanumerico (Reforma Tributaria, jul/2026): mantem letras
+      form.append("cnpj", formCnpj.replace(/[^A-Za-z0-9]/g, "").toUpperCase())
       form.append("senha", formSenha)
       form.append("polling_mode", "manual")
 
