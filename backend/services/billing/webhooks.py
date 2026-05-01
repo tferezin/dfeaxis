@@ -334,12 +334,45 @@ def _fire_ga4_purchase(
                     else lookup.plan.monthly_amount_cents
                 )
 
-    if amount_total_cents is None:
-        amount_total_cents = 0
+    transaction_id = subscription.get("id") or session.get("id") or "unknown"
+
+    # Guard 4 — não disparar GA4 sem valor concreto. Conversão sem `value`
+    # cai no fallback hardcoded da conversion action no painel do Ads
+    # (ex: "Se não houver um valor, use R$ 1") e polui o Smart Bidding com
+    # ticket inventado. Melhor descartar e investigar o caller pelo log.
+    if amount_total_cents is None or amount_total_cents <= 0:
+        logger.warning(
+            "ga4_purchase_skipped_no_amount transaction_id=%s session_id=%s "
+            "subscription_id=%s tenant_id=%s mode=%s livemode=%s price_id=%s",
+            transaction_id,
+            session.get("id"),
+            subscription.get("id"),
+            tenant_id,
+            session.get("mode"),
+            session.get("livemode"),
+            price_id,
+        )
+        return
 
     value_reais = round(amount_total_cents / 100.0, 2)
 
-    transaction_id = subscription.get("id") or session.get("id") or "unknown"
+    # Instrumentação: log do payload completo de cada disparo. Permite
+    # auditar quem chamou _fire_ga4_purchase e cruzar com transaction_id
+    # do GA4/Ads quando aparecer divergência.
+    logger.info(
+        "ga4_purchase_dispatch transaction_id=%s value=%.2f currency=%s "
+        "session_id=%s mode=%s livemode=%s tenant_id=%s ga_client_id=%s "
+        "item_id=%s",
+        transaction_id,
+        value_reais,
+        currency,
+        session.get("id"),
+        session.get("mode"),
+        session.get("livemode"),
+        tenant_id,
+        "present" if ga_client_id else "missing",
+        item_id,
+    )
 
     send_purchase_event(
         client_id=ga_client_id,
