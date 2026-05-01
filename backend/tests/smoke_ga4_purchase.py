@@ -6,12 +6,17 @@ Analytics aceita o payload.
 
 Como rodar:
     cd backend && source venv/bin/activate
-    python tests/smoke_ga4_purchase.py
+    DFEAXIS_ALLOW_SMOKE_TEST=true python tests/smoke_ga4_purchase.py
 
 O que esperar:
     - Resposta HTTP 204 do endpoint MP
     - Mensagem "✓ EVENTO ACEITO pelo GA4"
     - Em ~30s o evento aparece em GA4 → Tempo Real com transaction_id="smoke-test-..."
+
+IMPORTANTE: este script dispara um evento `purchase` REAL no GA4 da
+propriedade configurada via GA4_MEASUREMENT_ID. Rodar contra a propriedade
+de produção polui o histórico (já aconteceu uma vez — ver memória do
+projeto). Por isso exigimos opt-in explícito via DFEAXIS_ALLOW_SMOKE_TEST=true.
 """
 
 from __future__ import annotations
@@ -37,6 +42,21 @@ def main() -> int:
     print("GA4 Measurement Protocol — smoke test")
     print("=" * 70)
     print()
+
+    # Guard 6 — opt-in explícito. Sem esse flag, o smoke test não roda.
+    # Razão: este script dispara purchase real no GA4 e já poluiu prod 1x
+    # (transaction_id "smoke-test-34d5df82" R$ 290 em 28/04/2026).
+    if os.getenv("DFEAXIS_ALLOW_SMOKE_TEST", "").lower() != "true":
+        print("✗ Smoke test bloqueado.")
+        print()
+        print("  Este script dispara um evento `purchase` REAL no GA4.")
+        print("  Pra autorizar, defina a env var explicitamente:")
+        print()
+        print("    DFEAXIS_ALLOW_SMOKE_TEST=true python tests/smoke_ga4_purchase.py")
+        print()
+        print("  Use APENAS contra GA4 de homologação/teste — nunca em prod.")
+        return 1
+
 
     # Config check
     measurement_id = settings.ga4_measurement_id
